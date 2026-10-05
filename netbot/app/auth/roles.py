@@ -1,13 +1,13 @@
 """Roles predeterminados y comprobación de permisos."""
 
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 from typing import AbstractSet
 
 from .permissions import Permission
 
 
-class RoleName(StrEnum):
+class RoleName(str, Enum):
     ADMIN = "admin"
     OPERADOR = "operador"
     VISOR = "visor"
@@ -59,4 +59,8 @@ DEFAULT_ROLES: dict[RoleName, Role] = {
 
 def has_permission(roles: AbstractSet[RoleName], permission: Permission) -> bool:
     """Indica si alguno de los roles asignados concede el permiso."""
-    return any(permission in DEFAULT_ROLES[role].permissions for role in roles)
+    return any(
+        permission in DEFAULT_ROLES[role].permissions
+        for role in roles
+        if role in DEFAULT_ROLES
+    )
