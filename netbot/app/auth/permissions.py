@@ -1,9 +1,9 @@
 """Permisos de la aplicación."""
 
-from enum import StrEnum
+from enum import Enum
 
 
-class Permission(StrEnum):
+class Permission(str, Enum):
     USERS_READ = "users:read"
     USERS_MANAGE = "users:manage"
     ROLES_MANAGE = "roles:manage"

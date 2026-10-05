@@ -17,6 +17,13 @@ class Settings(BaseSettings):
 
     app_name: str = "Netbot"
     environment: str = "development"
+    database_url: str = "sqlite:///./netbot.db"
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    admin_email: str | None = None
+    admin_password: str | None = None
 
     # --- Monitoreo (Épica 002) ---
     # "mock" es el valor por defecto: el entorno local no tiene hardware de red.
@@ -75,3 +82,6 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
