@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     admin_email: Optional[str] = None
     admin_password: Optional[str] = None
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,null"
 
     # --- Monitoreo (Épica 002) ---
     # "mock" es el valor por defecto: el entorno local no tiene hardware de red.

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f1e8" />
+    <title>Netbot | Centro de monitoreo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section class="login-screen" id="login-screen">
+      <div class="login-aside">
+        <div class="brand login-brand">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div><strong>netbot</strong><small>network intelligence</small></div>
+        </div>
+        <div class="login-aside-copy"><p class="eyebrow">CENTRO DE MONITOREO</p><h1>Tu red,<br /><em>bajo control.</em></h1><p>Observa el estado de tu infraestructura y responde antes de que un incidente se convierta en un problema.</p></div>
+        <div class="login-aside-footer"><span class="status-dot"></span><span>Sistema de monitoreo operativo</span><span class="login-version">v0.1.0</span></div>
+      </div>
+      <div class="login-form-wrap">
+        <form class="login-form" id="login-form">
+          <p class="eyebrow">BIENVENIDO DE VUELTA</p>
+          <h2>Iniciar sesion</h2>
+          <p class="login-copy">Ingresa tus credenciales para acceder al centro de monitoreo.</p>
+          <label for="email">Correo electronico</label>
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="nombre@empresa.cl" required />
+          <label for="password">Contraseña</label>
+          <div class="password-field"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required /><button type="button" id="toggle-password" aria-label="Mostrar contraseña">Mostrar</button></div>
+          <div class="login-options"><label class="remember-option"><input type="checkbox" id="remember" checked /> <span>Recordar sesion</span></label><a href="#support">¿Necesitas ayuda?</a></div>
+          <p class="login-error" id="login-error" role="alert"></p>
+          <button class="login-submit" type="submit" id="login-submit">Ingresar <span>→</span></button>
+          <p class="login-note">La conexion se realiza de forma segura con la API de Netbot.</p>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell is-hidden" id="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div>
+            <strong>netbot</strong>
+            <small>network intelligence</small>
+          </div>
+        </div>
+
+        <nav class="main-nav" aria-label="Navegacion principal">
+          <p class="nav-label">Workspace</p>
+          <a class="nav-item active" href="#overview"><span class="nav-icon">⌂</span> Resumen</a>
+          <a class="nav-item" href="#interfaces"><span class="nav-icon">⌁</span> Interfaces <b>4</b></a>
+          <a class="nav-item" href="#clients"><span class="nav-icon">◌</span> Clientes</a>
+          <a class="nav-item" href="#firewall"><span class="nav-icon">◇</span> Firewall <b class="alert-count">12</b></a>
+          <p class="nav-label nav-label-spaced">Gestion</p>
+          <a class="nav-item" href="#tickets"><span class="nav-icon">□</span> Tickets <b>3</b></a>
+          <a class="nav-item" href="#settings"><span class="nav-icon">⚙</span> Configuracion</a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="connection-status"><span class="status-dot"></span><span><strong>OPNsense</strong><small>Conectado hace 2 min</small></span></div>
+          <div class="user-profile"><div class="avatar" id="user-avatar">AM</div><span><strong id="user-name">Alex Morgan</strong><small id="user-role">Administrador</small></span><button class="icon-button" id="logout-button" aria-label="Cerrar sesion">↪</button></div>
+        </div>
+      </aside>
+
+      <main class="main-content" id="overview">
+        <header class="topbar">
+          <button class="mobile-menu" aria-label="Abrir navegacion">☰</button>
+          <div class="breadcrumbs"><span>Workspace</span><i>/</i><strong>Resumen</strong></div>
+          <div class="topbar-actions"><span class="last-sync">Ultima sincronizacion <strong id="last-sync">hace 18 s</strong></span><button class="refresh-button" id="refresh-button"><span>↻</span> Actualizar</button><button class="notification-button" aria-label="Ver notificaciones">♢<i></i></button></div>
+        </header>
+
+        <div class="content-wrap">
+          <section class="page-heading">
+            <div><p class="eyebrow">MIERCOLES, 07 OCTUBRE 2026</p><h1>Buenos dias, Alex <span>↗</span></h1><p class="heading-copy">Este es el estado de tu infraestructura en este momento.</p></div>
+            <div class="period-picker"><button class="period active">24 h</button><button class="period">7 dias</button><button class="period">30 dias</button><button class="calendar-button" aria-label="Seleccionar fecha">▣</button></div>
+          </section>
+
+          <section class="stats-grid" aria-label="Indicadores principales">
+            <article class="stat-card accent-lime"><div class="stat-top"><span class="stat-label">SALUD DEL SISTEMA</span><span class="stat-symbol">↗</span></div><div class="stat-value">98.7<span>%</span></div><div class="stat-meta positive"><span>↑ 1.2%</span> vs. periodo anterior</div><div class="sparkline lime"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="stat-card accent-orange"><div class="stat-top"><span class="stat-label">TRAFICO TOTAL</span><span class="stat-symbol">↗</span></div><div class="stat-value">1.84<span> TB</span></div><div class="stat-meta positive"><span>↑ 8.4%</span> vs. periodo anterior</div><div class="sparkline orange"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="stat-card accent-blue"><div class="stat-top"><span class="stat-label">CLIENTES ACTIVOS</span><span class="stat-symbol">↗</span></div><div class="stat-value">247</div><div class="stat-meta neutral"><span>+18</span> desde ayer</div><div class="sparkline blue"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="stat-card accent-red"><div class="stat-top"><span class="stat-label">EVENTOS BLOQUEADOS</span><span class="stat-symbol">↗</span></div><div class="stat-value">12.4<span> k</span></div><div class="stat-meta negative"><span>↓ 3.1%</span> vs. periodo anterior</div><div class="sparkline red"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+          </section>
+
+          <section class="dashboard-grid">
+            <article class="panel traffic-panel" id="interfaces"><div class="panel-heading"><div><p class="panel-kicker">RENDIMIENTO</p><h2>Uso de red</h2></div><div class="legend"><span><i class="legend-dot inbound"></i>Entrada</span><span><i class="legend-dot outbound"></i>Salida</span><button class="more-button" aria-label="Mas opciones">•••</button></div></div><div class="chart-area"><div class="y-axis"><span>800 MB</span><span>600 MB</span><span>400 MB</span><span>200 MB</span><span>0 MB</span></div><div class="chart"><div class="grid-line"></div><div class="grid-line"></div><div class="grid-line"></div><div class="grid-line"></div><div class="grid-line"></div><svg viewBox="0 0 760 190" preserveAspectRatio="none" aria-label="Grafico de trafico de red"><path class="area-fill" d="M0,155 C35,150 45,130 78,142 S125,164 154,135 S210,99 237,120 S278,150 314,108 S355,126 388,91 S432,54 463,84 S495,92 532,55 S574,82 605,44 S653,75 682,49 S720,61 760,23 L760,190 L0,190 Z"></path><path class="line inbound-line" d="M0,155 C35,150 45,130 78,142 S125,164 154,135 S210,99 237,120 S278,150 314,108 S355,126 388,91 S432,54 463,84 S495,92 532,55 S574,82 605,44 S653,75 682,49 S720,61 760,23"></path><path class="line outbound-line" d="M0,174 C35,168 54,177 78,165 S126,150 154,163 S208,145 237,153 S285,165 314,139 S359,153 388,123 S435,134 463,116 S502,130 532,101 S578,120 605,90 S655,111 682,82 S722,99 760,74"></path></svg><div class="x-axis"><span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>Ahora</span></div></div></div></article>
+
+            <article class="panel system-panel"><div class="panel-heading"><div><p class="panel-kicker">INFRAESTRUCTURA</p><h2>Estado del sistema</h2></div><span class="live-badge"><i></i> En vivo</span></div><div class="system-list"><div class="system-row"><div class="system-icon cpu">◒</div><div class="system-name"><strong>CPU</strong><small>Intel Xeon E-2286G</small></div><div class="system-reading"><strong>24<span>%</span></strong><div class="mini-progress"><i style="width:24%"></i></div></div></div><div class="system-row"><div class="system-icon memory">▥</div><div class="system-name"><strong>Memoria</strong><small>6.8 GB de 16 GB</small></div><div class="system-reading"><strong>42<span>%</span></strong><div class="mini-progress"><i style="width:42%"></i></div></div></div><div class="system-row"><div class="system-icon storage">▤</div><div class="system-name"><strong>Almacenamiento</strong><small>182 GB de 512 GB</small></div><div class="system-reading"><strong>35<span>%</span></strong><div class="mini-progress"><i style="width:35%"></i></div></div></div><div class="system-row"><div class="system-icon uptime">◷</div><div class="system-name"><strong>Disponibilidad</strong><small>Ultimos 30 dias</small></div><div class="system-reading"><strong>99.9<span>%</span></strong><div class="mini-progress"><i class="uptime-progress" style="width:99.9%"></i></div></div></div></div></article>
+
+            <article class="panel activity-panel" id="firewall"><div class="panel-heading"><div><p class="panel-kicker">SEGURIDAD</p><h2>Actividad reciente</h2></div><a class="text-link" href="#events">Ver todo <span>→</span></a></div><div class="activity-list"><div class="activity-row"><span class="activity-icon blocked">×</span><div><strong>Conexion bloqueada</strong><small>45.132.98.21 · WAN</small></div><time>hace 2 min</time></div><div class="activity-row"><span class="activity-icon connected">↗</span><div><strong>Nuevo cliente conectado</strong><small>MacBook-Pro-Alex · LAN</small></div><time>hace 8 min</time></div><div class="activity-row"><span class="activity-icon config">◇</span><div><strong>Regla de firewall actualizada</strong><small>Por Alex Morgan · Sistema</small></div><time>hace 21 min</time></div><div class="activity-row"><span class="activity-icon blocked">×</span><div><strong>Escaneo detectado</strong><small>185.220.101.4 · WAN</small></div><time>hace 34 min</time></div></div></article>
+
+            <article class="panel interfaces-panel"><div class="panel-heading"><div><p class="panel-kicker">CONECTIVIDAD</p><h2>Interfaces</h2></div><a class="text-link" href="#interfaces">Administrar <span>→</span></a></div><div class="interfaces-list"><div class="interface-row"><span class="interface-status"></span><div><strong>WAN</strong><small>igc0 · 181.43.22.10</small></div><span class="interface-speed">1 Gb/s</span><span class="interface-traffic">↓ 620 Mb/s</span></div><div class="interface-row"><span class="interface-status"></span><div><strong>LAN</strong><small>igc1 · 192.168.1.1</small></div><span class="interface-speed">1 Gb/s</span><span class="interface-traffic">↓ 284 Mb/s</span></div><div class="interface-row"><span class="interface-status warning"></span><div><strong>GUEST</strong><small>igc1.20 · 192.168.20.1</small></div><span class="interface-speed">100 Mb/s</span><span class="interface-traffic">↓ 42 Mb/s</span></div></div></article>
+          </section>
+
+          <footer class="page-footer"><span>Netbot v0.1.0</span><span>Todos los sistemas operativos <i class="status-dot"></i></span></footer>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status">Datos actualizados</div>
+    <script src="./app.js"></script>
+  </body>
+</html>
