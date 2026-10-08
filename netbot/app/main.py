@@ -19,6 +19,7 @@ from app.monitoring.router import router as monitoring_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    initialize_database()
     service = build_monitoring_service(get_settings())
     app.state.monitoring_service = service
     try:
