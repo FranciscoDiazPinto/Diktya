@@ -1,0 +1,50 @@
+"""Contratos y límites para mensajes conversacionales."""
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.config import Settings
+
+
+class ChatTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class ChatMessageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    message: str = Field(min_length=1)
+    history: list[ChatTurn] = Field(default_factory=list)
+
+
+class ChatMessageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str = Field(min_length=1)
+    tools_used: list[str] = Field(default_factory=list)
+
+
+class ChatInputError(ValueError):
+    """Mensaje o historial excede los límites del chatbot."""
+
+
+def normalize_chat_request(
+    request: ChatMessageRequest, settings: Settings
+) -> ChatMessageRequest:
+    message = request.message.strip()
+    if not message:
+        raise ChatInputError("El mensaje no puede estar vacío.")
+    if len(message) > settings.chat_max_message_chars:
+        raise ChatInputError("El mensaje supera el largo máximo permitido.")
+
+    history_limit = settings.chat_max_history_turns
+    history = request.history[-history_limit:] if history_limit else []
+    history_size = sum(len(turn.content) for turn in history)
+    if history_size > settings.chat_max_history_chars:
+        raise ChatInputError("El historial supera el largo máximo permitido.")
+
+    return request.model_copy(update={"message": message, "history": history})
