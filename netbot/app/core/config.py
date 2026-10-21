@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     monitoring_mock_scenario: Literal["healthy", "degraded", "outage"] = "healthy"
     firewall_log_fetch_limit: int = Field(500, ge=1, le=5000)
 
+    # --- Chatbot ---
+    openrouter_api_key: SecretStr | None = None
+    openrouter_model: str | None = None
+    openrouter_timeout_seconds: float = Field(20.0, gt=0)
+    chat_max_message_chars: int = Field(2000, ge=1)
+    chat_max_history_chars: int = Field(8000, ge=0)
+    chat_max_history_turns: int = Field(8, ge=0)
+    chat_max_tool_rounds: int = Field(3, ge=1)
+    chat_max_output_tokens: int = Field(600, ge=1)
+
     # --- OPNsense ---
     # Se acepta OPNSENSE_BASE_URL (nombre actual de .env.example) y OPNSENSE_API_URL.
     opnsense_base_url: Optional[str] = Field(
@@ -53,6 +63,8 @@ class Settings(BaseSettings):
         "opnsense_api_key",
         "opnsense_api_secret",
         "opnsense_ca_bundle",
+        "openrouter_api_key",
+        "openrouter_model",
         mode="before",
     )
     @classmethod
