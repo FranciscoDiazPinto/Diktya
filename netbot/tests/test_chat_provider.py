@@ -139,4 +139,3 @@ async def test_provider_hides_upstream_errors(respond):
     assert "test-key" not in str(error.value)
     assert "private upstream response" not in str(error.value)
     assert "secret timeout" not in str(error.value)
-

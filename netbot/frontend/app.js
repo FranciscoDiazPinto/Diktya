@@ -11,6 +11,13 @@ const syncLabel = document.querySelector('#last-sync');
 const toast = document.querySelector('#toast');
 const mobileMenu = document.querySelector('.mobile-menu');
 const sidebar = document.querySelector('.sidebar');
+const chatForm = document.querySelector('#chat-form');
+const chatInput = document.querySelector('#chat-message');
+const chatMessages = document.querySelector('#chat-messages');
+const chatEmpty = document.querySelector('#chat-empty');
+const chatStatus = document.querySelector('#chat-status');
+const chatSend = document.querySelector('#chat-send');
+let chatHistory = [];
 
 const getStoredTokens = () => {
   try { return JSON.parse(localStorage.getItem('netbot_tokens') || 'null'); } catch { return null; }
@@ -68,7 +75,69 @@ logoutButton.addEventListener('click', async () => {
   appShell.classList.add('is-hidden');
   loginScreen.style.display = '';
   loginForm.reset();
+  chatHistory = [];
+  chatMessages.replaceChildren(chatEmpty);
+  chatEmpty.hidden = false;
+  chatStatus.textContent = '';
+  chatStatus.classList.remove('is-error');
   showToast('Sesion cerrada');
+});
+
+function appendChatMessage(role, content) {
+  chatEmpty.hidden = true;
+  const message = document.createElement('article');
+  message.className = `chat-message chat-message-${role}`;
+  const text = document.createElement('p');
+  text.textContent = content;
+  message.append(text);
+  chatMessages.append(message);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function setChatStatus(message, isError = false) {
+  chatStatus.textContent = message;
+  chatStatus.classList.toggle('is-error', isError);
+}
+
+chatForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = chatInput.value.trim();
+  if (!message || chatSend.disabled) return;
+
+  const tokens = getStoredTokens();
+  if (!tokens?.access_token) {
+    setChatStatus('Inicia sesión para conversar con Netbot.', true);
+    return;
+  }
+
+  appendChatMessage('user', message);
+  chatInput.value = '';
+  chatSend.disabled = true;
+  chatInput.disabled = true;
+  setChatStatus('Consultando el monitoreo…');
+  try {
+    const response = await apiRequest(
+      '/api/v1/chat/messages',
+      {
+        method: 'POST',
+        body: JSON.stringify({ message, history: chatHistory.slice(-8) }),
+      },
+      tokens.access_token,
+    );
+    appendChatMessage('assistant', response.answer);
+    chatHistory = [
+      ...chatHistory,
+      { role: 'user', content: message },
+      { role: 'assistant', content: response.answer },
+    ].slice(-8);
+    setChatStatus('Consulta completada.');
+  } catch (error) {
+    setChatStatus(error.message || 'No se pudo completar la consulta.', true);
+  } finally {
+    chatSend.disabled = false;
+    chatInput.disabled = false;
+    chatInput.focus();
+  }
 });
 
 function showToast(message) {

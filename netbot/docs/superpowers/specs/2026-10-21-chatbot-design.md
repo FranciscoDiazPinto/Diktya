@@ -54,6 +54,8 @@ La integración se encapsulará detrás de un adaptador. Se configurará mediant
 
 La clave solo estará en el backend; no se incluirá en archivos versionados ni en el frontend. El tiempo de espera, errores y respuestas inválidas del proveedor se manejarán sin mostrar secretos o cuerpos sensibles al usuario.
 
+Las preguntas, el historial acotado y los resultados normalizados de las herramientas necesarios para generar una respuesta se envían a OpenRouter. El panel informará este procesamiento externo; no se afirmará que las conversaciones o los datos están sujetos a una política de retención específica del proveedor.
+
 ### Panel web
 
 El dashboard existente incorporará un panel sencillo de conversación con campo de entrada, envío, historial de la sesión, indicador de espera y presentación legible de errores. El cliente usará el token de acceso ya almacenado por el flujo de login. No se rediseñará el dashboard en esta entrega.

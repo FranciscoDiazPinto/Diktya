@@ -50,6 +50,7 @@
         <nav class="main-nav" aria-label="Navegacion principal">
           <p class="nav-label">Workspace</p>
           <a class="nav-item active" href="#overview"><span class="nav-icon">⌂</span> Resumen</a>
+          <a class="nav-item" href="#chat"><span class="nav-icon">✳</span> Asistente</a>
           <a class="nav-item" href="#interfaces"><span class="nav-icon">⌁</span> Interfaces <b>4</b></a>
           <a class="nav-item" href="#clients"><span class="nav-icon">◌</span> Clientes</a>
           <a class="nav-item" href="#firewall"><span class="nav-icon">◇</span> Firewall <b class="alert-count">12</b></a>
@@ -92,6 +93,23 @@
             <article class="panel activity-panel" id="firewall"><div class="panel-heading"><div><p class="panel-kicker">SEGURIDAD</p><h2>Actividad reciente</h2></div><a class="text-link" href="#events">Ver todo <span>→</span></a></div><div class="activity-list"><div class="activity-row"><span class="activity-icon blocked">×</span><div><strong>Conexion bloqueada</strong><small>45.132.98.21 · WAN</small></div><time>hace 2 min</time></div><div class="activity-row"><span class="activity-icon connected">↗</span><div><strong>Nuevo cliente conectado</strong><small>MacBook-Pro-Alex · LAN</small></div><time>hace 8 min</time></div><div class="activity-row"><span class="activity-icon config">◇</span><div><strong>Regla de firewall actualizada</strong><small>Por Alex Morgan · Sistema</small></div><time>hace 21 min</time></div><div class="activity-row"><span class="activity-icon blocked">×</span><div><strong>Escaneo detectado</strong><small>185.220.101.4 · WAN</small></div><time>hace 34 min</time></div></div></article>
 
             <article class="panel interfaces-panel"><div class="panel-heading"><div><p class="panel-kicker">CONECTIVIDAD</p><h2>Interfaces</h2></div><a class="text-link" href="#interfaces">Administrar <span>→</span></a></div><div class="interfaces-list"><div class="interface-row"><span class="interface-status"></span><div><strong>WAN</strong><small>igc0 · 181.43.22.10</small></div><span class="interface-speed">1 Gb/s</span><span class="interface-traffic">↓ 620 Mb/s</span></div><div class="interface-row"><span class="interface-status"></span><div><strong>LAN</strong><small>igc1 · 192.168.1.1</small></div><span class="interface-speed">1 Gb/s</span><span class="interface-traffic">↓ 284 Mb/s</span></div><div class="interface-row"><span class="interface-status warning"></span><div><strong>GUEST</strong><small>igc1.20 · 192.168.20.1</small></div><span class="interface-speed">100 Mb/s</span><span class="interface-traffic">↓ 42 Mb/s</span></div></div></article>
+          </section>
+
+          <section class="panel chat-panel" id="chat" aria-labelledby="chat-heading">
+            <div class="panel-heading">
+              <div><p class="panel-kicker">ASISTENTE DE REDES</p><h2 id="chat-heading">Conversa con Netbot</h2></div>
+              <span class="chat-scope">Solo monitoreo</span>
+            </div>
+            <p class="chat-intro">Pregunta por el estado del sistema, interfaces, clientes o firewall. Las preguntas y los datos de monitoreo necesarios se procesan en OpenRouter.</p>
+            <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
+              <p class="chat-empty" id="chat-empty">Tus consultas aparecerán aquí durante esta sesión.</p>
+            </div>
+            <form class="chat-form" id="chat-form">
+              <label class="visually-hidden" for="chat-message">Mensaje para el asistente</label>
+              <textarea id="chat-message" name="message" rows="2" maxlength="2000" placeholder="Ej.: ¿Qué interfaces están caídas?" required></textarea>
+              <button class="chat-send" id="chat-send" type="submit">Enviar <span aria-hidden="true">→</span></button>
+            </form>
+            <p class="chat-status" id="chat-status" role="status" aria-live="polite"></p>
           </section>
 
           <footer class="page-footer"><span>Netbot v0.1.0</span><span>Todos los sistemas operativos <i class="status-dot"></i></span></footer>
