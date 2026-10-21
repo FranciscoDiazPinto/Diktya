@@ -53,3 +53,19 @@ Las preguntas, el historial acotado y los resultados de monitoreo necesarios se 
 ## Pruebas
 
 `pip install -r requirements-dev.txt` y luego `pytest`.
+# Reservas VLAN desde el chatbot
+
+El chatbot puede preparar propuestas para reservar VLAN ya existentes. En
+`MONITORING_PROVIDER=opnsense`, Netbot consulta el inventario OPNsense de forma
+read-only; en modo mock solo aparecen VLAN sintéticas para desarrollo. Ninguna
+operación de reserva escribe configuración en OPNsense. El SSID se guarda como
+metadato de Netbot y la liberación es manual por operador o administrador.
+
+La consulta de opciones está disponible para usuarios con `monitoring:read` en
+`GET /api/v1/changes/vlan-options`. Las rutas `GET` y `POST
+/api/v1/changes/vlan-reservations` y `POST
+/api/v1/changes/vlan-reservations/{id}/release` requieren `vlan:reserve`
+(roles operador/admin). Preparar una propuesta en el chat no la persiste: el
+usuario debe confirmarla explícitamente en el panel. Para propuestas, el texto
+de chat, su historial y la información VLAN relevante se envían al proveedor
+configurado en OpenRouter.

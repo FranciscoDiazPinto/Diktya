@@ -25,6 +25,15 @@ async def test_healthy_scenario_has_no_issues():
     assert (await provider.get_firewall_events(10)).data
 
 
+async def test_mock_vlan_inventory_matches_existing_event_networks():
+    provider = MockMonitoringProvider(clock=Clock())
+
+    result = await provider.get_vlan_inventory()
+
+    assert [(v.parent_interface, v.tag) for v in result.data] == [("igc1", 20), ("igc1", 30)]
+    assert result.issues == []
+
+
 async def test_system_metrics_are_realistic_and_uptime_advances():
     clock = Clock()
     provider = MockMonitoringProvider(clock=clock)
@@ -95,5 +104,6 @@ async def test_outage_scenario_returns_no_data_everywhere():
         await provider.get_clients(),
         await provider.get_firewall_statistics(),
         await provider.get_firewall_events(5),
+        await provider.get_vlan_inventory(),
     ]
     assert all(r.data is None and r.issues for r in results)

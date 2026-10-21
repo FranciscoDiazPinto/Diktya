@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, require_permission
 from app.auth.models import User
@@ -10,6 +11,8 @@ from app.auth.permissions import Permission
 from app.auth.roles import DEFAULT_ROLES, RoleName
 from app.core.config import Settings, get_settings
 from app.monitoring.dependencies import MonitoringServiceDep
+from app.core.database import get_db
+from app.changes.service import VlanReservationService
 
 from .provider import (
     ChatProviderError,
@@ -34,12 +37,14 @@ def get_chat_settings() -> Settings:
 
 def get_chat_service(
     monitoring_service: MonitoringServiceDep,
+    db: Session = Depends(get_db),
 ) -> ChatService:
     settings = get_chat_settings()
     return ChatService(
         settings=settings,
         provider=OpenRouterProvider(settings),
         monitoring_service=monitoring_service,
+        reservation_service=VlanReservationService(monitoring_service, db),
     )
 
 

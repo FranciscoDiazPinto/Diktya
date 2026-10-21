@@ -40,6 +40,9 @@ class StubProvider(NetworkMonitoringProvider):
     async def get_clients(self):
         raise NotImplementedError
 
+    async def get_vlan_inventory(self):
+        raise NotImplementedError
+
     async def get_firewall_statistics(self):
         raise NotImplementedError
 

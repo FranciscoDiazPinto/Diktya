@@ -170,3 +170,26 @@ def test_firewall_statistics_with_unknown_shapes_yields_nulls():
     stats = m.parse_firewall_statistics("weird", None)
     assert stats.pf_enabled is None and stats.states is None
     assert stats.packets_passed is None and stats.packets_blocked is None
+
+
+def test_vlan_inventory_normalizes_search_rows():
+    assert m.parse_vlan_inventory({"rows": [
+        {"if": "igc1", "tag": "20", "descr": " Evento ", "vlanif": "vlan01"},
+        {"if": "igc1", "tag": 30, "descr": "", "vlanif": "vlan02"},
+    ]}) == [
+        m.VlanInventoryItem(
+            parent_interface="igc1", tag=20, description="Evento", interface_name="vlan01"
+        ),
+        m.VlanInventoryItem(
+            parent_interface="igc1", tag=30, description=None, interface_name="vlan02"
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [None, {}, {"rows": "not-a-list"}, {"rows": [{"if": "igc1", "tag": 4095}]}],
+)
+def test_vlan_inventory_rejects_malformed_rows(payload):
+    with pytest.raises(ValueError):
+        m.parse_vlan_inventory(payload)

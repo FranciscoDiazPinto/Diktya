@@ -21,11 +21,24 @@ class ChatMessageRequest(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list)
 
 
+class VlanReservationProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parent_interface: str
+    tag: int
+    description: str | None
+    interface_name: str
+    event_name: str
+    purpose: str
+    ssid: str
+
+
 class ChatMessageResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     answer: str = Field(min_length=1)
     tools_used: list[str] = Field(default_factory=list)
+    reservation_proposal: VlanReservationProposal | None = None
 
 
 class ChatInputError(ValueError):

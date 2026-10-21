@@ -11,7 +11,7 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from ...exceptions import MonitoringError, ProviderNotSupportedError
+from ...exceptions import MonitoringError, ProviderInvalidResponseError, ProviderNotSupportedError
 from ...schemas import (
     CollectionIssue,
     DhcpLease,
@@ -21,6 +21,7 @@ from ...schemas import (
     IssueKind,
     SystemMetrics,
     TemperatureMetrics,
+    VlanInventoryItem,
 )
 from ..base import CollectionResult, DhcpLeaseProvider, NetworkMonitoringProvider
 from .client import OPNsenseClient
@@ -34,6 +35,7 @@ from .mappers import (
     parse_system_information,
     parse_temperature,
     parse_uptime_seconds,
+    parse_vlan_inventory,
 )
 
 logger = logging.getLogger("netbot.monitoring.opnsense.provider")
@@ -50,6 +52,7 @@ PATH_FIREWALL_STATS = "/api/diagnostics/firewall/stats"
 # pf_statistics exige una sección; "info" equivale a `pfctl -si` (estados y contadores).
 PATH_PF_STATISTICS = "/api/diagnostics/firewall/pf_statistics/info"
 PATH_FIREWALL_LOG = "/api/diagnostics/firewall/log"
+PATH_VLAN_SEARCH = "/api/interfaces/vlan_settings/search_item"
 
 
 @dataclass(slots=True)
@@ -157,6 +160,17 @@ class OPNsenseMonitoringProvider(NetworkMonitoringProvider):
 
     async def get_clients(self) -> CollectionResult[list[DhcpLease]]:
         outcome = await _collect("clients.dhcp", self._dhcp.get_leases())
+        return CollectionResult(data=outcome.value, issues=_issues(outcome))
+
+    async def get_vlan_inventory(self) -> CollectionResult[list[VlanInventoryItem]]:
+        async def load() -> list[VlanInventoryItem]:
+            payload = await self._client.get_json(PATH_VLAN_SEARCH)
+            try:
+                return parse_vlan_inventory(payload)
+            except ValueError as exc:
+                raise ProviderInvalidResponseError(str(exc)) from exc
+
+        outcome = await _collect("vlans.inventory", load())
         return CollectionResult(data=outcome.value, issues=_issues(outcome))
 
     async def get_firewall_statistics(self) -> CollectionResult[FirewallStatistics]:

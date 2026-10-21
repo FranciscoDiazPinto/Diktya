@@ -1,6 +1,6 @@
 # Diseño: reservas de VLAN desde el chatbot
 
-**Estado:** aprobado para revisión de especificación  
+**Estado:** implementado; pendiente validación con OPNsense real
 **Fecha:** 2026-10-21
 
 ## Objetivo
@@ -42,7 +42,11 @@ No incluye crear, editar, asignar, reconfigurar ni eliminar VLAN en OPNsense; ca
 
 ## Contratos previstos
 
-Las rutas y modelos definitivos se detallarán en el plan de implementación, manteniendo estas responsabilidades:
+Rutas implementadas:
+
+- `GET /api/v1/changes/vlan-options` para opciones disponibles (`MONITORING_READ`).
+- `GET` y `POST /api/v1/changes/vlan-reservations` para listar y confirmar (`VLAN_RESERVE`).
+- `POST /api/v1/changes/vlan-reservations/{id}/release` para liberar (`VLAN_RESERVE`).
 
 - Lectura autenticada de VLAN disponibles desde OPNsense y Netbot.
 - Confirmación autenticada de una reserva local.
@@ -70,7 +74,8 @@ Al igual que el chatbot actual, las preguntas, historial acotado y datos de VLAN
 
 - `401`: sesión ausente o inválida.
 - `403`: el usuario no tiene `VLAN_RESERVE` para preparar, confirmar o liberar.
-- `409`: VLAN inexistente al confirmar, ya reservada, o estado de reserva incompatible al liberar.
+- `409`: VLAN inexistente al confirmar, ya reservada, o reserva ya liberada.
+- `404`: reserva inexistente al liberar.
 - `422`: campos vacíos, tag inválido, combinación de interfaz/tag ausente o payload inválido.
 - `502/503`: OPNsense no responde, está mal configurado o la respuesta no puede normalizarse.
 - Ningún error del proveedor incluye credenciales ni cuerpos upstream.
@@ -88,3 +93,7 @@ Al igual que el chatbot actual, las preguntas, historial acotado y datos de VLAN
 8. Errores de OPNsense bloquean la reserva con mensajes controlados.
 9. El panel muestra la propuesta, permite confirmar/cancelar y liberar una reserva activa, renderizando valores externos con `textContent`.
 10. Las pruebas cubren roles, validación, proveedor OPNsense, confirmación, conflicto concurrente, liberación, errores y presentación segura; además, se documenta cómo probar la lectura contra una instancia real.
+
+## Implementación y verificación
+
+La implementación normaliza el inventario mediante `GET /api/interfaces/vlan_settings/search_item`, aplica una restricción de unicidad parcial en SQLite/PostgreSQL y separa la preparación de la propuesta de la confirmación autenticada. La suite ejecutada en el worktree aislado reportó 152 pruebas Python aprobadas y 2 pruebas Node aprobadas. La migración `002_vlan_reservations` se probó con upgrade y downgrade en SQLite temporal. El adaptador se verificó con `httpx.MockTransport`; todavía debe probarse contra la versión real de OPNsense antes de conectar el despliegue.

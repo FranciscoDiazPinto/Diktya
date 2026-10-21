@@ -8,6 +8,7 @@ from typing import Any
 from app.auth.permissions import Permission
 from app.core.config import Settings
 from app.monitoring.service import MonitoringService
+from app.changes.service import VlanReservationService
 
 from .policy import SYSTEM_POLICY
 from .provider import (
@@ -20,6 +21,7 @@ from .schemas import (
     ChatMessageResponse,
     ChatTurn,
     normalize_chat_request,
+    VlanReservationProposal,
 )
 from .tools import (
     ChatToolError,
@@ -36,10 +38,12 @@ class ChatService:
         settings: Settings,
         provider: OpenRouterProvider,
         monitoring_service: MonitoringService,
+        reservation_service: VlanReservationService | None = None,
     ) -> None:
         self._settings = settings
         self._provider = provider
         self._monitoring = monitoring_service
+        self._reservations = reservation_service
 
     async def answer(
         self,
@@ -59,8 +63,9 @@ class ChatService:
             ),
             {"role": "user", "content": request.message},
         ]
-        tools = openrouter_tool_definitions()
+        tools = openrouter_tool_definitions(permissions)
         tools_used: list[str] = []
+        proposal = None
         seen_call_ids: set[str] = set()
         tool_rounds = 0
 
@@ -70,7 +75,8 @@ class ChatService:
                 answer = (completion.content or "").strip()
                 if not answer:
                     raise ChatProviderError("OpenRouter no devolvió una respuesta de texto.")
-                return ChatMessageResponse(answer=answer, tools_used=tools_used)
+                return ChatMessageResponse(answer=answer, tools_used=tools_used,
+                                           reservation_proposal=proposal)
 
             if tool_rounds >= self._settings.chat_max_tool_rounds:
                 raise ChatProviderError("OpenRouter superó el límite de consultas de monitoreo.")
@@ -88,6 +94,7 @@ class ChatService:
                         call.arguments,
                         self._monitoring,
                         permissions,
+                        self._reservations,
                     )
                 except ChatToolPermissionError:
                     raise
@@ -97,6 +104,8 @@ class ChatService:
                     ) from None
                 if call.name not in tools_used:
                     tools_used.append(call.name)
+                if call.name == "prepare_vlan_reservation":
+                    proposal = VlanReservationProposal.model_validate(result)
                 messages.append(
                     {
                         "role": "tool",

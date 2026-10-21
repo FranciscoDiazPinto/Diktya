@@ -33,3 +33,10 @@ Las preguntas y los resultados de monitoreo necesarios para responder se procesa
 
 El resto del dashboard conserva datos visuales de demostración. Las consultas actuales
 del chatbot sí usan la API de monitoreo.
+# Reservas VLAN
+
+El panel muestra propuestas de reserva para operador y administrador. Confirmar
+envía los campos de evento, propósito y SSID junto a la VLAN elegida; cancelar no
+hace ninguna solicitud. Las reservas activas se muestran debajo del chat y el
+operador puede liberarlas manualmente. La API del backend vuelve a validar el
+permiso, el inventario OPNsense y la disponibilidad antes de guardar.

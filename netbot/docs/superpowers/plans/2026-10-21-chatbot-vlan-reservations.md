@@ -1,6 +1,6 @@
 # Chatbot VLAN Reservations Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Let an authenticated operator or admin reserve in Netbot an existing OPNsense VLAN through a chatbot proposal and an explicit dashboard confirmation, then release it manually.
 
@@ -54,7 +54,7 @@ Implement [the approved design](../specs/2026-10-21-chatbot-vlan-reservations-de
 - Test: `netbot/tests/monitoring/test_mock_provider.py`
 - Test: `netbot/tests/test_vlan_inventory.py`
 
-- [ ] **Step 1: Add failing parser and provider contract tests**
+- [x] **Step 1: Add failing parser and provider contract tests**
 
 Test a valid OPNsense search response whose `rows` contain `if`, numeric-string `tag`, `descr`, and `vlanif`; assert normalized objects expose only `parent_interface`, `tag`, `description`, and `interface_name`. Test empty rows, malformed top-level payloads, out-of-range tags, missing parent interface, provider timeout/401/404, mock healthy inventory, and mock outage behavior.
 
@@ -72,7 +72,7 @@ async def test_opnsense_vlan_search_normalizes_resource_fields():
     assert result.issues == []
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm the missing contract fails**
+- [x] **Step 2: Run the focused tests and confirm the missing contract fails**
 
 Run from `netbot/`:
 
@@ -82,7 +82,7 @@ pytest tests/test_vlan_inventory.py tests/monitoring/test_mappers.py tests/monit
 
 Expected before implementation: failures for the absent schema/provider method and endpoint constant.
 
-- [ ] **Step 3: Add the normalized model and provider contract**
+- [x] **Step 3: Add the normalized model and provider contract**
 
 Add a frozen model in `monitoring/schemas.py`:
 
@@ -98,11 +98,11 @@ Add `get_vlan_inventory() -> CollectionResult[list[VlanInventoryItem]]` to `Netw
 
 The mock provider returns deterministic existing resources `(igc1, 20)` and `(igc1, 30)` for healthy/degraded scenarios; outage returns `data=None` with a sanitized connection issue.
 
-- [ ] **Step 4: Expose inventory through `MonitoringService` and run focused tests**
+- [x] **Step 4: Expose inventory through `MonitoringService` and run focused tests**
 
 Add `get_vlan_inventory()` to `MonitoringService`, using its existing `_cached()` single-flight/cache behavior. Run the command from Step 2 and expect all focused tests to pass, including timeout and malformed-response cases.
 
-- [ ] **Step 5: Commit the inventory slice**
+- [x] **Step 5: Commit the inventory slice**
 
 ```bash
 git add netbot/app/monitoring netbot/tests/test_vlan_inventory.py netbot/tests/monitoring
@@ -120,11 +120,11 @@ git commit -m "feat: read normalized OPNsense VLAN inventory"
 - Modify: `netbot/app/main.py`
 - Test: `netbot/tests/test_vlan_reservations.py`
 
-- [ ] **Step 1: Write failing persistence and lifecycle tests**
+- [x] **Step 1: Write failing persistence and lifecycle tests**
 
 Use the existing `db_session` fixture. Cover successful create with server-supplied user ID; rejection if the VLAN is absent from current inventory; rejection of an already-active `(parent_interface, tag)`; reuse after release; retention of the old released row; and release metadata (`released_by_id`, `released_at`). Verify event, purpose, and SSID are trimmed and validated. Add a database-level test proving two active rows with the same interface/tag violate uniqueness while a released row may coexist.
 
-- [ ] **Step 2: Run the reservation tests and confirm they fail for missing models/service**
+- [x] **Step 2: Run the reservation tests and confirm they fail for missing models/service**
 
 ```bash
 pytest tests/test_vlan_reservations.py -q
@@ -132,7 +132,7 @@ pytest tests/test_vlan_reservations.py -q
 
 Expected before implementation: import errors for `VlanReservation` and `VlanReservationService`.
 
-- [ ] **Step 3: Define reservation models and schemas**
+- [x] **Step 3: Define reservation models and schemas**
 
 Create a `VlanReservation` SQLAlchemy model with:
 
@@ -143,11 +143,11 @@ Create a `VlanReservation` SQLAlchemy model with:
 
 Create strict Pydantic models with extra fields forbidden. `VlanReservationCreate` accepts only the resource identity and three user-entered metadata fields; the authenticated user, status, and timestamps are never client-controlled. `VlanReservationRead` includes server-owned audit fields.
 
-- [ ] **Step 4: Add the migration and register the model**
+- [x] **Step 4: Add the migration and register the model**
 
 Create Alembic revision `002_vlan_reservations`, with `down_revision = "001_authentication_roles"`; add the table, foreign keys to `users`, and active partial index. Downgrade drops the index then table. Import `changes.models` in `migrations/env.py` for metadata and in application startup before `Base.metadata.create_all()`.
 
-- [ ] **Step 5: Implement service operations and verify them**
+- [x] **Step 5: Implement service operations and verify them**
 
 Implement `VlanReservationService(monitoring_service, db_session)` with these methods:
 
@@ -162,7 +162,7 @@ def release(self, reservation_id: int, actor: User) -> VlanReservationRead: ...
 
 Run `pytest tests/test_vlan_reservations.py -q`; expect all lifecycle, uniqueness, and availability tests to pass.
 
-- [ ] **Step 6: Verify migration upgrade/downgrade on SQLite**
+- [x] **Step 6: Verify migration upgrade/downgrade on SQLite**
 
 Run with an isolated temporary database URL:
 
@@ -173,7 +173,7 @@ DATABASE_URL=sqlite:///./test-vlan-migration.db .venv/bin/alembic downgrade 001_
 
 Expected: both commands exit 0; the first creates the reservation table/index and the second removes them. Delete `test-vlan-migration.db` and its journal files after verification.
 
-- [ ] **Step 7: Commit persistence and lifecycle**
+- [x] **Step 7: Commit persistence and lifecycle**
 
 ```bash
 git add netbot/app/changes netbot/app/main.py netbot/migrations netbot/tests/test_vlan_reservations.py
@@ -188,11 +188,11 @@ git commit -m "feat: persist VLAN reservations with release history"
 - Test: `netbot/tests/test_vlan_reservation_api.py`
 - Modify: `netbot/tests/conftest.py` only if a reusable service override fixture is needed.
 
-- [ ] **Step 1: Write failing endpoint and authorization tests**
+- [x] **Step 1: Write failing endpoint and authorization tests**
 
 Cover unauthenticated 401; `visor` may GET the authenticated VLAN options but receives 403 for reservation list/create/release; `operador` and `admin` can list, create, and release; invalid body returns 422; missing inventory returns controlled 503; VLAN no longer present or already reserved returns 409; unknown reservation returns 404. Assert each rejected request leaves the database unchanged.
 
-- [ ] **Step 2: Run API tests and confirm the route is absent**
+- [x] **Step 2: Run API tests and confirm the route is absent**
 
 ```bash
 pytest tests/test_vlan_reservation_api.py -q
@@ -200,7 +200,7 @@ pytest tests/test_vlan_reservation_api.py -q
 
 Expected before implementation: route-not-found or import failures.
 
-- [ ] **Step 3: Add the changes router and fixed endpoints**
+- [x] **Step 3: Add the changes router and fixed endpoints**
 
 Register `router = APIRouter(prefix="/changes", tags=["changes"])` under `/api/v1`. Add:
 
@@ -209,7 +209,7 @@ Register `router = APIRouter(prefix="/changes", tags=["changes"])` under `/api/v
 
 Inject the existing `MonitoringServiceDep`, SQLAlchemy `Session` from `get_db`, and current `User`. Map provider unavailable to 503, concurrent/removed VLAN conflicts to 409, unknown reservation to 404, and validation failures to 422. The request body must not accept actor IDs or lifecycle fields.
 
-- [ ] **Step 4: Run API, auth, and migration-adjacent tests**
+- [x] **Step 4: Run API, auth, and migration-adjacent tests**
 
 ```bash
 pytest tests/test_vlan_reservation_api.py tests/test_auth_api.py tests/test_security.py -q
@@ -217,7 +217,7 @@ pytest tests/test_vlan_reservation_api.py tests/test_auth_api.py tests/test_secu
 
 Expected: all role and endpoint cases pass; existing authentication tests remain green.
 
-- [ ] **Step 5: Commit the API slice**
+- [x] **Step 5: Commit the API slice**
 
 ```bash
 git add netbot/app/changes/router.py netbot/app/main.py netbot/tests/test_vlan_reservation_api.py
@@ -236,11 +236,11 @@ git commit -m "feat: expose authorized VLAN reservation endpoints"
 - Test: `netbot/tests/test_chat_service.py`
 - Test: `netbot/tests/test_chat_api.py`
 
-- [ ] **Step 1: Add failing role-filter and proposal tests**
+- [x] **Step 1: Add failing role-filter and proposal tests**
 
 Assert `visor` receives only read tools and never receives a reservation proposal tool; `operador` and `admin` receive the proposal tool; every invocation still checks `MONITORING_READ` or `VLAN_RESERVE` server-side. Test proposal arguments for exact current available VLAN, event, purpose, and SSID; reject a reserved/nonexistent resource; assert preparation does not insert into the database. Test the chat response includes the exact typed proposal fields and that a normal response serializes `reservation_proposal: null`; update existing exact response assertions accordingly.
 
-- [ ] **Step 2: Run the focused chat tests and confirm the proposal contract is missing**
+- [x] **Step 2: Run the focused chat tests and confirm the proposal contract is missing**
 
 ```bash
 pytest tests/test_chat_tools.py tests/test_chat_service.py tests/test_chat_api.py -q
@@ -248,7 +248,7 @@ pytest tests/test_chat_tools.py tests/test_chat_service.py tests/test_chat_api.p
 
 Expected before implementation: failures for role-filtered tools and `reservation_proposal`.
 
-- [ ] **Step 3: Add a typed proposal response and permission-filtered tools**
+- [x] **Step 3: Add a typed proposal response and permission-filtered tools**
 
 Add `VlanReservationProposal` with `parent_interface`, `tag`, `description`, `interface_name`, `event_name`, `purpose`, and `ssid`; add `reservation_proposal: VlanReservationProposal | None = None` to `ChatMessageResponse`. Extend the registry with:
 
@@ -257,11 +257,11 @@ Add `VlanReservationProposal` with `parent_interface`, `tag`, `description`, `in
 
 Update `openrouter_tool_definitions(permissions)` to omit tools whose permission the caller lacks. Keep checks in `invoke_tool()` even after filtering. Pass `VlanReservationService` into the chat service and preserve the proposal in its final `ChatMessageResponse`. Update the fixed Spanish policy to say a proposal is not a reservation and the assistant must never claim success until the confirmation API returns success.
 
-- [ ] **Step 4: Re-run chat tests and verify persistence boundary**
+- [x] **Step 4: Re-run chat tests and verify persistence boundary**
 
 Run the focused test command from Step 2. Expect all tests to pass, with no provider tool capable of creating or releasing a reservation.
 
-- [ ] **Step 5: Commit the chat proposal slice**
+- [x] **Step 5: Commit the chat proposal slice**
 
 ```bash
 git add netbot/app/chat netbot/tests/test_chat_tools.py netbot/tests/test_chat_service.py netbot/tests/test_chat_api.py
@@ -277,7 +277,7 @@ git commit -m "feat: prepare role-gated VLAN reservation proposals in chat"
 - Create: `netbot/frontend/chat-reservations.mjs`
 - Create: `netbot/frontend/tests/chat-reservations.test.mjs`
 
-- [ ] **Step 1: Write failing Node tests for frontend role and request helpers**
+- [x] **Step 1: Write failing Node tests for frontend role and request helpers**
 
 Use `node:test` and `node:assert/strict` to cover permission display and request payload formation:
 
@@ -303,7 +303,7 @@ test('reservation payload contains only the approved fields', () => {
 });
 ```
 
-- [ ] **Step 2: Run Node tests and confirm they fail because the module is absent**
+- [x] **Step 2: Run Node tests and confirm they fail because the module is absent**
 
 ```bash
 node --test frontend/tests/chat-reservations.test.mjs
@@ -311,11 +311,11 @@ node --test frontend/tests/chat-reservations.test.mjs
 
 Expected before implementation: module-not-found failures.
 
-- [ ] **Step 3: Build accessible proposal and active-reservation UI**
+- [x] **Step 3: Build accessible proposal and active-reservation UI**
 
 Implement/export `canReserveVlans(roles)` and `reservationPayload(formValues)` from `chat-reservations.mjs`. Convert the dashboard script to an ES module and import these helpers. Use the authenticated `/auth/me` roles for display only; API permissions remain authoritative. When a chat response includes `reservation_proposal`, render a text-only summary with **Confirmar** and **Cancelar** buttons using DOM elements and `textContent`. Confirm posts only the approved fields to `/api/v1/changes/vlan-reservations`; on success, show a success state and refresh the active reservation list. Cancel removes the proposal without an API write. For `operador`/`admin`, list active reservations and add a manual **Liberar** button calling `POST /api/v1/changes/vlan-reservations/{id}/release`. Disable controls during requests, show recoverable errors, and clear chat proposals and reservation state on logout. Do not render OPNsense or model strings with `innerHTML`.
 
-- [ ] **Step 4: Run helper tests and inspect the browser flow**
+- [x] **Step 4: Run helper tests and inspect the browser flow**
 
 Run:
 
@@ -326,7 +326,7 @@ node --input-type=module --check < frontend/app.js
 
 Expected: all Node tests pass and the app script parses as an ES module. Then use a local static server and mocked chat/changes API responses to verify: visor cannot see action controls; operator sees a proposal and must click confirm; cancel creates no request; confirm refreshes reservations; manual release updates the list; logout clears proposal state; HTML-like values render as plain text.
 
-- [ ] **Step 5: Commit the dashboard slice**
+- [x] **Step 5: Commit the dashboard slice**
 
 ```bash
 git add netbot/frontend
@@ -341,15 +341,15 @@ git add netbot/frontend
 - Modify: `netbot/docs/superpowers/specs/2026-10-21-chatbot-vlan-reservations-design.md`
 - Modify: `netbot/docs/superpowers/plans/2026-10-21-chatbot-vlan-reservations.md`
 
-- [ ] **Step 1: Document setup, roles, endpoints, and external processing**
+- [x] **Step 1: Document setup, roles, endpoints, and external processing**
 
 Update backend/frontend READMEs to explain that `MONITORING_PROVIDER=opnsense` is needed to use actual OPNsense inventory; mock mode exposes only synthetic VLANs. Document `GET /api/v1/changes/vlan-options`, list/create/release endpoints, `VLAN_RESERVE` roles, manual release, the explicit confirmation boundary, and that the SSID is metadata only. State that chat input/history and relevant VLAN data are sent to OpenRouter, and that no OPNsense write call occurs.
 
-- [ ] **Step 2: Record implementation and live integration limitations**
+- [x] **Step 2: Record implementation and live integration limitations**
 
 Mark plan checkboxes as tasks complete after each task. Update the design document with final route names and test evidence. State clearly that `httpx.MockTransport` validates the adapter offline, while the deployed OPNsense API version must still be checked with a real authorized read-only account before relying on live inventory.
 
-- [ ] **Step 3: Run all backend and frontend checks**
+- [x] **Step 3: Run all backend and frontend checks**
 
 From `netbot/` run:
 
@@ -368,7 +368,7 @@ rg -l --hidden 'sk-or-v1-[[:alnum:]]+|OPENROUTER_API_KEY=[^[:space:]]+' . --glob
 
 Expected: no whitespace errors and no secret-file paths. Delete any `test-auth.db`, migration database, or journal files created by verification.
 
-- [ ] **Step 4: Commit documentation and verified plan**
+- [x] **Step 4: Commit documentation and verified plan**
 
 ```bash
 git add netbot/README.md netbot/frontend/README.md netbot/docs/superpowers/specs/2026-10-21-chatbot-vlan-reservations-design.md netbot/docs/superpowers/plans/2026-10-21-chatbot-vlan-reservations.md
@@ -382,3 +382,8 @@ git commit -m "docs: document chatbot VLAN reservation flow"
 - **Type consistency:** `VlanInventoryItem`, `VlanReservationCreate`, `VlanReservationRead`, `AvailableVlan`, `VlanReservationProposal`, `VlanReservationService`, and `ChatMessageResponse.reservation_proposal` are introduced before later use.
 - **No placeholders:** route operations, permissions, data fields, test commands, expected behavior, error cases, and commit steps are specified.
 - **External integration:** fixture tests are deterministic and offline; live API verification is documented as a required pre-deployment check because no OPNsense credentials/device are available in this worktree.
+
+
+## Estado de ejecución
+
+Tareas implementadas y verificadas en el worktree de la rama `feature/chatbot-vlan-reservations`. Verificaciones: `pytest -q` (152 passed), Node tests (2 passed), sintaxis ES module, Alembic upgrade/downgrade SQLite temporal y `git diff --check`. No se hizo una prueba visual interactiva en navegador; debe ejecutarse al integrar en el entorno de desarrollo. La lectura contra una instancia OPNsense real también queda pendiente por no disponer de una cuenta/dispositivo en este entorno.

@@ -42,6 +42,7 @@ from ..schemas import (
     StateTableStats,
     SystemMetrics,
     TemperatureMetrics,
+    VlanInventoryItem,
 )
 from .base import CollectionResult, DhcpLeaseProvider, NetworkMonitoringProvider
 
@@ -288,6 +289,14 @@ class MockMonitoringProvider(NetworkMonitoringProvider):
         if self._scenario == "outage":
             return self._outage("clients.dhcp")
         return CollectionResult(data=await self._dhcp.get_leases(), issues=[])
+
+    async def get_vlan_inventory(self) -> CollectionResult[list[VlanInventoryItem]]:
+        if self._scenario == "outage":
+            return self._outage("vlans.inventory")
+        return CollectionResult(data=[
+            VlanInventoryItem(parent_interface="igc1", tag=20, description="ASISTENTES", interface_name="vlan01"),
+            VlanInventoryItem(parent_interface="igc1", tag=30, description="STAFF", interface_name="vlan02"),
+        ], issues=[])
 
     async def get_firewall_statistics(self) -> CollectionResult[FirewallStatistics]:
         if self._scenario == "outage":

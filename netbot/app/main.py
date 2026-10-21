@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from app.auth.models import Role, User
+from app.changes import models as change_models  # noqa: F401
+from app.changes.router import router as changes_router
 from app.auth.routes import admin_router, router
 from app.auth.roles import DEFAULT_ROLES
 from app.auth.security import hash_password
@@ -39,6 +41,7 @@ app.add_middleware(
 )
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
+app.include_router(changes_router, prefix="/api/v1")
 app.include_router(router)
 app.include_router(admin_router)
 

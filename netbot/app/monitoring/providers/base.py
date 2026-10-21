@@ -11,6 +11,7 @@ from ..schemas import (
     FirewallStatistics,
     InterfaceMetrics,
     SystemMetrics,
+    VlanInventoryItem,
 )
 
 T = TypeVar("T")
@@ -49,6 +50,9 @@ class NetworkMonitoringProvider(ABC):
 
     @abstractmethod
     async def get_clients(self) -> CollectionResult[list[DhcpLease]]: ...
+
+    @abstractmethod
+    async def get_vlan_inventory(self) -> CollectionResult[list[VlanInventoryItem]]: ...
 
     @abstractmethod
     async def get_firewall_statistics(self) -> CollectionResult[FirewallStatistics]: ...

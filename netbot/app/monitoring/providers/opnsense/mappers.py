@@ -25,6 +25,7 @@ from ...schemas import (
     MemoryMetrics,
     StateTableStats,
     TemperatureMetrics,
+    VlanInventoryItem,
 )
 
 logger = logging.getLogger("netbot.monitoring.opnsense.mappers")
@@ -88,6 +89,35 @@ def extract_rows(payload: Any) -> list[dict[str, Any]]:
         if payload and all(isinstance(v, dict) for v in payload.values()):
             return list(payload.values())
     return []
+
+
+def parse_vlan_inventory(payload: Any) -> list[VlanInventoryItem]:
+    """Normaliza vlan_settings/search_item y rechaza respuestas ambiguas."""
+    if isinstance(payload, list) and all(isinstance(row, dict) for row in payload):
+        rows = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("rows"), list):
+        rows = payload["rows"]
+        if not all(isinstance(row, dict) for row in rows):
+            raise ValueError("Respuesta de inventario VLAN con forma inválida")
+    elif isinstance(payload, dict) and payload and all(
+        isinstance(row, dict) for row in payload.values()
+    ):
+        rows = list(payload.values())
+    else:
+        raise ValueError("Respuesta de inventario VLAN con forma inválida")
+
+    items: list[VlanInventoryItem] = []
+    for row in rows:
+        parent = _clean_str(row.get("if"))
+        tag = to_int(row.get("tag"))
+        interface_name = _clean_str(row.get("vlanif"))
+        if not parent or tag is None or not 1 <= tag <= 4094 or not interface_name:
+            raise ValueError("Fila de inventario VLAN inválida")
+        items.append(VlanInventoryItem(
+            parent_interface=parent, tag=tag,
+            description=_clean_str(row.get("descr")), interface_name=interface_name,
+        ))
+    return items
 
 
 def _valid_ip(text: Any) -> str | None:

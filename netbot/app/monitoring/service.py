@@ -26,6 +26,7 @@ from .schemas import (
     MonitoringResponse,
     MonitoringStatus,
     SystemMetrics,
+    VlanInventoryItem,
 )
 
 logger = logging.getLogger("netbot.monitoring.service")
@@ -68,6 +69,9 @@ class MonitoringService:
 
     async def get_clients(self) -> MonitoringResponse[list[DhcpLease]]:
         return await self._cached("clients", self._provider.get_clients)
+
+    async def get_vlan_inventory(self) -> MonitoringResponse[list[VlanInventoryItem]]:
+        return await self._cached("vlans", self._provider.get_vlan_inventory)
 
     async def get_firewall_stats(self) -> MonitoringResponse[FirewallStatistics]:
         return await self._cached("firewall.stats", self._provider.get_firewall_statistics)

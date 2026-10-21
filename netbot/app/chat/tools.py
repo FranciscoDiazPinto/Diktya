@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.auth.permissions import Permission
 from app.monitoring.schemas import FirewallAction, MonitoringResponse
+from app.changes.schemas import VlanReservationCreate
+from app.changes.service import InventoryUnavailable, VlanConflict, VlanReservationService
 
 if TYPE_CHECKING:
     from app.monitoring.service import MonitoringService
@@ -36,6 +38,10 @@ class FirewallEventsArguments(BaseModel):
 
     limit: int = Field(default=100, ge=1, le=100)
     action: FirewallAction | None = None
+
+
+class VlanProposalArguments(VlanReservationCreate):
+    pass
 
 
 ToolExecutor = Callable[
@@ -91,6 +97,13 @@ async def _get_firewall_events(
     )
 
 
+async def _get_available_vlans(service, _: BaseModel):
+    inventory = await service.get_vlan_inventory()
+    if inventory.data is None:
+        return {"status": "unavailable", "data": None}
+    return {"status": inventory.status.value, "data": [item.model_dump() for item in inventory.data]}
+
+
 _tools = {
     "get_system": MonitoringTool(
         name="get_system",
@@ -127,12 +140,29 @@ _tools = {
         required_permission=Permission.MONITORING_READ,
         executor=_get_firewall_events,
     ),
+    "get_available_vlans": MonitoringTool(
+        name="get_available_vlans",
+        description="Consulta el inventario de VLAN existentes en OPNsense.",
+        arguments_model=EmptyToolArguments,
+        required_permission=Permission.MONITORING_READ,
+        executor=_get_available_vlans,
+    ),
+    "prepare_vlan_reservation": MonitoringTool(
+        name="prepare_vlan_reservation",
+        description="Prepara una propuesta de reserva local; no la confirma ni modifica OPNsense.",
+        arguments_model=VlanProposalArguments,
+        required_permission=Permission.VLAN_RESERVE,
+        executor=_get_available_vlans,
+    ),
 }
 TOOL_REGISTRY: Mapping[str, MonitoringTool] = MappingProxyType(_tools)
 
 
-def openrouter_tool_definitions() -> list[dict[str, Any]]:
-    return [tool.provider_definition() for tool in TOOL_REGISTRY.values()]
+def openrouter_tool_definitions(permissions: frozenset[Permission] | None = None) -> list[dict[str, Any]]:
+    tools = list(TOOL_REGISTRY.values())
+    if permissions is not None:
+        tools = [tool for tool in tools if tool.required_permission in permissions]
+    return [tool.provider_definition() for tool in tools]
 
 
 async def invoke_tool(
@@ -140,7 +170,34 @@ async def invoke_tool(
     arguments: dict[str, Any],
     service: MonitoringService,
     permissions: frozenset[Permission],
+    reservation_service: VlanReservationService | None = None,
 ) -> dict[str, Any]:
+    if name == "prepare_vlan_reservation":
+        if Permission.VLAN_RESERVE not in permissions:
+            raise ChatToolPermissionError("Permiso insuficiente para preparar una reserva.")
+        if reservation_service is None:
+            raise ChatToolError("Servicio de reservas no disponible.")
+        try:
+            arguments_model = VlanProposalArguments.model_validate(arguments)
+            available = await reservation_service.available_vlans()
+        except (ValidationError, InventoryUnavailable):
+            raise ChatToolError("Propuesta de reserva inválida o inventario no disponible.") from None
+        candidate = next((item for item in available if
+                          (item.parent_interface, item.tag) ==
+                          (arguments_model.parent_interface, arguments_model.tag)), None)
+        if candidate is None:
+            raise ChatToolError("La VLAN seleccionada no está disponible.")
+        return {**candidate.model_dump(), "event_name": arguments_model.event_name,
+                "purpose": arguments_model.purpose, "ssid": arguments_model.ssid}
+    if name == "get_available_vlans":
+        if Permission.MONITORING_READ not in permissions:
+            raise ChatToolPermissionError("Permiso insuficiente para consultar VLAN.")
+        if reservation_service is None:
+            raise ChatToolError("Servicio de reservas no disponible.")
+        try:
+            return {"status": "ok", "data": [item.model_dump() for item in await reservation_service.available_vlans()]}
+        except InventoryUnavailable:
+            return {"status": "unavailable", "data": None}
     tool = TOOL_REGISTRY.get(name)
     if tool is None:
         raise ChatToolError("Herramienta no disponible.")

@@ -11,6 +11,9 @@ from app.chat.service import ChatService
 from app.chat.tools import ChatToolPermissionError
 from app.core.config import Settings
 from app.monitoring.schemas import MonitoringResponse, MonitoringStatus
+from app.monitoring.providers.mock import MockMonitoringProvider
+from app.changes.service import VlanReservationService
+from app.monitoring.service import MonitoringService
 
 from datetime import datetime, timezone
 
@@ -125,6 +128,30 @@ async def test_unknown_tool_is_rejected_without_monitoring_call():
         )
 
     assert monitoring.calls == []
+
+
+@pytest.mark.asyncio
+async def test_prepared_vlan_proposal_is_returned_typed_and_not_persisted(db_session):
+    monitoring = MonitoringService(MockMonitoringProvider())
+    reservations = VlanReservationService(monitoring, db_session)
+    provider = FakeProvider([
+        ProviderCompletion(content=None, tool_calls=(ProviderToolCall(
+            id="proposal-1", name="prepare_vlan_reservation", arguments={
+                "parent_interface": "igc1", "tag": 20, "event_name": "Feria",
+                "purpose": "Invitados", "ssid": "Evento",
+            }),)),
+        ProviderCompletion(content="Preparé la propuesta; confirma en el panel.")
+    ])
+    service = ChatService(settings=Settings(_env_file=None), provider=provider,
+                          monitoring_service=monitoring, reservation_service=reservations)
+    result = await service.answer(message="Reserva una VLAN", history=[], permissions=frozenset({
+        Permission.MONITORING_READ, Permission.VLAN_RESERVE,
+    }))
+    assert result.reservation_proposal.tag == 20
+    assert result.reservation_proposal.event_name == "Feria"
+    assert reservations.list_active() == []
+    offered = {tool["function"]["name"] for tool in provider.calls[0]["tools"]}
+    assert "prepare_vlan_reservation" in offered
 
 
 @pytest.mark.asyncio

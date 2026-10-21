@@ -120,6 +120,15 @@ class InterfaceMetrics(NetbotModel):
     traffic: InterfaceTraffic | None = None
 
 
+class VlanInventoryItem(NetbotModel):
+    """VLAN ya creada en OPNsense, normalizada para el inventario de NetBot."""
+
+    parent_interface: str = Field(min_length=1)
+    tag: int = Field(ge=1, le=4094)
+    description: str | None = None
+    interface_name: str = Field(min_length=1)
+
+
 # --------------------------------------------------------------------------- #
 # DHCP / clientes
 # --------------------------------------------------------------------------- #

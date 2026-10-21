@@ -11,6 +11,9 @@ from app.chat.tools import (
     openrouter_tool_definitions,
 )
 from app.monitoring.schemas import MonitoringResponse, MonitoringStatus
+from app.monitoring.providers.mock import MockMonitoringProvider
+from app.monitoring.service import MonitoringService
+from app.changes.service import VlanReservationService
 
 
 class FakeMonitoringService:
@@ -54,11 +57,16 @@ async def test_registry_contains_only_read_only_monitoring_tools():
         "get_clients",
         "get_firewall_stats",
         "get_firewall_events",
+        "get_available_vlans",
+        "prepare_vlan_reservation",
     }
 
     assert set(TOOL_REGISTRY) == expected
     assert {item["function"]["name"] for item in openrouter_tool_definitions()} == expected
-    assert all(tool.required_permission is Permission.MONITORING_READ for tool in TOOL_REGISTRY.values())
+    visor = frozenset({Permission.MONITORING_READ})
+    operator = frozenset({Permission.MONITORING_READ, Permission.VLAN_RESERVE})
+    assert "prepare_vlan_reservation" not in {item["function"]["name"] for item in openrouter_tool_definitions(visor)}
+    assert "prepare_vlan_reservation" in {item["function"]["name"] for item in openrouter_tool_definitions(operator)}
 
 
 @pytest.mark.asyncio
@@ -106,3 +114,24 @@ async def test_tool_permission_is_checked_before_monitoring_call():
         await invoke_tool("get_system", {}, service, frozenset())
 
     assert service.calls == []
+
+
+@pytest.mark.asyncio
+async def test_reservation_tool_only_prepares_available_vlan_without_persisting(db_session):
+    monitoring = MonitoringService(MockMonitoringProvider())
+    reservations = VlanReservationService(monitoring, db_session)
+    result = await invoke_tool("prepare_vlan_reservation", {
+        "parent_interface": "igc1", "tag": 20, "event_name": "Feria",
+        "purpose": "Invitados", "ssid": "Evento",
+    }, monitoring, frozenset({Permission.MONITORING_READ, Permission.VLAN_RESERVE}), reservations)
+    assert result["tag"] == 20 and result["event_name"] == "Feria"
+    assert reservations.list_active() == []
+
+
+@pytest.mark.asyncio
+async def test_visor_cannot_prepare_reservation(db_session):
+    monitoring = MonitoringService(MockMonitoringProvider())
+    reservations = VlanReservationService(monitoring, db_session)
+    with pytest.raises(ChatToolPermissionError):
+        await invoke_tool("prepare_vlan_reservation", {}, monitoring,
+                          frozenset({Permission.MONITORING_READ}), reservations)

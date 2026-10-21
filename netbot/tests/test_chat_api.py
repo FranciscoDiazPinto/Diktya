@@ -55,7 +55,7 @@ def test_default_roles_can_use_chat_and_receive_server_permissions(
             headers=headers,
         )
         assert response.status_code == 200
-        assert response.json() == {"answer": "Consulta recibida.", "tools_used": []}
+        assert response.json() == {"answer": "Consulta recibida.", "tools_used": [], "reservation_proposal": None}
 
     assert len(service.calls) == 3
     assert all("monitoring:read" in {permission.value for permission in call[2]} for call in service.calls)

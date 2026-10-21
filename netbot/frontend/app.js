@@ -1,3 +1,5 @@
+import { canReserveVlans, reservationPayload } from './chat-reservations.mjs';
+
 const API_BASE = localStorage.getItem('netbot_api_url') || 'http://localhost:8000';
 const loginScreen = document.querySelector('#login-screen');
 const appShell = document.querySelector('#app-shell');
@@ -18,18 +20,23 @@ const chatEmpty = document.querySelector('#chat-empty');
 const chatStatus = document.querySelector('#chat-status');
 const chatSend = document.querySelector('#chat-send');
 let chatHistory = [];
+let currentRoles = [];
+const reservationList = document.querySelector('#vlan-reservations');
 
 const getStoredTokens = () => {
   try { return JSON.parse(localStorage.getItem('netbot_tokens') || 'null'); } catch { return null; }
 };
 
 function setAuthenticated(user) {
+  currentRoles = user.roles || [];
   loginScreen.style.display = 'none';
   appShell.classList.remove('is-hidden');
   const name = user.full_name || user.email.split('@')[0];
   document.querySelector('#user-name').textContent = name;
   document.querySelector('#user-role').textContent = user.roles?.join(', ') || 'Usuario';
   document.querySelector('#user-avatar').textContent = name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+  reservationList.hidden = !canReserveVlans(currentRoles);
+  if (!reservationList.hidden) refreshReservations();
 }
 
 async function apiRequest(path, options = {}, accessToken = '') {
@@ -76,6 +83,9 @@ logoutButton.addEventListener('click', async () => {
   loginScreen.style.display = '';
   loginForm.reset();
   chatHistory = [];
+  currentRoles = [];
+  reservationList.replaceChildren();
+  reservationList.hidden = true;
   chatMessages.replaceChildren(chatEmpty);
   chatEmpty.hidden = false;
   chatStatus.textContent = '';
@@ -91,6 +101,7 @@ function appendChatMessage(role, content) {
   text.textContent = content;
   message.append(text);
   chatMessages.append(message);
+  return message;
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
@@ -125,6 +136,9 @@ chatForm.addEventListener('submit', async (event) => {
       tokens.access_token,
     );
     appendChatMessage('assistant', response.answer);
+    if (response.reservation_proposal && canReserveVlans(currentRoles)) {
+      renderReservationProposal(response.reservation_proposal);
+    }
     chatHistory = [
       ...chatHistory,
       { role: 'user', content: message },
@@ -139,6 +153,80 @@ chatForm.addEventListener('submit', async (event) => {
     chatInput.focus();
   }
 });
+
+function textNode(tag, value, className) {
+  const element = document.createElement(tag);
+  element.textContent = value ?? '';
+  if (className) element.className = className;
+  return element;
+}
+
+function renderReservationProposal(proposal) {
+  const card = document.createElement('article');
+  card.className = 'reservation-card';
+  card.append(textNode('h3', 'Propuesta de reserva VLAN'));
+  card.append(textNode('p', `VLAN ${proposal.tag} · ${proposal.parent_interface} · ${proposal.description || proposal.interface_name}`));
+  card.append(textNode('p', `Evento: ${proposal.event_name} · Propósito: ${proposal.purpose} · SSID: ${proposal.ssid}`));
+  card.append(textNode('p', 'La VLAN solo quedará reservada después de confirmar.'));
+  const actions = document.createElement('div');
+  actions.className = 'reservation-actions';
+  const confirm = textNode('button', 'Confirmar');
+  confirm.type = 'button';
+  const cancel = textNode('button', 'Cancelar');
+  cancel.type = 'button';
+  cancel.className = 'button-secondary';
+  cancel.addEventListener('click', () => card.remove());
+  confirm.addEventListener('click', async () => {
+    const tokens = getStoredTokens();
+    confirm.disabled = cancel.disabled = true;
+    try {
+      await apiRequest('/api/v1/changes/vlan-reservations', {
+        method: 'POST', body: JSON.stringify(reservationPayload(proposal)),
+      }, tokens?.access_token);
+      card.replaceChildren(textNode('p', 'Reserva confirmada.'));
+      await refreshReservations();
+    } catch (error) {
+      confirm.disabled = cancel.disabled = false;
+      card.append(textNode('p', error.message, 'reservation-error'));
+    }
+  });
+  actions.append(confirm, cancel);
+  card.append(actions);
+  chatMessages.append(card);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function refreshReservations() {
+  if (!canReserveVlans(currentRoles)) return;
+  const tokens = getStoredTokens();
+  try {
+    const rows = await apiRequest('/api/v1/changes/vlan-reservations', {}, tokens?.access_token);
+    reservationList.replaceChildren(textNode('h3', 'Reservas VLAN activas'));
+    if (!rows.length) reservationList.append(textNode('p', 'No hay reservas activas.'));
+    for (const row of rows) {
+      const item = document.createElement('article');
+      item.className = 'reservation-card';
+      item.append(textNode('strong', `VLAN ${row.tag} · ${row.parent_interface}`));
+      item.append(textNode('p', `${row.event_name} · ${row.purpose} · SSID ${row.ssid}`));
+      const release = textNode('button', 'Liberar');
+      release.type = 'button';
+      release.addEventListener('click', async () => {
+        release.disabled = true;
+        try {
+          await apiRequest(`/api/v1/changes/vlan-reservations/${row.id}/release`, { method: 'POST' }, tokens?.access_token);
+          await refreshReservations();
+        } catch (error) {
+          release.disabled = false;
+          showToast(error.message);
+        }
+      });
+      item.append(release);
+      reservationList.append(item);
+    }
+  } catch (error) {
+    reservationList.replaceChildren(textNode('p', `No se pudieron cargar las reservas: ${error.message}`));
+  }
+}
 
 function showToast(message) {
   toast.textContent = message;
