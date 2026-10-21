@@ -1,5 +1,7 @@
 import jwt
 
+from app.auth.permissions import Permission
+from app.auth.roles import RoleName, has_permission
 from app.auth.security import create_access_token, hash_password, verify_password
 
 
@@ -20,3 +22,7 @@ def test_access_token_contains_identity_roles_and_type():
     assert payload["roles"] == ["visor"]
     assert payload["type"] == "access"
     assert "exp" in payload
+
+
+def test_visor_can_use_chat():
+    assert has_permission({RoleName.VISOR}, Permission.CHAT_USE)
