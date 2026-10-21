@@ -9,6 +9,7 @@ from app.auth.models import Role, User
 from app.auth.routes import admin_router, router
 from app.auth.roles import DEFAULT_ROLES
 from app.auth.security import hash_password
+from app.chat.router import router as chat_router
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 
@@ -37,6 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(monitoring_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
 app.include_router(router)
 app.include_router(admin_router)
 
