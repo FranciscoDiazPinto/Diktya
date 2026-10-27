@@ -1,49 +1,90 @@
 # Arquitectura de NetBot
 
-Este documento resume la arquitectura de software de **NetBot** a partir de los diagramas que están en esta carpeta, sacados de *Documento 05 – Documento de Diseño* y de la *Guía Fase 2 – Desarrollo de Proyecto*.
+Este documento describe por escrito la arquitectura de software de **NetBot**. Su contenido se transcribió de los diagramas del *Documento 05 – Documento de Diseño* y de la *Guía Fase 2 – Desarrollo de Proyecto*. Se puede leer completo sin abrir ninguna imagen; las imágenes originales quedan en esta misma carpeta solo como respaldo (ver sección 11).
 
-NetBot es un asistente que recibe solicitudes de cambio de configuración de red escritas en lenguaje natural (por web o por chat). Analiza cada solicitud con un LLM y genera un plan de acción. Luego ejecuta el plan sobre **UniFi Controller** y **OPNsense**, comprueba el resultado y registra todo en auditoría. Si algo falla, revierte el cambio (rollback).
+## Resumen
 
-![Vista general](2_4_GuiaEstudiante_Fase_2_DesarrolloProyecto_APT_image3.png)
+NetBot es un asistente que recibe solicitudes de cambio de configuración de red escritas en lenguaje natural (por web o por chat). Cada solicitud pasa por estas etapas:
+
+1. Un **LLM** analiza la solicitud y genera un **plan de acción**.
+2. El backend valida permisos y **reserva** el cambio.
+3. El usuario **confirma** el cambio.
+4. El backend **ejecuta** el cambio en **UniFi Controller** (Wi-Fi, VLANs, APs) y en **OPNsense** (firewall y VLANs).
+5. El backend **verifica** el estado real de los dispositivos.
+6. Todo se **registra en auditoría**.
+7. Si la verificación falla, se hace **rollback**.
+
+Patrón común de todos los flujos:
+
+```
+reserva → confirmación → ejecución → verificación → auditoría → (rollback si falla)
+```
 
 ---
 
 ## 1. Stack tecnológico
 
-| Capa | Tecnología | Detalle |
+| Capa | Tecnología | Responsabilidad |
 |---|---|---|
-| Frontend | **React** | Interfaz web y móvil, WebSocket y API REST, gestión de sesiones |
-| Backend | **Python + FastAPI** | Endpoints REST, coordinación de cambios, integración con el LLM y las APIs externas |
+| Frontend | **React** | Interfaz web y móvil; se comunica con el backend por API REST y WebSocket; gestión de sesiones |
+| Backend | **Python + FastAPI** | Endpoints REST, coordinación de cambios, integración con el LLM y las APIs de red, gestión de configuración |
 | Base de datos | **PostgreSQL** | Usuarios, configuraciones, historial de cambios y auditoría |
-| IA | **LLM vía OpenRouter / Claude** (o compatible) | Análisis de solicitudes, generación de planes, clasificación de incidentes |
-| Red (Wi-Fi/switching) | **UniFi Controller API** (HTTPS) | Gestión de red: SSIDs, VLANs, APs |
+| IA | **LLM vía OpenRouter / Claude** (o cualquier proveedor compatible) | Interpretar solicitudes, generar planes de acción, clasificar incidentes por criticidad |
+| Red | **UniFi Controller API** (HTTPS) | Gestión de red: SSIDs, VLANs, access points |
 | Firewall | **OPNsense API** (HTTPS) | Reglas de firewall y VLANs |
-| Infraestructura | **Docker** | Todos los servicios en un mismo Docker Host |
+| Infraestructura | **Docker** | Frontend, backend y base de datos corren como contenedores en un mismo Docker Host |
 
 ---
 
 ## 2. Vista lógica (capas)
 
+La aplicación tiene tres capas internas y un grupo de servicios externos.
+
 ```
-┌──────────────────────── Presentación ────────────────────────┐
-│ Frontend (React): UI, WebSocket / API REST, sesiones          │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ HTTPS (JSON)
-┌──────────────────────── Lógica de Negocio ───────────────────┐      HTTPS (JSON)    ┌── Servicios Externos ──┐
-│ Backend (FastAPI): endpoints REST, coordinación de cambios,  │ ◄──────────────────► │ LLM (OpenRouter/Claude) │
-│ integración con LLM y APIs, gestión de configuración         │                      │ UniFi Controller API    │
-└──────────────────────────────┬───────────────────────────────┘                      │ OPNsense API            │
-                               │ SQL (5432)                                           └─────────────────────────┘
-┌──────────────────────────── Datos ───────────────────────────┐
-│ PostgreSQL: usuarios, configuraciones, historial, auditoría  │
-└──────────────────────────────────────────────────────────────┘
+┌───────────────────────── Presentación ─────────────────────────┐
+│ Frontend (React)                                               │
+│  · Interfaz de usuario                                         │
+│  · WebSocket / API REST                                        │
+│  · Gestión de sesiones                                         │
+└───────────────────────────────┬────────────────────────────────┘
+                                │ HTTPS (JSON)
+┌─────────────────────── Lógica de Negocio ──────────────────────┐   HTTPS (JSON)   ┌──── Servicios Externos ────┐
+│ Backend (FastAPI)                                              │ ◄──────────────► │ LLM (OpenRouter / Claude)  │
+│  · Endpoints REST                                              │                  │ UniFi Controller API       │
+│  · Coordinación de cambios                                     │                  │ OPNsense API               │
+│  · Integración con LLM y APIs                                  │                  └────────────────────────────┘
+│  · Gestión de configuración                                    │
+└───────────────────────────────┬────────────────────────────────┘
+                                │ SQL (puerto 5432)
+┌──────────────────────────── Datos ─────────────────────────────┐
+│ PostgreSQL                                                     │
+│  · Usuarios · Configuraciones · Historial de cambios · Auditoría│
+└────────────────────────────────────────────────────────────────┘
 ```
+
+Reglas que se desprenden de esta vista:
+- La **presentación** solo habla con la **lógica de negocio**, nunca con la base de datos ni con los servicios externos.
+- La **lógica de negocio** es la única capa que accede a PostgreSQL y a las APIs externas.
 
 ---
 
 ## 3. Diagrama de componentes
 
-![Componentes](Documento_05_-_Documento_de_Diseño_image6.png)
+```
+                HTTPS                HTTP/JSON                    API HTTPS
+ ┌─────────┐ ─────────► ┌──────────┐ ─────────► ┌───────────────┐ ─────────► ┌───────────────────────┐
+ │ Cliente │            │ Frontend │            │    Backend    │            │ LLM (OpenRouter/Claude)│
+ │(navega- │ ◄───────── │ (React)  │ ◄───────── │   (FastAPI)   │ ◄───────── └───────────────────────┘
+ │dor/móvil│            └──────────┘            └───┬───┬───┬───┘
+ └─────────┘                                    SQL │   │   │ HTTPS
+                                                    ▼   │   ▼
+                                     ┌──────────────┐   │  ┌────────────────┐
+                                     │ PostgreSQL   │   │  │ OPNsense (API) │
+                                     └──────────────┘   ▼  └────────────────┘
+                                                 ┌──────────────────────┐
+                                                 │ UniFi Controller(API)│
+                                                 └──────────────────────┘
+```
 
 | Origen | Destino | Protocolo |
 |---|---|---|
@@ -54,161 +95,326 @@ NetBot es un asistente que recibe solicitudes de cambio de configuración de red
 | Backend | UniFi Controller API | HTTPS |
 | Backend | OPNsense API | HTTPS |
 
-El **Backend** es el único componente que se comunica con la base de datos y con los servicios externos. El frontend nunca llama directamente al LLM, a UniFi ni a OPNsense.
+En el diagrama original, las conexiones del backend con la base de datos, UniFi y OPNsense aparecen con línea discontinua. Según la leyenda, eso marca una "conexión opcional" (ver sección 10).
 
 ---
 
 ## 4. Vista de despliegue
 
-![Despliegue](Documento_05_-_Documento_de_Diseño_image7.png)
+```
+┌── Usuario ──────────┐                 ┌── Servidor de Aplicaciones (Docker Host) ─────────────────┐            ┌── Red / Dispositivos ──┐
+│ Navegador web (React)│   Internet     │ ┌──────────┐  HTTP  ┌───────────┐  SQL  ┌────────────┐   │   HTTPS    │ UniFi Controller       │
+│ Móvil (React)        │ ──(HTTPS)────► │ │ Frontend │ ─────► │  Backend  │ ────► │ PostgreSQL │   │ ─────────► │ (API HTTPS)            │
+└──────────────────────┘                │ │ React    │        │  FastAPI  │       │            │   │            ├────────────────────────┤
+                                        │ │ :80      │        │  :8000    │       │ :5432      │   │ ─────────► │ OPNsense (API HTTPS)   │
+                                        │ └──────────┘        └───────────┘       └────────────┘   │            └────────────────────────┘
+                                        └───────────────────────────────────────────────────────────┘
+```
 
-- **Usuario:** navegador web (React) o móvil (React) que entra por Internet (HTTPS).
-- **Servidor de aplicaciones (Docker Host):**
+| Nodo | Contenido | Puerto |
+|---|---|---|
+| Dispositivo del usuario | Navegador web o app móvil (React) | — |
+| Docker Host – contenedor Frontend | React | 80 |
+| Docker Host – contenedor Backend | FastAPI | 8000 |
+| Docker Host – contenedor BD | PostgreSQL | 5432 |
+| Red / Dispositivos | UniFi Controller (API HTTPS), OPNsense (API HTTPS) | HTTPS |
 
-  | Contenedor | Puerto |
-  |---|---|
-  | Frontend (React) | 80 |
-  | Backend (FastAPI) | 8000 |
-  | BD (PostgreSQL) | 5432 |
-
-  El frontend se comunica con el backend por HTTP y el backend con la BD por SQL.
-- **Red / Dispositivos:** UniFi Controller (API HTTPS) y OPNsense (API HTTPS), a los que se llega desde el Docker Host.
+- El usuario llega al frontend por **Internet (HTTPS)**.
+- Dentro del Docker Host, el frontend se comunica con el backend por **HTTP** y el backend con la BD por **SQL**.
+- Desde el Docker Host salen conexiones **HTTPS** hacia UniFi y OPNsense, en la red de dispositivos.
+- El LLM es un servicio externo en Internet y el backend lo consume por HTTPS. No aparece en el diagrama de despliegue.
 
 ---
 
 ## 5. Casos de uso
 
-![Casos de uso](Documento_05_-_Documento_de_Diseño_image8.png)
-
-**Actor:** Usuario (web / chat).
+**Actor principal:** Usuario (web / chat).
+**Actores secundarios (sistemas externos):** Proveedor LLM (OpenRouter / Claude / compatible), UniFi Controller API (gestión de red) y OPNsense API (firewall).
 
 Casos de uso del usuario:
-1. Enviar solicitud de cambio de configuración
-2. Consultar estado de un cambio
-3. Ver historial de cambios
-4. Revisar logs / auditoría
-5. Gestionar configuración (roles / credenciales)
 
-Casos internos de NetBot (`«include»` desde *Enviar solicitud*):
-- Analizar solicitud con IA, usando el **proveedor LLM**
-- Generar plan de acción
-- Ejecutar cambio en dispositivos / servicios, sobre **UniFi Controller API** y **OPNsense API**
-- Verificar estado del cambio
-- Registrar en auditoría
+| # | Caso de uso | Descripción |
+|---|---|---|
+| CU1 | Enviar solicitud de cambio de configuración | El usuario pide un cambio de red en lenguaje natural |
+| CU2 | Consultar estado de un cambio | Ver en qué etapa está una solicitud o cambio |
+| CU3 | Ver historial de cambios | Listar los cambios realizados |
+| CU4 | Revisar logs / auditoría | Consultar el registro de auditoría |
+| CU5 | Gestionar configuración (roles / credenciales) | Administrar roles de usuario y credenciales de servicios |
+
+Casos de uso internos del sistema NetBot. CU1 los incluye con `«include»`:
+
+| Caso interno | Sistema externo involucrado |
+|---|---|
+| Analizar solicitud con IA | Proveedor LLM |
+| Generar plan de acción | Proveedor LLM |
+| Ejecutar cambio en dispositivos / servicios | UniFi Controller API, OPNsense API |
+| Verificar estado del cambio | UniFi Controller API, OPNsense API |
+| Registrar en auditoría | — (base de datos propia) |
 
 ---
 
 ## 6. Modelo de datos (E-R propuesto)
 
-![Modelo E-R](Documento_05_-_Documento_de_Diseño_image9.png)
+> Según el propio diagrama, este es un "modelo lógico propuesto según requerimientos del README", así que todavía no es el esquema definitivo.
 
-| Tabla | Campos |
-|---|---|
-| `usuarios` | **id_usuario (PK)**, nombre, email, rol, estado, fecha_creacion |
-| `solicitudes` | **id_solicitud (PK)**, id_usuario (FK), tipo_cambio, descripcion, estado, fecha_solicitud |
-| `cambios` | **id_cambio (PK)**, id_solicitud (FK), id_dispositivo (FK), accion, estado, fecha_ejecucion, resultado |
-| `dispositivos` | **id_dispositivo (PK)**, nombre, tipo, ip, descripcion, estado |
-| `servicios` | **id_servicio (PK)**, nombre, tipo, endpoint, credenciales |
-| `auditoria` | **id_auditoria (PK)**, id_solicitud (FK), id_usuario (FK), accion, detalle, fecha |
+### Tablas
 
-**Relaciones** (tal como aparecen en el diagrama):
-- `usuarios` 1 — 1 `solicitudes` (en el diagrama de clases es **1 — 0..\***, que parece ser la relación correcta)
-- `solicitudes` 1 — N `cambios`
-- `dispositivos` 1 — N `solicitudes` / `cambios`
-- `dispositivos` 1 — N `servicios`
-- `cambios` N — 1 `servicios`
-- `auditoria` 1 — N `cambios`
+**`usuarios`**
+| Campo | Tipo sugerido | Notas |
+|---|---|---|
+| id_usuario | int | **PK** |
+| nombre | text | |
+| email | text | |
+| rol | text | |
+| estado | text / bool | activo / inactivo |
+| fecha_creacion | timestamp | |
 
-> El diagrama aclara que es un "modelo lógico propuesto según requerimientos del README", así que todavía no es el esquema definitivo.
+**`solicitudes`**
+| Campo | Tipo sugerido | Notas |
+|---|---|---|
+| id_solicitud | int | **PK** |
+| id_usuario | int | **FK → usuarios** |
+| tipo_cambio | text | ej. cambio de VLAN, carga de SSIDs |
+| descripcion | text | texto original de la solicitud |
+| estado | text | |
+| fecha_solicitud | timestamp | |
+
+**`cambios`**
+| Campo | Tipo sugerido | Notas |
+|---|---|---|
+| id_cambio | int | **PK** |
+| id_solicitud | int | **FK → solicitudes** |
+| id_dispositivo | int | **FK → dispositivos** |
+| accion | text | acción concreta a aplicar |
+| estado | text | |
+| fecha_ejecucion | timestamp | |
+| resultado | text | |
+
+**`dispositivos`**
+| Campo | Tipo sugerido | Notas |
+|---|---|---|
+| id_dispositivo | int | **PK** |
+| nombre | text | |
+| tipo | text | AP, switch, firewall… |
+| ip | text / inet | |
+| descripcion | text | |
+| estado | text | |
+
+**`servicios`**
+| Campo | Tipo sugerido | Notas |
+|---|---|---|
+| id_servicio | int | **PK** |
+| nombre | text | |
+| tipo | text | UniFi, OPNsense, LLM… |
+| endpoint | text | URL de la API |
+| credenciales | text | debe guardarse cifrado (ver sección 9) |
+
+**`auditoria`**
+| Campo | Tipo sugerido | Notas |
+|---|---|---|
+| id_auditoria | int | **PK** |
+| id_solicitud | int | **FK → solicitudes** |
+| id_usuario | int | **FK → usuarios** |
+| accion | text | |
+| detalle | text | |
+| fecha | timestamp | |
+
+### Relaciones
+
+Las cardinalidades se transcribieron del diagrama tal como aparecen:
+
+```
+usuarios ──1───────1── solicitudes ──N───────1── dispositivos
+                           │1                        │1
+                           │                         │
+                           │N                        │N
+auditoria ──1───────N── cambios ──────N───────1── servicios
+```
+
+| Relación | Cardinalidad en el diagrama | Lectura |
+|---|---|---|
+| usuarios – solicitudes | 1 : 1 | En el diagrama de clases es 1 : 0..*. Lo correcto es **1 : N** (un usuario hace muchas solicitudes) |
+| solicitudes – dispositivos | N : 1 | Muchas solicitudes pueden afectar a un mismo dispositivo |
+| solicitudes – cambios | 1 : N | Una solicitud genera uno o varios cambios |
+| dispositivos – servicios | 1 : N | Un dispositivo se gestiona mediante servicios (APIs) |
+| cambios – servicios | N : 1 | Cada cambio se aplica a través de un servicio |
+| auditoria – cambios | 1 : N | Los registros de auditoría se asocian a cambios |
 
 ---
 
 ## 7. Diagrama de clases
 
-![Clases](Documento_05_-_Documento_de_Diseño_image10.png)
-
 | Clase | Atributos | Métodos |
 |---|---|---|
-| `Usuario` | id, nombre, email, rol, estado: bool | `enviarSolicitud()`, `verHistorial()` |
-| `SolicitudCambio` | id, usuarioId, tipoCambio, descripcion, estado, fechaSolicitud | `analizarConIA()`, `generarPlanAccion()`, `validar()` |
-| `Cambio` | id, solicitudId, dispositivoId, accion, estado, resultado, fechaEjecucion | `ejecutar()`, `verificar()`, `rollback()` |
-| `Dispositivo` | id, nombre, tipo, ip, descripcion, estado | `aplicarConfiguracion()` |
-| `Auditoria` | id, usuarioId, solicitudId, accion, detalle, fecha | `registrar()` |
-| `ServicioExterno` | id, nombre, tipo, endpoint, credenciales | `conectar()`, `ejecutarAccion()` |
-| `UniFiController` | id, ip, version | `aplicarConfig()`, `obtenerEstado()` |
-| `OPNsenseFirewall` | id, ip, version | `aplicarRegla()`, `obtenerEstado()` |
+| `Usuario` | id: int, nombre: string, email: string, rol: string, estado: boolean | `enviarSolicitud()`, `verHistorial()` |
+| `SolicitudCambio` | id: int, usuarioId: int, tipoCambio: string, descripcion: string, estado: string, fechaSolicitud: datetime | `analizarConIA()`, `generarPlanAccion()`, `validar()` |
+| `Cambio` | id: int, solicitudId: int, dispositivoId: int, accion: string, estado: string, resultado: string, fechaEjecucion: datetime | `ejecutar()`, `verificar()`, `rollback()` |
+| `Dispositivo` | id: int, nombre: string, tipo: string, ip: string, descripcion: string, estado: string | `aplicarConfiguracion()` |
+| `Auditoria` | id: int, usuarioId: int, solicitudId: int, accion: string, detalle: string, fecha: datetime | `registrar()` |
+| `ServicioExterno` | id: int, nombre: string, tipo: string, endpoint: string, credenciales: string | `conectar()`, `ejecutarAccion()` |
+| `UniFiController` | id: int, ip: string, version: string | `aplicarConfig()`, `obtenerEstado()` |
+| `OPNsenseFirewall` | id: int, ip: string, version: string | `aplicarRegla()`, `obtenerEstado()` |
 
-**Multiplicidades:**
-- `Usuario` 1 → 0..* `SolicitudCambio`
-- `SolicitudCambio` 1 → 0..* `Cambio`
-- `Cambio` 0..* → 1 `Dispositivo`
-- `Dispositivo` 1 → `Auditoria`; `Cambio` 0..* → 0..* `Auditoria`
-- `ServicioExterno` 1 → 1 `UniFiController` 1 → 1 `OPNsenseFirewall`
+### Asociaciones
 
-> Sugerencia para la implementación: `UniFiController` y `OPNsenseFirewall` pueden ser subclases (o adaptadores) de `ServicioExterno` con una interfaz común (`conectar`, `aplicar…`, `obtenerEstado`). Así el `Cambio` se ejecuta igual sobre cualquier proveedor.
+| Desde | Hacia | Multiplicidad |
+|---|---|---|
+| Usuario | SolicitudCambio | 1 → 0..* |
+| SolicitudCambio | Cambio | 1 → 0..* |
+| Cambio | Dispositivo | 0..* → 1 |
+| Dispositivo | Auditoria | 1 → (asociado) |
+| Cambio | Auditoria | 0..* → 0..* |
+| ServicioExterno | UniFiController | 1 → 1 |
+| UniFiController | OPNsenseFirewall | 1 → 1 |
+
+> Sugerencia para la implementación: `UniFiController` y `OPNsenseFirewall` pueden ser subclases (o adaptadores) de `ServicioExterno` con una interfaz común (`conectar`, `aplicar…`, `obtenerEstado`). Así un `Cambio` se ejecuta igual sobre cualquier proveedor y se pueden agregar otros sin tocar la lógica de negocio.
 
 ---
 
-## 8. Flujos principales (secuencia)
+## 8. Flujos (diagramas de secuencia)
 
-Todos los flujos siguen el mismo patrón:
+Notación: `A → B: mensaje` es una llamada y `A ⇠ B: mensaje` es una respuesta. Los bloques **alt** son alternativas excluyentes y **loop** es una repetición. La numeración es la de los diagramas originales.
 
-**reserva → confirmación → ejecución → verificación → auditoría → rollback (si falla)**
+### 8.1 Flujo general de un cambio de configuración
 
-### 8.1 Flujo general (vista general, diagrama 5)
-1. El usuario envía la solicitud al frontend.
-2. El frontend la reenvía al backend (API REST).
-3. El backend envía la solicitud al LLM (prompt + contexto), que devuelve un plan de acción.
-4. El backend reserva el cambio (verificando el estado actual en UniFi).
-5. El backend confirma y ejecuta el cambio (OPNsense / UniFi) y recibe el resultado.
-6. El backend verifica el estado consultando las APIs.
-7. El backend registra el resultado en auditoría (PostgreSQL).
-8. El frontend notifica al usuario el resultado (éxito, error y detalles).
+Participantes: Usuario (web/chat), Frontend (React), Backend (FastAPI), LLM (OpenRouter/Claude), UniFi Controller API, OPNsense API, BD (PostgreSQL).
+
+1. Usuario → Frontend: envía la solicitud (cambio de configuración).
+2. Frontend → Backend: envía la solicitud (API REST).
+3. Backend → LLM: analiza y genera un plan (prompt + contexto).
+4. LLM ⇠ Backend: respuesta (plan de acción).
+5. Backend → UniFi: reserva el cambio (verifica el estado actual).
+6. Backend → OPNsense: confirma y ejecuta el cambio.
+7. OPNsense ⇠ Backend: resultado de la ejecución.
+8. Backend → UniFi: verifica el estado (consulta las APIs).
+9. UniFi ⇠ Backend: estado del cambio.
+10. Backend → BD: registra en auditoría.
+11. Backend ⇠ Frontend ⇠ Usuario: notifica el resultado (éxito o error, con detalles).
 
 ### 8.2 Cambio de VLAN solicitado por chat
 
-![Cambio de VLAN](Documento_05_-_Documento_de_Diseño_image4.png)
+Participantes: Usuario (Web), Frontend (React), Backend (FastAPI), LLM (OpenRouter/Claude), PostgreSQL, UniFi (API), OPNsense (API).
 
-1. El usuario pide un cambio de VLAN en lenguaje natural y el frontend lo envía al backend.
-2. El backend pide al **LLM** que analice la solicitud y genere un plan.
-3. El backend valida permisos y datos, y crea una **reserva de cambio**.
-4. **alt – Requiere confirmación:** se muestra la propuesta al usuario y este confirma.
-5. El backend ejecuta el cambio de VLAN en **UniFi** y en **OPNsense**, y luego verifica el estado.
-6. **alt – Verificación correcta:** se registra el resultado OK y la auditoría, y se notifica el éxito.
-7. **alt – Verificación fallida:** se ejecuta el **rollback en UniFi y OPNsense**, se registran el rollback y la auditoría, y se notifica el error y el rollback.
+1. Usuario → Frontend: pide un cambio de VLAN en lenguaje natural.
+2. Frontend → Backend: envía la solicitud.
+3. Backend → LLM: analiza la solicitud y genera un plan.
+4. LLM ⇠ Backend: respuesta (plan).
+5. Backend: valida permisos y datos (proceso interno).
+6. Backend → PostgreSQL: crea la reserva de cambio.
+7. PostgreSQL ⇠ Backend: reserva creada.
 
-**Puntos clave:** validar permisos antes de ejecutar, pedir confirmación explícita, verificar y hacer rollback si falla, y registrar todo en auditoría.
+**alt [Requiere confirmación]**
+
+8. Frontend → Usuario: muestra la propuesta de cambio.
+9. Usuario → Frontend: confirma el cambio.
+10. Frontend → Backend: envía la confirmación (el backend la persiste en PostgreSQL).
+
+**Ejecución**
+
+11. Backend → UniFi: ejecuta el cambio de VLAN.
+12. Backend → OPNsense: ejecuta el cambio de VLAN.
+13. UniFi ⇠ Backend: resultado de UniFi.
+14. OPNsense ⇠ Backend: resultado de OPNsense.
+15. Backend → UniFi / OPNsense: verifica el estado.
+16. UniFi / OPNsense ⇠ Backend: estado de la verificación.
+
+**alt [Verificación correcta]**
+
+17. Backend → PostgreSQL: registra el resultado OK.
+18. Backend → PostgreSQL: registra la auditoría.
+19. Backend ⇠ Frontend ⇠ Usuario: notifica el éxito.
+
+**alt [Verificación fallida]**
+
+17. Backend → UniFi: ejecuta el rollback.
+18. Backend → OPNsense: ejecuta el rollback.
+19. Backend → PostgreSQL: registra el rollback.
+20. Backend → PostgreSQL: registra la auditoría.
+21. Backend ⇠ Frontend ⇠ Usuario: notifica el error y el rollback.
+
+**Puntos clave:** validar permisos antes de ejecutar; pedir confirmación explícita del usuario; verificar y hacer rollback si falla; registrar todo en auditoría.
 
 ### 8.3 Carga masiva de SSIDs vía CSV
 
-![Carga CSV](Documento_05_-_Documento_de_Diseño_image3.png)
+Participantes: Usuario (Web), Frontend (React), Backend (FastAPI), PostgreSQL, UniFi (API), OPNsense (API).
 
-1. El usuario sube un archivo CSV y el frontend lo envía al backend.
-2. El backend valida el formato y el contenido.
-3. **alt – Archivo inválido:** se muestran los errores y se notifica.
-4. **alt – Archivo válido:** se reservan las VLANs necesarias, se muestra una **vista previa** y se pide confirmación.
-5. **alt – Usuario confirma:** se aplican los SSIDs en lote: se **crean los SSIDs en UniFi** y se **configuran las VLANs en OPNsense**. Después se verifican los SSIDs.
-6. **alt – Verificación correcta:** se genera un resumen, se notifica el resultado y se registra en la BD.
-7. **alt – Verificación fallida:** se registra el error y se notifica el fallo.
+1. Usuario → Frontend: sube el archivo CSV.
+2. Frontend → Backend: envía el archivo.
+3. Backend: valida el formato y el contenido.
+4. Backend: obtiene el resultado de la validación.
 
-**Puntos clave:** validar el CSV (formato y datos), reservar las VLANs antes de aplicar, mostrar vista previa y pedir confirmación, y entregar verificación y resumen final.
+**alt [Archivo inválido]**
+
+5. Backend → Frontend: muestra los errores.
+6. Frontend → Usuario: notifica el error.
+
+**alt [Archivo válido]**
+
+5. Backend → UniFi: reserva las VLANs necesarias.
+6. UniFi ⇠ Backend: reserva creada.
+7. Backend → Frontend: muestra la vista previa.
+8. Frontend → Usuario: solicita confirmación.
+
+**alt [Usuario confirma]**
+
+9. Backend: aplica los SSIDs en lote.
+10. Backend → UniFi: crea los SSIDs.
+11. Backend → OPNsense: configura las VLANs.
+12. UniFi ⇠ Backend: resultado de UniFi.
+13. OPNsense ⇠ Backend: resultado de OPNsense.
+14. Backend → UniFi / OPNsense: verifica los SSIDs.
+15. UniFi / OPNsense ⇠ Backend: estado de la verificación.
+
+**alt [Verificación correcta]**
+
+16. Backend: genera el resumen.
+17. Backend → Frontend: notifica el resultado.
+18. Backend → PostgreSQL: registra en la BD.
+19. Frontend → Usuario: notifica el resultado (en el original este paso aparece numerado como 13).
+
+**alt [Verificación fallida]**
+
+16. Backend → PostgreSQL: registra el error.
+17. Backend ⇠ Frontend ⇠ Usuario: notifica el fallo.
+
+**Puntos clave:** validar el CSV (formato y datos); reservar las VLANs antes de aplicar; mostrar vista previa y pedir confirmación; verificar y entregar un resumen final.
+
+> El diagrama no especifica las columnas del CSV. Hay que definirlas (por ejemplo: `ssid`, `vlan_id`, `seguridad`, `contraseña`, `sitio`) antes de implementar.
 
 ### 8.4 Incidente, ticket y notificación
 
-![Incidentes](Documento_05_-_Documento_de_Diseño_image5.png)
+Participantes: Agente de Monitoreo (proceso en segundo plano), Backend (FastAPI), LLM (OpenRouter/Claude), Agente de Tickets (FastAPI), Equipo Técnico (receptor de notificaciones), PostgreSQL.
 
-Participantes adicionales: **Agente de Monitoreo** (proceso en segundo plano), **Agente de Tickets** (FastAPI) y **Equipo Técnico** (recibe las notificaciones).
+1. Agente de Monitoreo: detecta una anomalía (por ejemplo, la caída de un AP).
+2. Agente de Monitoreo → Backend: envía la alerta.
+3. Backend → LLM: analiza y clasifica la alerta.
+4. LLM ⇠ Backend: resultado (criticidad).
+5. Backend / LLM → Agente de Tickets: crea el ticket.
+6. Agente de Tickets → PostgreSQL: registra el ticket.
+7. PostgreSQL ⇠ Agente de Tickets: ticket creado.
+8. Agente de Tickets → Equipo Técnico: notifica al equipo técnico.
 
-1. El agente de monitoreo detecta una anomalía (por ejemplo, la caída de un AP) y envía una alerta al backend.
-2. El backend pide al **LLM** que analice y clasifique la alerta según su **criticidad**.
-3. Se crea un ticket, que el agente de tickets registra en PostgreSQL, y se notifica al equipo técnico.
-4. **loop – Seguimiento periódico:** se consulta el estado del ticket, se actualiza en la BD, se notifica la actualización y se recibe la respuesta del equipo.
-5. **alt – Incidente resuelto:** se cierra el ticket, se registra el cierre y se notifica.
-6. **alt – Requiere escalamiento:** se escala el incidente y se notifica el escalamiento.
+**loop [Seguimiento periódico]**
 
-**Puntos clave:** detección automática, clasificación de criticidad con el LLM, creación y notificación del ticket, y seguimiento periódico hasta la resolución.
+10. Backend / LLM → Agente de Tickets: consulta el estado.
+11. Agente de Tickets → PostgreSQL: actualiza el estado.
+12. Agente de Tickets → Equipo Técnico: notifica la actualización.
+13. Equipo Técnico ⇠ Backend / LLM: respuesta del equipo.
 
-> Este flujo añade dos componentes que **no aparecen** en los diagramas de componentes, despliegue, clases ni E-R: el agente de monitoreo y el agente de tickets. Tampoco hay una tabla `tickets` en el modelo de datos. Hay que agregarlos si este flujo entra en el alcance.
+**alt [Incidente resuelto]**
+
+14. Backend / LLM → Agente de Tickets: cierra el ticket.
+15. Agente de Tickets → PostgreSQL: registra el cierre.
+16. Agente de Tickets ⇠ Backend: notifica el cierre.
+
+**alt [Requiere escalamiento]**
+
+14. Backend / LLM → Equipo Técnico: escala el incidente.
+15. Equipo Técnico → PostgreSQL: notifica y registra el escalamiento.
+
+**Puntos clave:** detección automática por el agente de monitoreo; clasificación de criticidad con el LLM; creación y notificación del ticket; seguimiento periódico hasta la resolución.
+
+> El diagrama original no incluye un paso 9; la numeración salta del 8 al 10.
 
 ---
 
@@ -216,21 +422,41 @@ Participantes adicionales: **Agente de Monitoreo** (proceso en segundo plano), *
 
 Conviene resolver estos puntos antes de implementar:
 
-1. **Tickets e incidentes no están modelados.** Faltan la entidad o tabla `tickets` y los servicios *Agente de Monitoreo* y *Agente de Tickets* en las vistas de componentes y despliegue.
-2. **Reservas sin persistencia.** Los flujos usan "reserva de cambio" y "reserva de VLANs", pero el E-R no tiene una tabla ni un estado para las reservas. Se podría resolver con un valor `reservado` en `cambios.estado` o con una tabla `reservas`.
+1. **Tickets e incidentes no están modelados.** Faltan la entidad o tabla `tickets` y los servicios *Agente de Monitoreo* y *Agente de Tickets* en las vistas de componentes, despliegue y clases.
+2. **Reservas sin persistencia.** Los flujos usan "reserva de cambio" y "reserva de VLANs", pero el E-R no tiene una tabla ni un estado para las reservas. Se podría resolver con un valor `reservado` en `cambios.estado` o con una tabla `reservas`. Tampoco está claro dónde vive la reserva: según el flujo, en PostgreSQL o en UniFi.
 3. **La cardinalidad usuarios–solicitudes no coincide.** En el E-R es 1:1 y en el diagrama de clases es 1:0..*. Lo correcto es **1:N**.
 4. **Las credenciales se guardan en la BD** (`servicios.credenciales`). Deben ir cifradas o en un gestor de secretos o variables de entorno, nunca en texto plano.
-5. **Algunas flechas apuntan al participante equivocado.** En el flujo de VLAN, "Crear reserva de cambio" apunta a UniFi y "Enviar confirmación" apunta a PostgreSQL. En el flujo CSV, la numeración se repite (13, 16 y 17) y hay un error de tipeo ("reulbdo"). Son detalles de los diagramas y no afectan la arquitectura.
+5. **Algunas flechas apuntan al participante equivocado.** En el flujo de VLAN, "Crear reserva de cambio" apunta a UniFi y "Enviar confirmación" apunta a PostgreSQL. En este documento se interpretaron según su sentido lógico. En el flujo CSV y en el de incidentes, la numeración se repite o salta.
 6. **No hay HTTPS en el contenedor del frontend.** El despliegue expone el frontend en el puerto 80. En producción hace falta TLS, por ejemplo con un reverse proxy como Nginx o Traefik delante.
-7. **Falta definir la autenticación.** Existe "gestionar roles / credenciales", pero ningún diagrama dice cómo se autentica el usuario (JWT, sesiones, SSO).
+7. **Falta definir la autenticación.** Existe "gestionar roles / credenciales", pero ningún diagrama dice cómo se autentica el usuario (JWT, sesiones, SSO) ni qué roles existen.
+8. **El LLM no aparece en el despliegue.** Hay que contemplar su API key, la salida a Internet desde el backend, los límites de uso y qué hacer si el proveedor no responde.
+9. **Formato del CSV sin definir** (ver sección 8.3).
 
 ---
 
-## 10. Índice de imágenes
+## 10. Leyenda de los diagramas originales
+
+| Elemento | Significado |
+|---|---|
+| Caja azul | Componente / contenedor |
+| Caja morada | Servicio externo |
+| Caja verde | Base de datos |
+| Caja amarilla | Entidad / modelo |
+| Flecha continua | Dependencia / flujo |
+| Flecha discontinua | Conexión opcional (en los diagramas de secuencia, una respuesta) |
+| Rectángulo discontinuo | Límite de contenedor |
+
+Pie de la lámina general: *NetBot – Diagramas de Arquitectura y Diseño · Python + FastAPI | PostgreSQL | React | UniFi | OPNsense*.
+
+---
+
+## 11. Archivos de respaldo en esta carpeta
+
+Este documento no depende de ellos, pero estas son las fuentes originales:
 
 | Archivo | Contenido |
 |---|---|
-| `2_4_GuiaEstudiante_Fase_2_DesarrolloProyecto_APT_image3.png` | Lámina completa: casos de uso, vista lógica, E-R, clases, secuencia, despliegue y componentes |
+| `2_4_GuiaEstudiante_Fase_2_DesarrolloProyecto_APT_image3.png` | Lámina completa: casos de uso, vista lógica, E-R, clases, secuencia general, despliegue, componentes y leyenda |
 | `Documento_05_-_Documento_de_Diseño_image3.png` | Secuencia: carga masiva de SSIDs vía CSV |
 | `Documento_05_-_Documento_de_Diseño_image4.png` | Secuencia: cambio de VLAN solicitado por chat |
 | `Documento_05_-_Documento_de_Diseño_image5.png` | Secuencia: incidente, ticket y notificación |
