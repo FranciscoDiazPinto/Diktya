@@ -26,6 +26,7 @@ class UserRead(BaseModel):
     full_name: Optional[str]
     is_active: bool
     roles: list[str]
+    permissions: list[str] = Field(default_factory=list)
     created_at: datetime
 
 

@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { canReserveVlans, reservationPayload } from '../chat-reservations.mjs';
 
-test('only operator and admin can see reservation controls', () => {
+test('only admin can see global reservation controls until scoped operations exist', () => {
   assert.equal(canReserveVlans(['visor']), false);
-  assert.equal(canReserveVlans(['operador']), true);
+  assert.equal(canReserveVlans(['operador']), false);
+  assert.equal(canReserveVlans(['tecnico']), false);
+  assert.equal(canReserveVlans(['cliente']), false);
   assert.equal(canReserveVlans(['admin']), true);
 });
 

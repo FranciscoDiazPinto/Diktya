@@ -15,6 +15,7 @@ from app.auth.routes import admin_router, router
 from app.auth.roles import DEFAULT_ROLES
 from app.auth.security import hash_password
 from app.chat.router import router as chat_router
+from app.networks.router import router as networks_router, admin_router as networks_admin_router
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 
@@ -62,6 +63,8 @@ app.add_middleware(
 )
 app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
+app.include_router(networks_router, prefix="/api/v1")
+app.include_router(networks_admin_router)
 app.include_router(changes_router, prefix="/api/v1")
 app.include_router(router)
 app.include_router(admin_router)
@@ -72,8 +75,11 @@ def initialize_database() -> None:
     db = SessionLocal()
     try:
         for role_name, role_definition in DEFAULT_ROLES.items():
-            if not db.scalar(select(Role).where(Role.name == role_name.value)):
+            role = db.scalar(select(Role).where(Role.name == role_name.value))
+            if role is None:
                 db.add(Role(name=role_name.value, description=role_definition.description))
+            else:
+                role.description = role_definition.description
         db.commit()
         if settings.admin_email and settings.admin_password and not db.scalar(
             select(User).where(User.email == settings.admin_email.lower())

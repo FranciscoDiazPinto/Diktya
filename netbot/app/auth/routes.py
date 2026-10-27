@@ -12,6 +12,7 @@ from app.core.database import get_db
 
 from .dependencies import get_current_user, require_permission
 from .models import RefreshToken, Role, User
+from .roles import effective_permissions
 from .schemas import LoginRequest, RefreshRequest, RoleCreate, RoleRead, TokenResponse, UserCreate, UserRead, UserUpdate
 from .security import create_access_token, create_refresh_token, hash_password, verify_password
 
@@ -22,7 +23,7 @@ admin_router = APIRouter(prefix="/admin", tags=["administration"])
 def _user_read(user: User) -> UserRead:
     return UserRead(
         id=user.id, email=user.email, full_name=user.full_name, is_active=user.is_active,
-        roles=[role.name for role in user.roles], created_at=user.created_at,
+        roles=[role.name for role in user.roles], permissions=sorted(p.value for p in effective_permissions(user)), created_at=user.created_at,
     )
 
 

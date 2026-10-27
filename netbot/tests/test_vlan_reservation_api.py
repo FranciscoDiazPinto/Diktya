@@ -17,8 +17,8 @@ def test_viewer_can_read_options_but_cannot_reserve(client, viewer_user, login):
     }, headers=headers).status_code == 403
 
 
-def test_operator_can_create_and_release_reservation(client, db_session, login):
-    role = db_session.query(Role).filter_by(name="operador").one()
+def test_admin_can_create_and_release_reservation(client, db_session, login):
+    role = db_session.query(Role).filter_by(name="admin").one()
     user = User(email="operator-reserve@example.com", hashed_password=hash_password("pass"), roles=[role])
     db_session.add(user)
     db_session.commit()

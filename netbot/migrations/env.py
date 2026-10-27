@@ -3,6 +3,8 @@ from sqlalchemy import engine_from_config, pool
 from app.core.database import Base
 from app.auth import models  # noqa: F401
 from app.changes import models as change_models  # noqa: F401
+from app.chat import models as chat_models  # noqa: F401
+from app.networks import models as network_models  # noqa: F401
 from app.core.config import settings
 
 config = context.config

@@ -47,6 +47,8 @@ Los trabajos que modifican infraestructura requieren almacenamiento persistente 
 - Historial técnico/admin se conserva tras recarga y nueva sesión, sin mezclar cuentas.
 - Una propuesta de reserva local no se presenta como aprovisionamiento real de VLAN o SSID.
 
-## Estado después de la integración inicial
+## Estado después de los bloques 2 y 3
 
-La integración conserva el dashboard con monitoreo en vivo, el chatbot y las reservas VLAN locales. Los roles de cliente, las asignaciones de recursos, la persistencia del chat, los tickets, los workers y las operaciones UniFi siguen pendientes. La integración inicial no habilita todavía atención aislada a clientes finales.
+La integración conserva el dashboard con monitoreo en vivo, el chatbot y las reservas VLAN locales (ahora limitadas a admin). Se implementaron cliente/tecnico, asignaciones por red, conversaciones privadas y persistencia del historial. Operador queda limitado como técnico; visor sigue siendo un rol interno global. Ver [detalle y migración](chat-roles-y-persistencia.md).
+
+Siguen pendientes entrega de credenciales, estado operativo por red, tickets, workers con ejecución de trabajos y operaciones UniFi. La interfaz distingue el inventario local del diagnóstico real. El siguiente bloque es atención al cliente; no se ha habilitado todavía el flujo completo de soporte.

@@ -55,7 +55,7 @@ class MonitoringTool:
     description: str
     arguments_model: type[BaseModel]
     required_permission: Permission
-    executor: ToolExecutor
+    executor: ToolExecutor | None
 
     def provider_definition(self) -> dict[str, Any]:
         return {
@@ -105,6 +105,13 @@ async def _get_available_vlans(service, _: BaseModel):
 
 
 _tools = {
+    "get_assigned_networks": MonitoringTool(
+        name="get_assigned_networks",
+        description="Consulta únicamente las redes autorizadas en esta conversación. Es inventario local, no telemetría ni credenciales.",
+        arguments_model=EmptyToolArguments,
+        required_permission=Permission.NETWORKS_READ_OWN,
+        executor=None,  # Se resuelve con contexto filtrado, sin llamar al proveedor global.
+    ),
     "get_system": MonitoringTool(
         name="get_system",
         description="Consulta métricas actuales del sistema de red administrado por Netbot.",
@@ -171,6 +178,7 @@ async def invoke_tool(
     service: MonitoringService,
     permissions: frozenset[Permission],
     reservation_service: VlanReservationService | None = None,
+    networks: list[dict] | None = None,
 ) -> dict[str, Any]:
     if name == "prepare_vlan_reservation":
         if Permission.VLAN_RESERVE not in permissions:
@@ -210,6 +218,13 @@ async def invoke_tool(
     except ValidationError:
         raise ChatToolError("Argumentos de herramienta inválidos.") from None
 
+    if name == "get_assigned_networks":
+        result = {"source": "netbot_inventory", "operational_status": "unknown", "data": networks or []}
+        if len(json.dumps(result, ensure_ascii=False)) > MAX_TOOL_RESULT_CHARS:
+            raise ChatToolError("El inventario es demasiado grande. Abre una conversación para una red específica.")
+        return result
+    if tool.executor is None:
+        raise ChatToolError("Herramienta sin ejecutor.")
     response = await tool.executor(service, validated_arguments)
     result = response.model_dump(mode="json")
     if len(json.dumps(result, ensure_ascii=False, separators=(",", ":"))) > MAX_TOOL_RESULT_CHARS:

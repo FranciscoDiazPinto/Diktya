@@ -20,6 +20,7 @@ const sidebar = $('.sidebar');
 
 const state = {
   user: null,
+  session: 0,
   timer: null,
   lastSync: null,
   chartWindow: 300,
@@ -93,7 +94,14 @@ const chatMessages = document.querySelector('#chat-messages');
 const chatEmpty = document.querySelector('#chat-empty');
 const chatStatus = document.querySelector('#chat-status');
 const chatSend = document.querySelector('#chat-send');
-let chatHistory = [];
+let conversationId = null;
+let conversationVersion = 0;
+let chatSelection = 0;
+let firstMessageId = null;
+const conversationSelect = $('#chat-conversation');
+const networkSelect = $('#chat-network');
+const newChatButton = $('#chat-new');
+const olderChatButton = $('#chat-older');
 let currentRoles = [];
 const reservationList = document.querySelector('#vlan-reservations');
 
@@ -114,23 +122,40 @@ async function apiRequest(path, options = {}, accessToken = '') {
   return body;
 }
 
+let refreshInFlight = null;
+
 async function refreshTokens() {
+  const session = state.session;
+  if (refreshInFlight?.session === session) return refreshInFlight.promise;
   const tokens = getStoredTokens();
   if (!tokens?.refresh_token) throw new ApiError('Sesion expirada', 401);
-  const fresh = await apiRequest('/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: tokens.refresh_token }) });
-  localStorage.setItem('netbot_tokens', JSON.stringify(fresh));
-  return fresh;
+  const promise = (async () => {
+    const fresh = await apiRequest('/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: tokens.refresh_token }) });
+    if (session !== state.session) throw new ApiError('La sesión cambió.', 0);
+    localStorage.setItem('netbot_tokens', JSON.stringify(fresh));
+    return fresh;
+  })();
+  refreshInFlight = { session, promise };
+  try { return await promise; }
+  finally { if (refreshInFlight?.promise === promise) refreshInFlight = null; }
 }
 
-// Peticion autenticada: si el token de acceso vencio, lo renueva una vez y reintenta.
-async function authedRequest(path) {
+// Cada solicitud conserva su sesión. Una respuesta tardía no puede renovar otra cuenta.
+async function authedRequest(path, options = {}) {
+  const session = state.session;
   const tokens = getStoredTokens();
   try {
-    return await apiRequest(path, {}, tokens?.access_token);
+    const response = await apiRequest(path, options, tokens?.access_token);
+    if (session !== state.session) throw new ApiError('La sesión cambió.', 0);
+    return response;
   } catch (error) {
-    if (error.status !== 401) throw error;
-    const fresh = await refreshTokens();
-    return apiRequest(path, {}, fresh.access_token);
+    if (session !== state.session || error.status !== 401) throw error;
+    const current = getStoredTokens();
+    const fresh = current?.access_token && current.access_token !== tokens?.access_token ? current : await refreshTokens();
+    if (session !== state.session) throw new ApiError('La sesión cambió.', 0);
+    const response = await apiRequest(path, options, fresh.access_token);
+    if (session !== state.session) throw new ApiError('La sesión cambió.', 0);
+    return response;
   }
 }
 
@@ -145,6 +170,8 @@ async function monitoringRequest(path) {
 }
 
 function setAuthenticated(user) {
+  resetChat();
+  state.session += 1;
   state.user = user;
   currentRoles = user.roles || [];
   reservationList.hidden = !canReserveVlans(currentRoles);
@@ -156,21 +183,30 @@ function setAuthenticated(user) {
   $('#user-role').textContent = user.roles?.join(', ') || 'Usuario';
   $('#user-avatar').textContent = name.split(/[\s._-]+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase();
   renderGreeting();
-  startPolling();
+  const globalMonitoring = user.permissions?.includes('monitoring:read');
+  document.querySelectorAll('.stats-grid, .dashboard-grid, .page-heading .period-picker, .last-sync, #refresh-button, #issues-banner, .nav-item[href="#interfaces"], .nav-item[href="#clients"], .nav-item[href="#firewall"]').forEach((element) => { element.hidden = !globalMonitoring; });
+  $('#chat-scope').textContent = user.roles.includes('admin') ? 'Administración' : user.roles.some((r) => ['tecnico', 'operador'].includes(r)) ? 'Soporte técnico' : user.roles.includes('cliente') ? 'Mis redes' : 'Monitoreo';
+  if (globalMonitoring) startPolling();
+  else {
+    stopPolling();
+    $('#source-name').textContent = 'Acceso personal';
+    $('#source-detail').textContent = 'Solo redes autorizadas';
+    $('#footer-status').textContent = 'Consulta tus redes desde el asistente';
+  }
+  restoreChat();
 }
 
 function signOut(message) {
   stopPolling();
   localStorage.removeItem('netbot_tokens');
   state.user = null;
-  chatHistory = [];
+  state.session += 1;
+  resetChat();
   currentRoles = [];
   reservationList.replaceChildren();
   reservationList.hidden = true;
-  chatMessages.replaceChildren(chatEmpty);
-  chatEmpty.hidden = false;
-  chatStatus.textContent = "";
-  chatStatus.classList.remove("is-error");
+  state.data = {};
+  state.lastSync = null;
   state.rates = {};
   state.history = { interfaces: [], traffic: [], clients: [], blocked: [] };
   appShell.classList.add('is-hidden');
@@ -210,8 +246,8 @@ togglePassword.addEventListener('click', () => {
 
 logoutButton.addEventListener('click', async () => {
   const tokens = getStoredTokens();
-  try { if (tokens?.refresh_token) await apiRequest('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token: tokens.refresh_token }) }); } catch {}
   signOut('Sesion cerrada');
+  try { if (tokens?.refresh_token) await apiRequest('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token: tokens.refresh_token }) }); } catch {}
 });
 
 function appendChatMessage(role, content) {
@@ -231,47 +267,161 @@ function setChatStatus(message, isError = false) {
   chatStatus.classList.toggle('is-error', isError);
 }
 
+function resetChat() {
+  chatSelection += 1;
+  conversationId = null;
+  conversationVersion = 0;
+  firstMessageId = null;
+  conversationSelect.replaceChildren(new Option('Nueva conversación', ''));
+  networkSelect.replaceChildren(new Option('Mis redes autorizadas', ''));
+  chatMessages.replaceChildren(chatEmpty);
+  chatEmpty.hidden = false;
+  chatInput.value = '';
+  chatInput.disabled = false;
+  chatSend.disabled = false;
+  conversationSelect.disabled = false;
+  newChatButton.disabled = false;
+  networkSelect.disabled = false;
+  olderChatButton.hidden = true;
+  setChatStatus('');
+}
+
+async function restoreChat() {
+  const session = state.session;
+  const selection = chatSelection;
+  chatSend.disabled = chatInput.disabled = true;
+  try {
+    const [conversations, networks] = await Promise.all([
+      authedRequest('/api/v1/chat/conversations'),
+      state.user.permissions?.includes('networks:read:own') ? authedRequest('/api/v1/networks') : [],
+    ]);
+    if (session !== state.session || selection !== chatSelection) return;
+    networkSelect.replaceChildren(new Option('Mis redes autorizadas', ''), ...networks.map((n) => new Option(`${n.name} · ${n.ssid}`, n.id)));
+    conversationSelect.replaceChildren(new Option('Nueva conversación', ''), ...conversations.map((c) => new Option(c.title, c.id)));
+    if (conversations.length) {
+      conversationSelect.value = conversations[0].id;
+      await loadConversation(conversations[0].id);
+    } else chatSend.disabled = chatInput.disabled = false;
+  } catch (error) {
+    if (session === state.session && selection === chatSelection) {
+      setChatStatus(`No se pudo recuperar el historial: ${error.message}`, true);
+      chatSend.disabled = chatInput.disabled = false;
+    }
+  }
+}
+
+async function loadConversation(id, older = false) {
+  const session = state.session;
+  const selection = ++chatSelection;
+  chatSend.disabled = chatInput.disabled = true;
+  try {
+    const suffix = older && firstMessageId ? `?before_id=${firstMessageId}` : '';
+    const conversation = await authedRequest(`/api/v1/chat/conversations/${id}${suffix}`);
+    if (session !== state.session || selection !== chatSelection) return;
+    conversationId = conversation.id;
+    conversationVersion = conversation.version;
+    if (!older) chatMessages.replaceChildren(chatEmpty);
+    const oldNodes = older ? [...chatMessages.children] : [];
+    if (older) chatMessages.replaceChildren();
+    for (const turn of conversation.messages) appendChatMessage(turn.role, turn.content);
+    if (older) chatMessages.append(...oldNodes);
+    firstMessageId = conversation.messages[0]?.id ?? firstMessageId;
+    olderChatButton.hidden = conversation.messages.length < 100;
+    chatEmpty.hidden = !!chatMessages.querySelector('.chat-message');
+    networkSelect.value = conversation.network_id ?? '';
+    networkSelect.disabled = true;
+    setChatStatus('Conversación recuperada.');
+  } catch (error) {
+    if (session === state.session && selection === chatSelection) {
+      conversationId = null;
+      conversationVersion = 0;
+      firstMessageId = null;
+      chatMessages.replaceChildren(chatEmpty);
+      chatEmpty.hidden = false;
+      setChatStatus(error.message, true);
+    }
+  } finally {
+    if (session === state.session && selection === chatSelection) {
+      chatSend.disabled = chatInput.disabled = false;
+      conversationSelect.disabled = newChatButton.disabled = false;
+    }
+  }
+}
+
+conversationSelect.addEventListener('change', () => {
+  if (conversationSelect.value) loadConversation(conversationSelect.value);
+  else startNewChat();
+});
+
+function startNewChat() {
+  chatSelection += 1;
+  conversationId = null;
+  conversationVersion = 0;
+  firstMessageId = null;
+  chatInput.value = "";
+  chatInput.disabled = false;
+  conversationSelect.value = '';
+  networkSelect.disabled = false;
+  chatMessages.replaceChildren(chatEmpty);
+  chatEmpty.hidden = false;
+  olderChatButton.hidden = true;
+  chatSend.disabled = false;
+  setChatStatus('Nueva conversación. Elige una red o consulta tus redes autorizadas.');
+}
+
+newChatButton.addEventListener('click', startNewChat);
+olderChatButton.addEventListener('click', () => conversationId && loadConversation(conversationId, true));
+
 chatForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const message = chatInput.value.trim();
-  if (!message || chatSend.disabled) return;
-
-  const tokens = getStoredTokens();
-  if (!tokens?.access_token) {
-    setChatStatus('Inicia sesión para conversar con Netbot.', true);
-    return;
-  }
-
-  appendChatMessage('user', message);
+  if (!message || chatSend.disabled || !state.user) return;
+  const session = state.session;
+  const selection = chatSelection;
+  const current = () => session === state.session && selection === chatSelection;
+  const pendingMessage = appendChatMessage('user', message);
   chatInput.value = '';
-  chatSend.disabled = true;
-  chatInput.disabled = true;
-  setChatStatus('Consultando el monitoreo…');
+  chatSend.disabled = chatInput.disabled = true;
+  conversationSelect.disabled = newChatButton.disabled = networkSelect.disabled = true;
+  setChatStatus('Consultando…');
   try {
-    const response = await apiRequest(
-      '/api/v1/chat/messages',
-      {
-        method: 'POST',
-        body: JSON.stringify({ message, history: chatHistory.slice(-8) }),
-      },
-      tokens.access_token,
-    );
-    appendChatMessage('assistant', response.answer);
-    if (response.reservation_proposal && canReserveVlans(currentRoles)) {
-      renderReservationProposal(response.reservation_proposal);
+    if (!conversationId) {
+      const conversation = await authedRequest('/api/v1/chat/conversations', {
+        method: 'POST', body: JSON.stringify({ network_id: networkSelect.value ? Number(networkSelect.value) : null }),
+      });
+      if (!current()) return;
+      conversationId = conversation.id;
+      conversationVersion = conversation.version;
+      conversationSelect.append(new Option(message.slice(0, 100), conversation.id));
+      conversationSelect.value = conversation.id;
     }
-    chatHistory = [
-      ...chatHistory,
-      { role: 'user', content: message },
-      { role: 'assistant', content: response.answer },
-    ].slice(-8);
-    setChatStatus('Consulta completada.');
+    const response = await authedRequest('/api/v1/chat/messages', {
+      method: 'POST', body: JSON.stringify({ message, conversation_id: conversationId, version: conversationVersion }),
+    });
+    if (!current()) return;
+    conversationVersion = response.version;
+    appendChatMessage('assistant', response.answer);
+    if (response.reservation_proposal && canReserveVlans(currentRoles)) renderReservationProposal(response.reservation_proposal);
+    setChatStatus('Consulta guardada.');
   } catch (error) {
+    if (!current()) return;
+    pendingMessage.remove();
+    chatInput.value = message;
     setChatStatus(error.message || 'No se pudo completar la consulta.', true);
+    if ([403, 404, 409].includes(error.status)) {
+      // Descartar el contexto visible rechazado antes de recuperar la lista autorizada.
+      startNewChat();
+      chatInput.disabled = false;
+      conversationSelect.disabled = newChatButton.disabled = false;
+      await restoreChat();
+    }
   } finally {
-    chatSend.disabled = false;
-    chatInput.disabled = false;
-    chatInput.focus();
+    if (current()) {
+      chatSend.disabled = chatInput.disabled = false;
+      conversationSelect.disabled = newChatButton.disabled = false;
+      networkSelect.disabled = !!conversationId;
+      chatInput.focus();
+    }
   }
 });
 
@@ -318,10 +468,12 @@ function renderReservationProposal(proposal) {
 }
 
 async function refreshReservations() {
+  const session = state.session;
   if (!canReserveVlans(currentRoles)) return;
   const tokens = getStoredTokens();
   try {
     const rows = await apiRequest('/api/v1/changes/vlan-reservations', {}, tokens?.access_token);
+    if (session !== state.session) return;
     reservationList.replaceChildren(textNode('h3', 'Reservas VLAN activas'));
     if (!rows.length) reservationList.append(textNode('p', 'No hay reservas activas.'));
     for (const row of rows) {
@@ -345,6 +497,7 @@ async function refreshReservations() {
       reservationList.append(item);
     }
   } catch (error) {
+    if (session !== state.session) return;
     reservationList.replaceChildren(textNode('p', `No se pudieron cargar las reservas: ${error.message}`));
   }
 }
@@ -371,6 +524,7 @@ function stopPolling() {
 }
 
 async function poll() {
+  const session = state.session;
   try {
     const [system, interfaces, traffic, clients, stats, events] = await Promise.all([
       monitoringRequest('/system'),
@@ -380,11 +534,13 @@ async function poll() {
       monitoringRequest('/firewall/stats'),
       monitoringRequest('/firewall/events?limit=200'),
     ]);
+    if (session !== state.session) return;
     state.data = { system, interfaces, traffic, clients, stats, events };
     state.lastSync = new Date();
     recordSamples();
     render();
   } catch (error) {
+    if (session !== state.session) return;
     if (error.status === 401) { signOut('Tu sesion expiro, ingresa nuevamente'); return; }
     if (error.status === 403) { renderFatal('Tu usuario no tiene permiso para ver el monitoreo (monitoring:read).'); return; }
     renderFatal('No se pudo conectar con la API de Netbot.');

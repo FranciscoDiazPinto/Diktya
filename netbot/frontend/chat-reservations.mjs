@@ -1,5 +1,5 @@
 export function canReserveVlans(roles = []) {
-  return roles.includes('admin') || roles.includes('operador');
+  return roles.includes('admin');
 }
 
 export function reservationPayload(values) {

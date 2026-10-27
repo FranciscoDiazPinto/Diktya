@@ -25,19 +25,18 @@ El backend permite por defecto los origenes de desarrollo `localhost:5173`,
 
 ## Chat con Netbot
 
-El panel envía `POST /api/v1/chat/messages` con el token de sesión. Los usuarios
-`visor`, `operador` y `admin` pueden preguntar por el estado del sistema, interfaces,
-clientes y firewall. El historial se mantiene solo en memoria hasta cerrar sesión o
-recargar la página; el frontend no guarda conversaciones ni la clave de OpenRouter.
-Las preguntas y los resultados de monitoreo necesarios para responder se procesan en OpenRouter.
+El panel envía `POST /api/v1/chat/messages` con el ID y la versión de la conversación. El historial se guarda en el servidor, por usuario, y se recupera al iniciar sesión. El selector permite abrir chats anteriores o empezar uno nuevo con una red autorizada. No se envía historial desde el navegador.
 
-El dashboard y el chatbot consultan la API de monitoreo.
+Cliente y técnico ven el asistente y sus redes asignadas; el dashboard global se muestra solo con `monitoring:read` (visor/admin). Las herramientas y APIs vuelven a comprobar permisos en el servidor. Las preguntas y los resultados necesarios se procesan en OpenRouter. No enviar contraseñas por el chat.
+
+Ver [contrato, permisos y migración](../docs/chat-roles-y-persistencia.md).
+
 ## Reservas VLAN
 
-El panel muestra propuestas de reserva para operador y administrador. Confirmar
+El panel muestra propuestas de reserva para administrador. Confirmar
 envía los campos de evento, propósito y SSID junto a la VLAN elegida; cancelar no
 hace ninguna solicitud. Las reservas activas se muestran debajo del chat y el
-operador puede liberarlas manualmente. La API del backend vuelve a validar el
+administrador puede liberarlas manualmente. La API del backend vuelve a validar el
 permiso, el inventario OPNsense y la disponibilidad antes de guardar.
 
 ## Monitoreo

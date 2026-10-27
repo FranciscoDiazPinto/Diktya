@@ -1,6 +1,8 @@
 """Contratos y límites para mensajes conversacionales."""
 
 from typing import Literal
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,6 +23,40 @@ class ChatMessageRequest(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list)
 
 
+class ChatSendRequest(BaseModel):
+    """Contrato HTTP: el historial nunca se acepta desde el navegador."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    message: str = Field(min_length=1)
+    conversation_id: UUID | None = None
+    version: int | None = Field(default=None, ge=0)
+
+
+class ConversationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    title: str = Field(default="Nueva conversación", min_length=1, max_length=100)
+    network_id: int | None = Field(default=None, gt=0)
+
+
+class ConversationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    title: str
+    network_id: int | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class StoredMessageRead(ChatTurn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class ConversationDetail(ConversationRead):
+    messages: list[StoredMessageRead]
+
+
 class VlanReservationProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -39,6 +75,8 @@ class ChatMessageResponse(BaseModel):
     answer: str = Field(min_length=1)
     tools_used: list[str] = Field(default_factory=list)
     reservation_proposal: VlanReservationProposal | None = None
+    conversation_id: str | None = None
+    version: int | None = None
 
 
 class ChatInputError(ValueError):

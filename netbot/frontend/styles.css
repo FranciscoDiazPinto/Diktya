@@ -79,3 +79,9 @@ button { cursor: pointer; }
 .pill { display: inline-block; padding: 3px 7px; border-radius: 3px; font: 9px var(--mono); }.pill.ok { color: #5e9162; background: #e3efd4; }.pill.off { color: #8c908a; background: #ecebe3; }.pill.block { color: #b25a4d; background: #f5ddd7; }
 .fw-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; }.fw-summary div { padding: 12px 14px; background: #f1f0e8; border-radius: 4px; }.fw-summary small { display: block; color: #91958f; font: 9px var(--mono); letter-spacing: 1px; text-transform: uppercase; }.fw-summary strong { display: block; margin-top: 6px; font-size: 18px; letter-spacing: -.5px; }
 @media (max-width: 700px) { .panel-heading { flex-wrap: wrap; gap: 12px; }.panel-tools { justify-content: start; }.search-input { width: 100%; }.fw-summary { grid-template-columns: repeat(2, 1fr); } }
+
+.chat-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+.chat-controls label { color: var(--muted); font-size: 11px; }
+.chat-controls select { max-width: 260px; padding: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; }
+.chat-controls button, #chat-older { padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+[hidden] { display: none !important; }

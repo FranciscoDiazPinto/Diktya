@@ -10,7 +10,7 @@ from app.core.config import Settings
 from app.monitoring.service import MonitoringService
 from app.changes.service import VlanReservationService
 
-from .policy import SYSTEM_POLICY
+from .policy import policy_for_profile
 from .provider import (
     ChatProviderError,
     OpenRouterProvider,
@@ -51,12 +51,14 @@ class ChatService:
         message: str,
         history: list[ChatTurn],
         permissions: frozenset[Permission],
+        networks: list[dict] | None = None,
+        profile: str = "visor",
     ) -> ChatMessageResponse:
         request = normalize_chat_request(
             ChatMessageRequest(message=message, history=history), self._settings
         )
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_POLICY},
+            {"role": "system", "content": policy_for_profile(profile)},
             *(
                 {"role": turn.role, "content": turn.content}
                 for turn in request.history
@@ -95,6 +97,7 @@ class ChatService:
                         self._monitoring,
                         permissions,
                         self._reservations,
+                        networks,
                     )
                 except ChatToolPermissionError:
                     raise

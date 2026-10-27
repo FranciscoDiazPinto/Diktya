@@ -17,7 +17,7 @@ Netbot combina una API con FastAPI, PostgreSQL y Alembic con un dashboard web es
 
 Para usar el chatbot, definir `OPENROUTER_API_KEY` y `OPENROUTER_MODEL` en el `.env` local. La clave se usa solo desde el backend; nunca debe incluirse en el frontend ni guardarse en Git. Sin esos valores, la API devuelve un error de servicio y no contacta a OpenRouter.
 
-El dashboard estático puede servirse en otra terminal con `python3 -m http.server 5173 --directory frontend`. Iniciar sesión con un usuario `visor`, `operador` o `admin` para acceder al asistente. El historial del chat vive en memoria durante la sesión del navegador.
+El dashboard estático puede servirse en otra terminal con `python3 -m http.server 5173 --directory frontend`. Iniciar sesión con un usuario `cliente`, `tecnico`, `operador`, `visor` o `admin`. Las conversaciones se guardan en la base por usuario y se recuperan al iniciar sesión. Cliente y técnico acceden únicamente a redes asignadas; visor es un rol interno de monitoreo global.
 
 La documentación interactiva de la API estará en `/docs` al iniciar el servidor.
 
@@ -38,7 +38,8 @@ Servir la carpeta `frontend` en el puerto 5173 (origen permitido por CORS):
 - `app/core`: configuración, seguridad, base de datos y logging.
 - `app/auth`: usuarios, roles y permisos (Épica 001).
 - `app/monitoring`: clientes UniFi/OPNsense y dashboard (Épica 002). Ver `docs/epica-002-monitoreo.md`.
-- `app/chat`: asistente de monitoreo mediante OpenRouter (Épica 003; solo lectura en esta entrega).
+- `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
+- `app/networks`: registro local y asignación de acceso por red.
 - `app/changes`: confirmación, ejecución y rollback (Épica 004).
 - `app/tickets`: incidencias y notificaciones (Épica 005).
 - `app/agents`: procesos en background (Épica 006).
@@ -58,7 +59,9 @@ OPNsense real, definir `MONITORING_PROVIDER=opnsense` y las variables `OPNSENSE_
 
 ## Chatbot
 
-El endpoint `POST /api/v1/chat/messages` requiere autenticación y el permiso `CHAT_USE`. Los roles predeterminados `visor`, `operador` y `admin` pueden consultar monitoreo en lenguaje natural. Las herramientas del modelo son de solo lectura y el backend vuelve a comprobar `MONITORING_READ` antes de ejecutarlas. El chatbot no reserva VLAN ni aplica cambios de red.
+El endpoint `POST /api/v1/chat/messages` requiere autenticación y `chat:use`. El servidor carga el historial persistente de la conversación y comprueba propietario, rol y ámbito antes de enviar contexto al proveedor. No acepta historial desde el navegador. Las herramientas se filtran por permisos y vuelven a autorizarlos antes de ejecutarse.
+
+Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. Las operaciones UniFi, credenciales Wi-Fi y tickets todavía están pendientes. Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
 
 Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en OpenRouter para generar respuestas.
 
@@ -67,17 +70,17 @@ Las preguntas, el historial acotado y los resultados de monitoreo necesarios se 
 `pip install -r requirements-dev.txt` y luego `pytest`.
 # Reservas VLAN desde el chatbot
 
-El chatbot puede preparar propuestas para reservar VLAN ya existentes. En
+El chatbot puede preparar propuestas para reservar VLAN ya existentes para un administrador. En
 `MONITORING_PROVIDER=opnsense`, Netbot consulta el inventario OPNsense de forma
 read-only; en modo mock solo aparecen VLAN sintéticas para desarrollo. Ninguna
 operación de reserva escribe configuración en OPNsense. El SSID se guarda como
-metadato de Netbot y la liberación es manual por operador o administrador.
+metadato de Netbot y la liberación es manual por administrador.
 
 La consulta de opciones está disponible para usuarios con `monitoring:read` en
 `GET /api/v1/changes/vlan-options`. Las rutas `GET` y `POST
 /api/v1/changes/vlan-reservations` y `POST
 /api/v1/changes/vlan-reservations/{id}/release` requieren `vlan:reserve`
-(roles operador/admin). Preparar una propuesta en el chat no la persiste: el
+(rol admin). Preparar una propuesta en el chat no la persiste: el
 usuario debe confirmarla explícitamente en el panel. Para propuestas, el texto
 de chat, su historial y la información VLAN relevante se envían al proveedor
 configurado en OpenRouter.

@@ -12,7 +12,7 @@ class FakeChatService:
         self.error = error
         self.calls = []
 
-    async def answer(self, *, message, history, permissions):
+    async def answer(self, *, message, history, permissions, networks=None, profile=None):
         self.calls.append((message, history, permissions))
         if self.error:
             raise self.error
@@ -55,10 +55,14 @@ def test_default_roles_can_use_chat_and_receive_server_permissions(
             headers=headers,
         )
         assert response.status_code == 200
-        assert response.json() == {"answer": "Consulta recibida.", "tools_used": [], "reservation_proposal": None}
+        assert response.json()["answer"] == "Consulta recibida."
+        assert response.json()["conversation_id"]
+        assert response.json()["version"] == 1
 
     assert len(service.calls) == 3
-    assert all("monitoring:read" in {permission.value for permission in call[2]} for call in service.calls)
+    assert "monitoring:read" in {p.value for p in service.calls[0][2]}
+    assert "monitoring:read" not in {p.value for p in service.calls[1][2]}
+    assert "networks:read:own" in {p.value for p in service.calls[1][2]}
 
 
 def test_user_without_chat_permission_is_rejected_before_service_call(

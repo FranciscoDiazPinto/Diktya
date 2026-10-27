@@ -109,11 +109,19 @@
           <section class="panel chat-panel" id="chat" aria-labelledby="chat-heading">
             <div class="panel-heading">
               <div><p class="panel-kicker">ASISTENTE DE REDES</p><h2 id="chat-heading">Conversa con Netbot</h2></div>
-              <span class="chat-scope">Monitoreo de red</span>
+              <span class="chat-scope" id="chat-scope">Asistente</span>
             </div>
-            <p class="chat-intro">Pregunta por el estado del sistema, interfaces, clientes o firewall. Las preguntas y los datos de monitoreo necesarios se procesan en OpenRouter.</p>
+            <p class="chat-intro">Consulta las redes que tienes autorizadas. Tus conversaciones se guardan en tu cuenta. Las consultas y los datos necesarios se procesan en OpenRouter. No envíes contraseñas por el chat.</p>
+            <div class="chat-controls">
+              <label for="chat-conversation">Conversación</label>
+              <select id="chat-conversation"><option value="">Nueva conversación</option></select>
+              <label for="chat-network">Red para nueva conversación</label>
+              <select id="chat-network"><option value="">Mis redes autorizadas</option></select>
+              <button id="chat-new" type="button">Nueva</button>
+            </div>
+            <button id="chat-older" type="button" hidden>Ver mensajes anteriores</button>
             <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
-              <p class="chat-empty" id="chat-empty">Tus consultas aparecerán aquí durante esta sesión.</p>
+              <p class="chat-empty" id="chat-empty">Selecciona una conversación o escribe para comenzar.</p>
             </div>
             <section id="vlan-reservations" class="reservation-list" hidden aria-label="Reservas VLAN activas"></section>
             <form class="chat-form" id="chat-form">

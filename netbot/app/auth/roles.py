@@ -11,6 +11,8 @@ class RoleName(str, Enum):
     ADMIN = "admin"
     OPERADOR = "operador"
     VISOR = "visor"
+    CLIENTE = "cliente"
+    TECNICO = "tecnico"
 
 
 @dataclass(frozen=True)
@@ -28,18 +30,12 @@ DEFAULT_ROLES: dict[RoleName, Role] = {
     ),
     RoleName.OPERADOR: Role(
         RoleName.OPERADOR,
-        "Monitorea la red y gestiona operaciones e incidencias.",
+        "Técnico: acceso limitado a las redes asignadas.",
         frozenset(
             {
-                Permission.MONITORING_READ,
                 Permission.CHAT_USE,
-                Permission.VLAN_RESERVE,
-                Permission.CHANGES_READ,
-                Permission.CHANGES_REQUEST,
-                Permission.CHANGES_EXECUTE,
-                Permission.CHANGES_ROLLBACK,
-                Permission.TICKETS_READ,
-                Permission.TICKETS_MANAGE,
+                Permission.NETWORKS_READ_OWN,
+                Permission.NETWORKS_READ_DETAILS,
             }
         ),
     ),
@@ -57,6 +53,16 @@ DEFAULT_ROLES: dict[RoleName, Role] = {
     ),
 }
 
+# Operador es el nombre anterior del rol técnico. Ninguno recibe permisos globales.
+DEFAULT_ROLES[RoleName.TECNICO] = Role(
+    RoleName.TECNICO, "Técnico de las redes asignadas.",
+    DEFAULT_ROLES[RoleName.OPERADOR].permissions,
+)
+DEFAULT_ROLES[RoleName.CLIENTE] = Role(
+    RoleName.CLIENTE, "Atención y consulta de sus propias redes.",
+    frozenset({Permission.CHAT_USE, Permission.NETWORKS_READ_OWN}),
+)
+
 
 def has_permission(roles: AbstractSet[RoleName], permission: Permission) -> bool:
     """Indica si alguno de los roles asignados concede el permiso."""
@@ -64,4 +70,13 @@ def has_permission(roles: AbstractSet[RoleName], permission: Permission) -> bool
         permission in DEFAULT_ROLES[role].permissions
         for role in roles
         if role in DEFAULT_ROLES
+    )
+
+
+def effective_permissions(user) -> frozenset[Permission]:
+    return frozenset(
+        permission
+        for role in user.roles
+        if role.name in RoleName._value2member_map_
+        for permission in DEFAULT_ROLES[RoleName(role.name)].permissions
     )

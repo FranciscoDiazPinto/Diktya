@@ -54,6 +54,7 @@ def test_role_policy_grants_operator_only_declared_permissions(client, login, db
     db_session.commit()
     _, headers = login(user.email, "operator-password")
 
-    assert has_permission({RoleName.OPERADOR}, Permission.MONITORING_READ)
+    assert has_permission({RoleName.OPERADOR}, Permission.NETWORKS_READ_OWN)
+    assert not has_permission({RoleName.OPERADOR}, Permission.MONITORING_READ)
     assert not has_permission({RoleName.OPERADOR}, Permission.USERS_MANAGE)
     assert client.get("/admin/users", headers=headers).status_code == 403
