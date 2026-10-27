@@ -23,6 +23,10 @@ El backend permite por defecto los origenes de desarrollo `localhost:5173`,
 `127.0.0.1:5173` y archivos locales (`null`). En otros entornos se puede definir
 `CORS_ORIGINS` como una lista separada por comas.
 
-La siguiente etapa puede reemplazar los datos de demostracion por llamadas a los
-recursos de monitoreo de la API (`/api/v1/monitoring/system`, `interfaces`, `clients`
-y `firewall`).
+## Monitoreo
+
+Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
+`/api/v1/monitoring` (`system`, `interfaces`, `interfaces/traffic`, `clients`,
+`firewall/stats` y `firewall/events`) con el token del usuario. Si el token de acceso
+vence, lo renueva con `/auth/refresh`. Las fallas parciales (`degraded`/`unavailable`)
+se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.

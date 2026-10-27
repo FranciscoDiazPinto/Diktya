@@ -18,6 +18,7 @@ from .schemas import (
     FirewallEvent,
     FirewallStatistics,
     InterfaceMetrics,
+    InterfaceTrafficHistory,
     MonitoringResponse,
     MonitoringStatus,
     SystemMetrics,
@@ -49,6 +50,22 @@ async def get_system(response: Response, service: MonitoringServiceDep):
 )
 async def get_interfaces(response: Response, service: MonitoringServiceDep):
     return _finalize(response, await service.get_interfaces())
+
+
+@router.get(
+    "/interfaces/traffic",
+    response_model=MonitoringResponse[list[InterfaceTrafficHistory]],
+    responses=_UNAVAILABLE,
+)
+async def get_interface_traffic(
+    response: Response,
+    service: MonitoringServiceDep,
+    window: Annotated[
+        int, Query(ge=10, le=3600, description="Segundos de historial a devolver.")
+    ] = 300,
+):
+    """Velocidad (bytes/s) por interfaz, calculada a partir de muestras periódicas."""
+    return _finalize(response, await service.get_traffic_history(window))
 
 
 @router.get("/clients", response_model=MonitoringResponse[list[DhcpLease]], responses=_UNAVAILABLE)

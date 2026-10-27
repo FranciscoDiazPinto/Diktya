@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     monitoring_cache_ttl_seconds: float = Field(5.0, ge=0)
     monitoring_mock_scenario: Literal["healthy", "degraded", "outage"] = "healthy"
     firewall_log_fetch_limit: int = Field(500, ge=1, le=5000)
+    # Muestreo de tráfico en segundo plano para el gráfico del dashboard.
+    monitoring_sample_interval_seconds: float = Field(5.0, gt=0)
+    monitoring_history_seconds: float = Field(3600.0, gt=0)
 
     # --- OPNsense ---
     # Se acepta OPNSENSE_BASE_URL (nombre actual de .env.example) y OPNSENSE_API_URL.
