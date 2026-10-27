@@ -37,7 +37,7 @@ flowchart TD
 | tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
 | monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
-| changes | Reservas VLAN locales confirmadas y liberación. No ejecuta configuración de infraestructura. |
+| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). No ejecuta configuración de infraestructura. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
 | core | Configuración, conexión SQL y errores de aplicación. No coordina dominios. |
 
@@ -69,7 +69,7 @@ Cada operación de escritura tiene un dueño de transacción. Usuarios, inventar
 
 Las herramientas de chat solo consultan o preparan propuestas. No llamar una operación que haga commit dentro del bucle del LLM. La creación del ticket o reserva ocurre por una solicitud API explícita; así un fallo del proveedor o conflicto de conversación no deja una escritura oculta.
 
-Los schemas de respuesta conservan los contratos públicos. Esta refactorización no cambia tablas ni requiere una nueva migración.
+Los schemas de respuesta conservan los contratos públicos. La refactorización modular no cambió tablas. La funcionalidad CSV posterior agrega `CsvImport` mediante la migración 005; su confirmación posee la transacción del lote completo. Ver [contrato CSV](carga-csv.md).
 
 ## Composición y ciclo de vida
 
@@ -96,6 +96,7 @@ Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las
 | support.mjs | Diagnóstico personal y panel temporal de acceso Wi-Fi. |
 | tickets.mjs | Formulario, confirmación, listado y seguimiento de tickets. |
 | reservations.mjs | Propuestas, confirmación y liberación de reservas locales. |
+| csv-imports.mjs | Archivo, vista previa, selección, recuperación y confirmación explícita de reservas por CSV. |
 | dom.mjs / format.mjs | Utilidades de vista y formato, sin reglas de permisos. |
 
 Solo identidad y época de sesión se comparten. Cada controlador conserva su estado; callbacks explícitos conectan acciones del chat con soporte, tickets o reservas. No importar dashboard desde una funcionalidad ni agregar variables globales para comunicar módulos.
@@ -122,4 +123,4 @@ Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.t
 
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
-Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, CSV y notificaciones externas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
+Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, aprovisionamiento CSV en UniFi y notificaciones externas. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.

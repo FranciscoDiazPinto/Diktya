@@ -53,7 +53,7 @@ La integración conserva el dashboard con monitoreo en vivo, el chatbot y las re
 
 Se agregó soporte con entrega protegida de acceso Wi-Fi desde secretos del entorno, diagnóstico acotado por interfaz y tickets persistentes con confirmación y seguimiento. Ver [soporte al cliente](soporte-cliente.md). La disponibilidad completa de SSID/AP/Internet sigue sin poder confirmarse con la fuente actual.
 
-El siguiente bloque es integrar las operaciones técnicas UniFi con permisos por recurso, confirmación, trabajos durables, verificación y auditoría; después, administración por chat. La carga CSV sigue para la etapa posterior acordada.
+El siguiente bloque es integrar las operaciones técnicas UniFi con permisos por recurso, confirmación, trabajos durables, verificación y auditoría; después, administración por chat. La primera etapa CSV incorpora validación, vista previa privada y reservas locales confirmadas. El aprovisionamiento sigue pendiente; ver [carga CSV](carga-csv.md).
 
 ## Refactorización modular
 

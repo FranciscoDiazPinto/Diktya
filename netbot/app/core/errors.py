@@ -11,3 +11,4 @@ class NotFound(ApplicationError): pass
 class Conflict(ApplicationError): pass
 class InvalidInput(ApplicationError): pass
 class ServiceUnavailable(ApplicationError): pass
+class PayloadTooLarge(ApplicationError): pass

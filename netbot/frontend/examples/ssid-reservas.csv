@@ -1,0 +1,3 @@
+parent_interface,tag,event_name,purpose,ssid
+igc1,20,Evento demo,Asistentes,Evento-Asistentes
+igc1,30,Evento demo,Equipo tecnico,Evento-Staff

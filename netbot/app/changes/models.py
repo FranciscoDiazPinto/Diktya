@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, text, JSON, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -26,3 +26,20 @@ class VlanReservation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     released_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CsvImport(Base):
+    __tablename__ = "csv_imports"
+    __table_args__ = (CheckConstraint("status IN ('preview', 'confirmed', 'cancelled')", name="ck_csv_import_status"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    filename: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(16), default="preview")
+    source: Mapped[str] = mapped_column(String(32))
+    source_context: Mapped[str] = mapped_column(String(64))
+    rows: Mapped[list] = mapped_column(JSON)
+    results: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

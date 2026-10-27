@@ -89,3 +89,7 @@ La consulta de opciones está disponible para usuarios con `monitoring:read` en
 usuario debe confirmarla explícitamente en el panel. Para propuestas, el texto
 de chat, su historial y la información VLAN relevante se envían al proveedor
 configurado en OpenRouter.
+
+### Carga CSV
+
+Admin puede validar la [plantilla y contrato CSV](docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.

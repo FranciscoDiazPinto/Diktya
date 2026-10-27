@@ -2,10 +2,10 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.core.errors import (ApplicationError, Unauthenticated, AccessDenied,
-                             NotFound, Conflict, InvalidInput, ServiceUnavailable)
+                             NotFound, Conflict, InvalidInput, ServiceUnavailable, PayloadTooLarge)
 
 STATUS_CODES = {Unauthenticated: 401, AccessDenied: 403, NotFound: 404,
-                Conflict: 409, InvalidInput: 400, ServiceUnavailable: 503}
+                Conflict: 409, InvalidInput: 400, ServiceUnavailable: 503, PayloadTooLarge: 413}
 
 async def application_error_handler(request: Request, exc: ApplicationError):
     headers = {}

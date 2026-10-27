@@ -7,6 +7,7 @@ import { createMonitoring } from './monitoring.mjs';
 import { createReservations } from './reservations.mjs';
 import { createSupport } from './support.mjs';
 import { createTickets } from './tickets.mjs';
+import { createCsvImports } from './csv-imports.mjs';
 
 export function createDashboard({document, window, localStorage, fetch, Option, crypto, FormData}) {
   const state = {user: null, session: 0};
@@ -21,12 +22,13 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
   const tickets = createTickets({document, Option, crypto, state, api, chatMessages, ...dom,
     selectedNetworkId: support.selectedNetworkId, captureChat, isChatCurrent});
   const reservations = createReservations({document, state, api, chatMessages, ...dom});
+  const csvImports = createCsvImports({document, Option, state, api, ...dom, onConfirmed: reservations.refresh});
   chat = createChat({document, Option, state, api, onConversationChanged: support.clearWifiAccess,
     onNetworksLoaded: support.setNetworks, renderAccessAction: support.renderAccessAction,
     renderTicketProposal: tickets.renderTicketProposal, renderReservationProposal: reservations.renderReservationProposal});
   const monitoring = createMonitoring({document, window, sessionState: state, api, format, ...dom,
     signOut: (message) => session.signOut(message)});
-  const features = [monitoring, reservations, support, tickets, chat];
+  const features = [monitoring, reservations, support, tickets, chat, csvImports];
   session = createSession({document, state, api, FormData, ...dom,
     onAuthenticated(user) { for (const feature of features) feature.reset(); for (const feature of features) feature.configureUser(user); },
     onSignedOut() { for (const feature of features) feature.reset(); }});
@@ -35,6 +37,6 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
     document.querySelector('.nav-item.active')?.classList.remove('active'); item.classList.add('active'); sidebar.classList.remove('open');
   }));
   document.querySelector('.mobile-menu').addEventListener('click', () => sidebar.classList.toggle('open'));
-  return {session, api, chat, support, tickets, reservations, monitoring,
+  return {session, api, chat, support, tickets, reservations, monitoring, csvImports,
     start: session.validateSession};
 }

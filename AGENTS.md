@@ -32,7 +32,7 @@
 ## Frontend
 
 - `frontend/app.js` solo arranca el compositor `modules/dashboard.mjs`.
-- Cambiar la funcionalidad en su módulo: api, session, chat, monitoring, support, tickets o reservations.
+- Cambiar la funcionalidad en su módulo: api, session, chat, monitoring, support, tickets, reservations o csv-imports.
 - Cada controlador conserva su estado privado; solo identidad y época de sesión se comparten. Comunicar módulos mediante APIs/callbacks inyectados por el compositor.
 - No crear un objeto global de negocio ni importar el compositor desde una funcionalidad.
 - Usar el cliente de API compartido para autenticación/renovación. Ignorar resultados tardíos de otra sesión o selección.
@@ -51,4 +51,4 @@ node --test frontend/tests/*.test.mjs
 
 Actualizar README y guías afectadas al cambiar contratos, permisos, módulos o arranque. Mantener rutas y comandos ejecutables. Los documentos de `docs/superpowers/specs` y `plans` son antecedentes históricos, no instrucciones vigentes para implementar sin revisar el estado actual.
 
-Pendientes reales: UniFi, operaciones AP/SSID/VLAN, trabajos durables, verificación/compensación, administración por chat y carga CSV. No documentarlos como terminados.
+Pendientes reales: UniFi, operaciones AP/SSID/VLAN, trabajos durables, verificación/compensación, administración por chat y aprovisionamiento CSV en UniFi. La validación CSV y reserva local están implementadas; consultar `netbot/docs/carga-csv.md`. No documentarlos como terminados.

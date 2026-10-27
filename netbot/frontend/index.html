@@ -135,6 +135,26 @@
               <span class="chat-scope" id="chat-scope">Asistente</span>
             </div>
             <p class="chat-intro">Consulta las redes que tienes autorizadas. Tus conversaciones se guardan en tu cuenta. Las consultas y los datos necesarios se procesan en OpenRouter. No envíes contraseñas por el chat.</p>
+            <section id="csv-panel" class="csv-panel" hidden aria-labelledby="csv-heading">
+              <h3 id="csv-heading">Carga de SSIDs y reservas por CSV</h3>
+              <p>Valida el archivo y confirma las filas que deseas reservar. Esta acción guarda reservas locales; no crea SSIDs ni modifica la red.</p>
+              <a href="./examples/ssid-reservas.csv" download>Descargar plantilla CSV</a>
+              <p id="csv-limits">UTF-8, separado por coma o punto y coma. Sin contraseñas.</p>
+              <form id="csv-form" class="chat-controls">
+                <label for="csv-file">Archivo CSV</label><input id="csv-file" type="file" accept=".csv,text/csv" required />
+                <button id="csv-upload" type="submit">Validar CSV</button>
+              </form>
+              <div class="chat-controls"><label for="csv-history">Cargas anteriores</label><select id="csv-history"><option value="">Selecciona una carga</option></select></div>
+              <p id="csv-status" role="status" aria-live="polite"></p>
+              <div id="csv-preview" hidden>
+                <p id="csv-summary"></p>
+                <label class="toggle-option"><input type="checkbox" id="csv-select-all" /> Seleccionar todas las filas válidas</label>
+                <div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Validación del CSV por fila</caption><thead><tr><th>Seleccionar</th><th>Fila</th><th>Interfaz</th><th>VLAN</th><th>SSID</th><th>Evento</th><th>Propósito</th><th>Validación</th></tr></thead><tbody id="csv-rows"></tbody></table></div>
+                <p id="csv-selection"></p>
+                <div class="chat-controls"><button id="csv-confirm" type="button">Confirmar reservas seleccionadas</button><button id="csv-cancel" type="button">Cancelar carga</button></div>
+                <div id="csv-results" aria-live="polite"></div>
+              </div>
+            </section>
             <div class="chat-controls">
               <label for="chat-conversation">Conversación</label>
               <select id="chat-conversation"><option value="">Nueva conversación</option></select>

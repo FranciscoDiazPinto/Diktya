@@ -19,4 +19,8 @@
 
 [Arquitectura original](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo y sus diagramas transcritos. Los documentos de superpowers/specs y superpowers/plans son antecedentes de entregas anteriores; pueden mencionar contratos o instrucciones que ya cambiaron. Usar las guías vigentes y el código para decidir una modificación actual.
 
-Actualizar la guía y el contrato correspondiente cuando cambien módulos, permisos, rutas, migraciones o arranque. No documentar UniFi, workers, CSV u otras funciones pendientes como implementadas.
+Actualizar la guía y el contrato correspondiente cuando cambien módulos, permisos, rutas, migraciones o arranque. No documentar UniFi, workers, aprovisionamiento CSV u otras funciones pendientes como implementadas.
+
+### Carga CSV
+
+Admin puede validar la [plantilla y contrato CSV](carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.

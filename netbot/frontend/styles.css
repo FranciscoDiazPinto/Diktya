@@ -94,3 +94,11 @@ button { cursor: pointer; }
 .support-panel p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .ticket-update { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .wifi-passphrase { font: 16px var(--mono); user-select: text; }
+.csv-panel { margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 5px; }
+.csv-panel h3 { margin: 0 0 10px; font-size: 14px; }
+.csv-panel p, .csv-panel a { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.csv-panel .data-table td { white-space: normal; min-width: 65px; overflow-wrap: anywhere; }
+.csv-panel .data-table td:last-child { min-width: 200px; }
+.csv-panel input[type=file] { max-width: 100%; font-size: 12px; }
+.csv-panel button { padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+.csv-panel button:disabled { opacity: .55; cursor: not-allowed; }

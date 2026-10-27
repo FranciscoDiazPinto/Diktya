@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.auth.access import require_user_permission
+from app.auth.permissions import Permission
 from app.monitoring.schemas import MonitoringStatus
 from app.monitoring.service import MonitoringService
 
@@ -16,6 +18,14 @@ class InventoryUnavailable(Exception): pass
 class VlanConflict(Exception): pass
 class ReservationNotFound(Exception): pass
 class ReservationAlreadyReleased(Exception): pass
+
+
+def build_reservation(data, item, actor_id: int, now: datetime) -> VlanReservation:
+    """Construye una reserva; el caso de uso llamante controla flush/commit."""
+    return VlanReservation(parent_interface=item.parent_interface, tag=item.tag,
+                           description=item.description, interface_name=item.interface_name,
+                           event_name=data.event_name, purpose=data.purpose, ssid=data.ssid,
+                           status="reserved", requested_by_id=actor_id, created_at=now)
 
 
 class VlanReservationService:
@@ -36,18 +46,16 @@ class VlanReservationService:
                 if (item.parent_interface, item.tag) not in reserved]
 
     async def create(self, data: VlanReservationCreate, actor: User) -> VlanReservationRead:
+        require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
         inventory = await self.monitoring.get_vlan_inventory()
+        require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
         if inventory.data is None or inventory.status == MonitoringStatus.UNAVAILABLE:
             raise InventoryUnavailable
         item = next((v for v in inventory.data if
                      (v.parent_interface, v.tag) == (data.parent_interface, data.tag)), None)
         if item is None or (data.parent_interface, data.tag) in self._active_keys():
             raise VlanConflict
-        row = VlanReservation(parent_interface=item.parent_interface, tag=item.tag,
-                              description=item.description, interface_name=item.interface_name,
-                              event_name=data.event_name, purpose=data.purpose, ssid=data.ssid,
-                              status="reserved", requested_by_id=actor.id,
-                              created_at=datetime.now(timezone.utc))
+        row = build_reservation(data, item, actor.id, datetime.now(timezone.utc))
         self.db.add(row)
         try:
             self.db.commit()
@@ -63,6 +71,7 @@ class VlanReservationService:
         return [VlanReservationRead.from_model(row) for row in rows]
 
     def release(self, reservation_id: int, actor: User) -> VlanReservationRead:
+        require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
         row = self.db.get(VlanReservation, reservation_id)
         if row is None:
             raise ReservationNotFound

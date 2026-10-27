@@ -60,3 +60,7 @@ El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El composi
 Cada controlador mantiene estado privado; identidad y época de sesión son el único estado compartido. No añadir lógica de funcionalidad a app.js/dashboard ni importar el compositor desde otro módulo. Usar el cliente API común y preservar los controles que descartan respuestas tardías de otra cuenta/selección.
 
 Las pruebas (`node --test frontend/tests/*.test.mjs`) importan los mismos módulos ES que el navegador con entorno inyectado; no concatenan app.js ni reemplazan sus imports. Ver [guía modular](../docs/arquitectura-modular.md) y [AGENTS.md](../../AGENTS.md).
+
+### Carga CSV
+
+Admin puede validar la [plantilla y contrato CSV](../docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.

@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     monitoring_site_id: str | None = None
     network_status_max_age_seconds: float = Field(60.0, gt=0)
 
+    csv_max_bytes: int = Field(1_048_576, ge=1024, le=10_485_760)
+    csv_max_rows: int = Field(500, ge=1, le=1000)
+    csv_preview_ttl_seconds: int = Field(900, ge=30, le=86400)
+    csv_inventory_max_age_seconds: float = Field(60.0, gt=0, le=3600)
+
     # --- OPNsense ---
     # Se acepta OPNSENSE_BASE_URL (nombre actual de .env.example) y OPNSENSE_API_URL.
     opnsense_base_url: Optional[str] = Field(
