@@ -110,3 +110,7 @@ El admin puede consultar `GET /admin/networks/{network_id}/support-audit?limit=5
 Con el backend detenido, aplicar `alembic upgrade head` antes de arrancar la nueva versión. La migración 004 crea network_support_config, support_audit, tickets y ticket_events. Se verificó upgrade → downgrade a 003 → upgrade en SQLite temporal y generación de DDL PostgreSQL sin conexión; no se aplicó a la base del usuario ni se probó contra hardware real.
 
 Validación: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Incluye aislamiento, revocación durante diagnóstico, idempotencia, transiciones, estado parcial/desconocido, claves fuera del contexto LLM y descarte de respuestas tardías.
+
+## Mantenimiento modular
+
+Ver [arquitectura vigente](arquitectura-modular.md) antes de extender este flujo. Autorización en auth/access y networks/access; diagnóstico en networks/diagnostics; claves en networks/credentials; consultas de tickets en tickets/service. El chat usa esos contratos, no sus tablas. Los errores públicos se traducen a HTTP en una frontera común. No se modificó el esquema SQL ni el contrato público por esta reorganización.

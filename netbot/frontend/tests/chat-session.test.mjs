@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { randomUUID } from 'node:crypto';
-import { canReserveVlans, reservationPayload } from '../chat-reservations.mjs';
+import { createDashboard } from '../modules/dashboard.mjs';
 
 // Ejecuta el controlador real sin dependencias de navegador. Los nodos se crean
 // a partir de los IDs del HTML para detectar también selectores que no existen.
@@ -45,7 +45,7 @@ function dashboard(fetch) {
   const storage = new Map();
   const timers = [];
   const monitoringNodes = [new Element(), new Element()];
-  const context = vm.createContext({
+  const environment = {
     document: {
       querySelector(selector) { assert.ok(nodes.has(selector), `Missing HTML selector ${selector}`); return nodes.get(selector); },
       querySelectorAll(selector) { return selector.startsWith('.stats-grid,') ? monitoringNodes : []; },
@@ -54,13 +54,23 @@ function dashboard(fetch) {
     Option: Element,
     localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     window: { setInterval() {}, clearInterval() {}, setTimeout(callback, delay) { timers.push({ callback, delay }); } },
-    crypto: { randomUUID },
-    fetch, canReserveVlans, reservationPayload,
+    crypto: { randomUUID }, FormData: class {}, fetch,
+  };
+  const controller = createDashboard(environment);
+  const exposed = {
+    setAuthenticated: controller.session.setAuthenticated, signOut: controller.session.signOut,
+    loadConversation: controller.chat.loadConversation, startNewChat: controller.chat.startNewChat,
+    refreshTokens: controller.api.refreshTokens, authedRequest: controller.api.authedRequest,
+    showWifiAccess: controller.support.showWifiAccess, renderTicketProposal: controller.tickets.renderTicketProposal,
+  };
+  Object.defineProperties(exposed, {
+    conversationId: {get: () => controller.chat.conversationId},
+    conversationVersion: {get: () => controller.chat.conversationVersion},
   });
-  const source = readFileSync(new URL('../app.js', import.meta.url), 'utf8').replace(/^import .*;\n/, '');
-  vm.runInContext(source, context);
-  return { nodes, storage, monitoringNodes, timers, run: (code) => vm.runInContext(code, context),
-    login(id, permissions) { context.testUser = user(id); if (permissions) context.testUser.permissions = permissions; vm.runInContext('setAuthenticated(testUser)', context); } };
+  const context = vm.createContext(exposed);
+  return { nodes, storage, monitoringNodes, timers, controller, run: (code) => vm.runInContext(code, context),
+    login(id, permissions) { const person = user(id); if (permissions) person.permissions = permissions; controller.session.setAuthenticated(person); } };
+
 }
 
 test('customer login restores saved chat and sends only conversation identity and version', async () => {
@@ -243,4 +253,38 @@ test('ticket proposals wait for confirmation and retries reuse the request key',
   assert.equal(bodies.length, 2);
   assert.equal(bodies[0].request_key, bodies[1].request_key);
   assert.match(card.children[0].textContent, /Ticket #42 creado/);
+});
+
+test('monitoring module still renders authorized telemetry after composition', async () => {
+  const calls = [];
+  const ui = dashboard(async (url) => {
+    const path = new URL(url).pathname;
+    calls.push(path);
+    if (!path.includes('/monitoring/')) return response([]);
+    const data = path.endsWith('/system') ? { hostname: 'test-firewall', uptime_seconds: 60, temperature: { available: false } }
+      : path.endsWith('/stats') ? { packets_blocked: 0 } : [];
+    return response({ data, source: 'mock', status: 'ok', issues: [], collected_at: new Date().toISOString() });
+  });
+  ui.login('internal', ['chat:use', 'monitoring:read']);
+  await tick();
+  assert.ok(calls.includes('/api/v1/monitoring/system'));
+  assert.ok(ui.monitoringNodes.every((node) => !node.hidden));
+  assert.equal(ui.nodes.get('#sys-host').textContent, 'test-firewall');
+  assert.equal(ui.nodes.get('#stat-clients').textContent, 0);
+  ui.controller.session.signOut();
+  ui.login('customer');
+  await tick();
+  assert.ok(ui.monitoringNodes.every((node) => node.hidden));
+});
+
+test('two composed dashboards keep session and conversation state independent', async () => {
+  const first = dashboard(async () => response([]));
+  const second = dashboard(async () => response([]));
+  first.login('a');
+  second.login('b');
+  await tick();
+  first.controller.session.signOut();
+  assert.equal(second.nodes.get('#chat-send').disabled, false);
+  assert.equal(second.nodes.get('#user-name').textContent, 'b');
+  assert.notEqual(first.controller.api, second.controller.api);
 });

@@ -16,7 +16,7 @@ from app.networks.support_schemas import WifiAccessAction
 from app.tickets.schemas import TicketProposal
 from .provider import (
     ChatProviderError,
-    OpenRouterProvider,
+    ChatProvider,
     ProviderCompletion,
 )
 from .schemas import (
@@ -39,7 +39,7 @@ class ChatService:
         self,
         *,
         settings: Settings,
-        provider: OpenRouterProvider,
+        provider: ChatProvider,
         monitoring_service: MonitoringService,
         reservation_service: VlanReservationService | None = None,
         customer_support: CustomerSupport | None = None,

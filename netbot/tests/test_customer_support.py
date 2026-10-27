@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 
-from fastapi import HTTPException
+from app.core.errors import NotFound
 from app.auth.roles import effective_permissions
 from app.chat.models import ChatMessage
 from app.chat.provider import ProviderCompletion, ProviderToolCall
@@ -327,10 +327,10 @@ async def test_chat_tools_cannot_leave_selected_network_or_use_model_chosen_owne
 
     support = CustomerSupport(db_session, users["admin"], monitoring, settings)
     allowed = [{"id": networks[0].id}]
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(NotFound) as error:
         await invoke_tool("get_network_status", {"network_id": networks[1].id}, monitoring,
                           effective_permissions(users["admin"]), networks=allowed, customer_support=support)
-    assert error.value.status_code == 404
+    assert error.value.detail == "Red no disponible en esta conversación."
     with pytest.raises(ChatToolError):
         await invoke_tool("offer_wifi_access", {"network_id": networks[0].id, "user_id": users["b"].id}, monitoring,
                           effective_permissions(users["admin"]), networks=allowed, customer_support=support)

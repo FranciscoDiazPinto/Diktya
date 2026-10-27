@@ -13,7 +13,8 @@ Netbot combina una API con FastAPI, PostgreSQL y Alembic con un dashboard web es
 2. Instalar dependencias: `pip install -r requirements.txt` (para pruebas: `requirements-dev.txt`).
 3. Copiar `.env.example` a `.env` y ajustar la configuración local.
 4. Iniciar PostgreSQL: `docker compose up -d db`.
-5. Iniciar la API: `uvicorn app.main:app --reload`.
+5. Aplicar migraciones con `alembic upgrade head`.
+6. Iniciar la API: `uvicorn app.main:app --reload`.
 
 Para usar el chatbot, definir `OPENROUTER_API_KEY` y `OPENROUTER_MODEL` en el `.env` local. La clave se usa solo desde el backend; nunca debe incluirse en el frontend ni guardarse en Git. Sin esos valores, la API devuelve un error de servicio y no contacta a OpenRouter.
 
@@ -26,30 +27,34 @@ Sin PostgreSQL se puede omitir `DATABASE_URL`: la API usa SQLite (`netbot.db`).
 ### Crear un usuario
 
 `python -m app.auth.cli correo@dominio.cl contraseña --role admin --name "Nombre"`
-(roles: `admin`, `operador`, `visor`). Si el correo existe, actualiza su contraseña y rol.
+(roles: `admin`, `tecnico`, `operador`, `cliente`, `visor`). Si el correo existe, actualiza su contraseña y rol.
 
 ### Dashboard
 
 Servir la carpeta `frontend` en el puerto 5173 (origen permitido por CORS):
 `python -m http.server 5173 --directory frontend` y abrir `http://localhost:5173`.
 
+## Guía para contribuir
+
+Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-modular.md) antes de editar. Los routers delegan en servicios propios; el chat consume contratos públicos. `main.py` compone HTTP, `lifecycle.py` gestiona recursos, `bootstrap.py` prepara roles/base y `model_registry.py` registra metadata. El frontend se divide en `frontend/modules/`; `app.js` solo lo arranca.
+
 ## Estructura
 
 - `app/core`: configuración, seguridad, base de datos y logging.
 - `app/auth`: usuarios, roles y permisos (Épica 001).
-- `app/monitoring`: clientes UniFi/OPNsense y dashboard (Épica 002). Ver `docs/epica-002-monitoreo.md`.
+- `app/monitoring`: proveedores OPNsense/mock y dashboard (Épica 002). Ver `docs/epica-002-monitoreo.md`.
 - `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
 - `app/networks`: registro local y asignación de acceso por red.
-- `app/changes`: confirmación, ejecución y rollback (Épica 004).
-- `app/tickets`: incidencias y notificaciones (Épica 005).
-- `app/agents`: procesos en background (Épica 006).
+- `app/changes`: reservas VLAN locales confirmadas; ejecución real y rollback pendientes.
+- `app/tickets`: tickets internos y seguimiento; notificaciones externas pendientes.
+- `app/agents`: espacio reservado; workers durables pendientes.
 - `migrations`: historial de migraciones de Alembic.
 - `docs`: ERS, diagramas PlantUML y decisiones de arquitectura.
 - `tests`: pruebas automatizadas.
 
 ## Migraciones
 
-Crear una migración con `alembic revision --autogenerate -m "descripcion"` y aplicarla con `alembic upgrade head`.
+Crear una migración con `alembic revision --autogenerate -m "descripcion"`, revisarla y aplicarla con `alembic upgrade head` antes del arranque. Producción comprueba las revisiones de Alembic y no crea tablas automáticamente. Solo development/test conservan create_all como ayuda local. Bases heredadas con tablas creadas fuera de Alembic necesitan conciliar su estado antes de migrar.
 
 ## Monitoreo sin hardware
 
@@ -67,7 +72,7 @@ Las preguntas, el historial acotado y los resultados de monitoreo necesarios se 
 
 ## Pruebas
 
-`pip install -r requirements-dev.txt` y luego `pytest`.
+`pip install -r requirements-dev.txt`, después `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Las pruebas incluyen límites modulares, contratos HTTP, aislamiento, arranque y controladores ES reales.
 # Reservas VLAN desde el chatbot
 
 El chatbot puede preparar propuestas para reservar VLAN ya existentes para un administrador. En

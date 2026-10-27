@@ -1,7 +1,11 @@
 import os
 
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test-auth.db")
-os.environ.setdefault("JWT_SECRET_KEY", "a-test-secret-key-that-is-long-enough")
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["ENVIRONMENT"] = "test"
+os.environ["MONITORING_PROVIDER"] = "mock"
+os.environ["JWT_SECRET_KEY"] = "a-test-secret-key-that-is-long-enough"
+os.environ["ADMIN_EMAIL"] = ""
+os.environ["ADMIN_PASSWORD"] = ""
 
 import pytest
 from fastapi.testclient import TestClient

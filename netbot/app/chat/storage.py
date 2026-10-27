@@ -1,18 +1,18 @@
 """Propiedad, ámbito y persistencia de conversaciones, independientes del LLM."""
+from app.core.errors import AccessDenied, NotFound, Conflict
 import hashlib
 import json
 from datetime import datetime, timezone
 
-from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.auth.roles import effective_permissions
 from app.core.config import Settings
-from app.networks.access import accessible_networks, require_network, network_read
+from app.networks.access import accessible_network_ids, assert_network_access, authorized_network_data
 from .models import ChatMessage, Conversation
-from .schemas import ChatTurn, ConversationCreate
+from .schemas import ChatTurn, ConversationCreate, ConversationRead, ConversationDetail, StoredMessageRead
 
 
 def authorization_key(db: Session, user: User) -> str:
@@ -20,7 +20,7 @@ def authorization_key(db: Session, user: User) -> str:
     scope = {
         "permissions": sorted(p.value for p in effective_permissions(user)),
         "roles": sorted(r.name for r in user.roles),
-        "networks": [n.id for n in accessible_networks(db, user)],
+        "networks": accessible_network_ids(db, user),
     }
     return hashlib.sha256(json.dumps(scope, sort_keys=True).encode()).hexdigest()
 
@@ -36,15 +36,15 @@ def owned_conversation(db: Session, user: User, conversation_id: str) -> Convers
     conversation = db.scalar(conversation_query(db, user).where(Conversation.id == conversation_id))
     if conversation is None:
         # Mismo resultado para un ID inexistente, ajeno o cuyo ámbito fue revocado.
-        raise HTTPException(status_code=404, detail="Conversación no encontrada o acceso modificado.")
+        raise NotFound("Conversación no encontrada o acceso modificado.")
     if conversation.network_id is not None:
-        require_network(db, user, conversation.network_id)
+        assert_network_access(db, user, conversation.network_id)
     return conversation
 
 
 def new_conversation(db: Session, user: User, payload: ConversationCreate) -> Conversation:
     if payload.network_id is not None:
-        require_network(db, user, payload.network_id)
+        assert_network_access(db, user, payload.network_id)
     conversation = Conversation(
         user_id=user.id, network_id=payload.network_id, title=payload.title,
         authorization_key=authorization_key(db, user),
@@ -56,8 +56,8 @@ def new_conversation(db: Session, user: User, payload: ConversationCreate) -> Co
 
 def network_context(db: Session, user: User, conversation: Conversation) -> list[dict]:
     return [
-        network_read(n, user).model_dump()
-        for n in accessible_networks(db, user)
+        n.model_dump()
+        for n in authorized_network_data(db, user)
         if conversation.network_id is None or n.id == conversation.network_id
     ]
 
@@ -84,7 +84,7 @@ def persist_exchange(db: Session, user: User, conversation: Conversation, versio
     db.expire_all()
     if not user.is_active or authorization_key(db, user) != expected_key:
         db.rollback()
-        raise HTTPException(status_code=403, detail="Tu acceso cambió durante la consulta. Inicia una nueva conversación.")
+        raise AccessDenied("Tu acceso cambió durante la consulta. Inicia una nueva conversación.")
     result = db.execute(update(Conversation).where(
         Conversation.id == conversation_id, Conversation.user_id == user.id,
         Conversation.authorization_key == expected_key, Conversation.version == version,
@@ -92,7 +92,7 @@ def persist_exchange(db: Session, user: User, conversation: Conversation, versio
         execution_options={"synchronize_session": False})
     if result.rowcount != 1:
         db.rollback()
-        raise HTTPException(status_code=409, detail="La conversación cambió. Recárgala antes de enviar otro mensaje.")
+        raise Conflict("La conversación cambió. Recárgala antes de enviar otro mensaje.")
     db.add_all([
         ChatMessage(conversation_id=conversation_id, role="user", content=message),
         ChatMessage(conversation_id=conversation_id, role="assistant", content=answer),
@@ -102,3 +102,26 @@ def persist_exchange(db: Session, user: User, conversation: Conversation, versio
                    execution_options={"synchronize_session": False})
     db.commit()
     return version + 1
+
+
+def list_conversations(db: Session, user: User, limit: int, offset: int) -> list[ConversationRead]:
+    rows = db.scalars(conversation_query(db, user).order_by(
+        Conversation.updated_at.desc(), Conversation.id.desc()).limit(limit).offset(offset)).all()
+    return [ConversationRead.model_validate(row) for row in rows]
+
+
+def conversation_detail(db: Session, user: User, conversation_id: str, limit: int, before_id: int | None) -> ConversationDetail:
+    conversation = owned_conversation(db, user, conversation_id)
+    query = select(ChatMessage).where(ChatMessage.conversation_id == conversation.id)
+    if before_id is not None:
+        query = query.where(ChatMessage.id < before_id)
+    rows = db.scalars(query.order_by(ChatMessage.id.desc()).limit(limit)).all()
+    return ConversationDetail(**ConversationRead.model_validate(conversation).model_dump(),
+                              messages=[StoredMessageRead.model_validate(m) for m in reversed(rows)])
+
+
+def create_conversation(db: Session, user: User, payload: ConversationCreate) -> ConversationRead:
+    conversation = new_conversation(db, user, payload)
+    db.commit()
+    db.refresh(conversation)
+    return ConversationRead.model_validate(conversation)

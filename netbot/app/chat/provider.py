@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
@@ -36,6 +36,10 @@ class ProviderToolCall:
 class ProviderCompletion:
     content: str | None
     tool_calls: tuple[ProviderToolCall, ...] = ()
+
+
+class ChatProvider(Protocol):
+    async def complete(self, *, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ProviderCompletion: ...
 
 
 class OpenRouterProvider:

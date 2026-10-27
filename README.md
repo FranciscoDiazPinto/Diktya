@@ -1,86 +1,27 @@
 # NetBot
 
-Agente inteligente para la gestión y monitoreo de infraestructura de red utilizada en eventos.
+Asistente para consultar y gestionar soporte de redes de eventos, con permisos por usuario y red.
 
-## Descripción
+## Estado implementado
 
-**Qué hace:** NetBot centraliza la administración de la infraestructura de red (puntos de acceso, VLANs, SSIDs) usada en eventos, actualmente gestionada de forma manual y dispositivo por dispositivo. Permite:
+- Autenticación y roles cliente, tecnico/operador, visor interno y admin.
+- Conversaciones privadas persistentes; admin no obtiene acceso a chats ajenos.
+- Monitoreo mediante OPNsense o datos mock, con dashboard y diagnóstico parcial por red.
+- Entrega protegida de acceso Wi-Fi fuera del modelo y del historial.
+- Tickets internos persistentes con confirmación, seguimiento y gestión por técnicos asignados.
+- Reservas VLAN locales con confirmación. No aprovisionan VLANs ni SSIDs en la infraestructura.
 
-- Consultar el estado de la red mediante un **chat conversacional** en lenguaje natural.
-- Visualizar un **dashboard de monitoreo** en tiempo real (APs, redes, alertas, disponibilidad, planos de cobertura).
-- Ejecutar **cambios controlados** sobre la infraestructura (modificación de VLAN, carga masiva de SSIDs vía CSV, reinicio de dispositivos), siempre con confirmación explícita del usuario y con verificación y *rollback* posterior a la ejecución.
-- Generar y hacer seguimiento de **tickets** ante incidentes, clasificando su criticidad y notificando al equipo técnico correspondiente.
+Pendientes: integración UniFi, reinicio/adopción de APs, aprovisionamiento SSID/VLAN, trabajos durables, verificación/compensación, administración por chat, CSV y notificaciones externas. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
 
-**A quién va dirigido:** técnicos y administradores de red que gestionan infraestructura temporal (redes de evento), con al menos 3 roles distintos y restricciones sobre qué puede solicitar o ejecutar cada uno.
+## Desarrollo y arquitectura
 
-**Qué problema resuelve:** reduce el tiempo de respuesta y el riesgo de error humano asociado a la configuración manual de dispositivos de red durante un evento, aportando trazabilidad y control centralizado sobre cada cambio realizado.
+Leer [AGENTS.md](AGENTS.md) y la [guía modular vigente](netbot/docs/arquitectura-modular.md) antes de modificar código. Las instrucciones para IA en [CLAUDE.md](CLAUDE.md) apuntan a la misma guía compartida.
 
-## Tecnologías utilizadas
+El proyecto ejecutable está en `netbot/`. Es un monolito modular Python/FastAPI y SQLAlchemy, con PostgreSQL para despliegue y SQLite para desarrollo/pruebas. El frontend actual es HTML/CSS y módulos ES, sin compilación ni React. OpenRouter se usa únicamente desde el backend. Docker Compose levanta PostgreSQL; API y frontend se arrancan por separado.
 
-| Categoría | Tecnología |
-|---|---|
-| Backend | Python + FastAPI |
-| Frontend | React (Vite) |
-| Base de datos | PostgreSQL |
-| Integraciones de red | API de UniFi Controller, API de OPNsense |
-| Proveedor de LLM | OpenRouter, Claude u otro proveedor compatible, configurable vía API key |
-| Despliegue | Red local, con proxy inverso / túnel para exponer el servicio de forma controlada |
+Consultar [inicio local, migraciones y pruebas](netbot/README.md), [índice de documentación](netbot/docs/README.md) y [soporte al cliente](netbot/docs/soporte-cliente.md).
 
-> Nota: la selección de framework de frontend (React) es la recomendación actual del equipo; confirmar antes de iniciar el desarrollo si se mantiene o se ajusta.
-
-## Instrucciones para ejecutar el proyecto localmente
-
-### Requisitos previos
-
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 14+
-- Acceso a un controlador UniFi y a un firewall OPNsense (o credenciales de prueba/sandbox)
-- Una API key de un proveedor de LLM (OpenRouter, Claude, etc.)
-
-### Backend
-
-```bash
-# Clonar el repositorio
-git clone <url-del-repositorio>
-cd netbot/backend
-
-# Crear entorno virtual e instalar dependencias
-python -m venv venv
-source venv/bin/activate        # En Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Configurar variables de entorno
-cp .env.example .env
-# Completar en .env:
-#   DATABASE_URL=postgresql://usuario:password@localhost:5432/netbot
-#   UNIFI_API_URL / UNIFI_API_KEY
-#   OPNSENSE_API_URL / OPNSENSE_API_KEY
-#   LLM_PROVIDER_API_KEY
-
-# Ejecutar migraciones de base de datos
-alembic upgrade head
-
-# Levantar el servidor de desarrollo
-uvicorn app.main:app --reload
-```
-
-El backend quedará disponible en `http://localhost:8000` (documentación interactiva en `http://localhost:8000/docs`).
-
-### Frontend
-
-```bash
-cd netbot/frontend
-npm install
-
-# Configurar la URL del backend
-cp .env.example .env
-# VITE_API_URL=http://localhost:8000
-
-npm run dev
-```
-
-El frontend quedará disponible en `http://localhost:5173`.
+El [documento de arquitectura original](Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo y distingue sus partes pendientes del código actual.
 
 ## Integrantes del equipo y roles
 
@@ -102,38 +43,8 @@ El equipo trabaja bajo **Scrum**, con las siguientes prácticas:
 - **Ajuste** continuo de la planificación y del Product Backlog según los resultados obtenidos.
 - Distribución del trabajo por **épicas completas** (cada integrante lidera 2 épicas de extremo a extremo), en lugar de por capa técnica (frontend/backend/datos), favoreciendo la autonomía y la trazabilidad de cada bloque funcional.
 
-## Arquitectura de la solución
+## Organización técnica
 
-NetBot conecta directamente con la infraestructura de red del evento (UniFi y OPNsense), sin depender de sistemas externos intermedios. Los cambios sobre la red pasan siempre por un flujo de reserva → confirmación → ejecución → verificación, evitando que un dato quede duplicado o sobrescrito y permitiendo revertir la acción si la verificación posterior falla.
+Cada módulo posee sus datos y servicios. Los routers adaptan HTTP; los casos de uso autorizan, consultan y confirman operaciones; los adaptadores externos normalizan sus respuestas. El chat coordina servicios públicos y prepara propuestas con herramientas acotadas por permisos. La aplicación se compone en main/routes/lifecycle, sin dependencias inversas desde los dominios.
 
-```mermaid
-flowchart TD
-    U["Usuario técnico"] -->|"Chat / Dashboard"| FE["Frontend (React)"]
-    FE -->|"REST API"| BE["Backend (FastAPI)"]
-
-    BE --> DB[("PostgreSQL")]
-    BE --> LLM["Proveedor LLM\n(OpenRouter / Claude / otro)"]
-
-    BE --> RES["Reserva de cambio\n(VLAN / SSID / reboot)"]
-    RES --> CHK["Verificación de\ndoble escritura"]
-    CHK -->|"Confirmado por el usuario"| EXE["Ejecución del cambio"]
-    EXE --> UNIFI["API UniFi Controller"]
-    EXE --> OPN["API OPNsense"]
-    EXE --> VER["Verificación post-ejecución"]
-    VER -->|"OK"| LOG["Registro / trazabilidad"]
-    VER -->|"Falla"| RB["Rollback"]
-
-    BE --> AGENTS["Agentes en background\n(monitoreo continuo, tickets)"]
-    AGENTS --> UNIFI
-    AGENTS --> OPN
-    AGENTS -->|"Incidente detectado"| TICK["Generación de ticket\n+ notificación al equipo"]
-```
-
-**Componentes principales:**
-
-- **Frontend (React):** chat conversacional y dashboard de monitoreo, consumido por los usuarios técnicos.
-- **Backend (FastAPI):** expone la API REST, gestiona autenticación/roles, orquesta el flujo de cambios y coordina a los agentes en background.
-- **Base de datos (PostgreSQL):** almacena usuarios, dispositivos, reservas de cambios, tickets y logs de auditoría.
-- **Integraciones de red:** APIs de UniFi Controller y OPNsense, consumidas tanto para monitoreo como para ejecución de cambios.
-- **Proveedor LLM:** interpreta las solicitudes del chat en lenguaje natural y las traduce en acciones propuestas sobre la infraestructura.
-- **Agentes en background:** monitorean la red de forma continua, generan tickets ante incidentes y hacen seguimiento periódico hasta su resolución.
+El frontend tiene controladores por funcionalidad y un compositor pequeño. Los cambios deben mantener sus límites y pasar las pruebas de arquitectura e aislamiento.

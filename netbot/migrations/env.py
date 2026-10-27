@@ -1,13 +1,10 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 from app.core.database import Base
-from app.auth import models  # noqa: F401
-from app.changes import models as change_models  # noqa: F401
-from app.chat import models as chat_models  # noqa: F401
-from app.networks import models as network_models  # noqa: F401
-from app.networks import support_models  # noqa: F401
-from app.tickets import models as ticket_models  # noqa: F401
+from app.model_registry import register_models
 from app.core.config import settings
+
+register_models()
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))

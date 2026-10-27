@@ -1,5 +1,19 @@
 # Arquitectura de NetBot
 
+## Guía vigente para modificar el proyecto
+
+Antes de implementar, leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular vigente](../netbot/docs/arquitectura-modular.md). Esa guía describe contratos, dependencias, transacciones, arranque y pruebas del código actual.
+
+El sistema implementado es un monolito modular FastAPI con PostgreSQL/SQLite y frontend estático en módulos ES. Los módulos auth, networks, tickets, chat, monitoring y changes tienen servicios propios; el chat usa APIs internas y no consulta tablas ajenas. FastAPI queda en adaptadores HTTP y los errores de aplicación se traducen en una frontera común.
+
+El punto de entrada HTTP, el ciclo de vida, la preparación de la base y el registro de modelos están separados. Producción exige migraciones aplicadas antes del arranque; solo development/test admiten create_all. El frontend separa sesión/API, chat, monitoreo, soporte, tickets y reservas.
+
+El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. UniFi, React, WebSocket, ejecución durable, verificación/compensación y CSV son objetivos, no capacidades ya disponibles.
+
+## Diseño de referencia histórico
+
+Las secciones siguientes conservan la transcripción del diseño original. No deben usarse como inventario de funcionalidades terminadas ni como instrucciones que contradigan la guía vigente.
+
 Este documento describe por escrito la arquitectura de software de **NetBot**. Su contenido se transcribió de los diagramas del *Documento 05 – Documento de Diseño* y de la *Guía Fase 2 – Desarrollo de Proyecto*. Se puede leer completo sin abrir ninguna imagen; las imágenes originales quedan en esta misma carpeta solo como respaldo (ver sección 11).
 
 ## Resumen

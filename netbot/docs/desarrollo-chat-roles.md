@@ -54,3 +54,9 @@ La integración conserva el dashboard con monitoreo en vivo, el chatbot y las re
 Se agregó soporte con entrega protegida de acceso Wi-Fi desde secretos del entorno, diagnóstico acotado por interfaz y tickets persistentes con confirmación y seguimiento. Ver [soporte al cliente](soporte-cliente.md). La disponibilidad completa de SSID/AP/Internet sigue sin poder confirmarse con la fuente actual.
 
 El siguiente bloque es integrar las operaciones técnicas UniFi con permisos por recurso, confirmación, trabajos durables, verificación y auditoría; después, administración por chat. La carga CSV sigue para la etapa posterior acordada.
+
+## Refactorización modular
+
+Se separaron controladores frontend, servicios de autenticación/inventario, autorización por recurso, diagnóstico y credenciales; el chat dejó de consultar tablas de tickets. Arranque, registro de modelos y HTTP tienen composición propia. Las pruebas de arquitectura vigilan esos límites y el arranque migrado de producción. Ver [guía vigente](arquitectura-modular.md).
+
+Este bloque conserva las funcionalidades y los contratos HTTP; no implementa todavía UniFi ni trabajos durables, y no requiere nuevas migraciones.

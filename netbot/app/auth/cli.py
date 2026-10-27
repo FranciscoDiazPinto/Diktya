@@ -10,7 +10,7 @@ import argparse
 from sqlalchemy import select
 
 from app.core.database import SessionLocal
-from app.main import initialize_database
+from app.bootstrap import initialize_database
 
 from .models import Role, User
 from .roles import RoleName

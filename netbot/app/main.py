@@ -1,101 +1,25 @@
-import asyncio
-import contextlib
-import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-
+"""Punto de entrada HTTP. No contiene reglas de negocio ni preparación de tablas."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
-
-from app.auth.models import Role, User
-from app.changes import models as change_models  # noqa: F401
-from app.changes.router import router as changes_router
-from app.auth.routes import admin_router, router
-from app.auth.roles import DEFAULT_ROLES
-from app.auth.security import hash_password
-from app.chat.router import router as chat_router
-from app.networks.router import router as networks_router, admin_router as networks_admin_router
-from app.networks.support_router import router as support_router, admin_router as support_admin_router
-from app.tickets.router import router as tickets_router
-from app.core.config import settings
-from app.core.database import Base, SessionLocal, engine
-
 from app.core.config import get_settings
-from app.monitoring.factory import build_monitoring_service
-from app.monitoring.router import router as monitoring_router
-from app.monitoring.service import MonitoringService
-
-logger = logging.getLogger("netbot")
+from app.http_errors import register_error_handlers
+from app.lifecycle import lifespan
+from app.routes import register_routes
 
 
-async def sample_traffic_forever(service: MonitoringService, interval: float) -> None:
-    while True:
-        try:
-            await service.sample_traffic()
-        except Exception:
-            logger.exception("Falló el muestreo de tráfico")
-        await asyncio.sleep(interval)
+def create_app() -> FastAPI:
+    settings = get_settings()
+    app = FastAPI(title="Netbot", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(CORSMiddleware,
+        allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
+        allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    register_error_handlers(app)
+    register_routes(app)
+
+    @app.get("/health", tags=["health"])
+    def health_check():
+        return {"status": "ok"}
+    return app
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    initialize_database()
-    service = build_monitoring_service(get_settings())
-    app.state.monitoring_service = service
-    sampler = asyncio.create_task(
-        sample_traffic_forever(service, get_settings().monitoring_sample_interval_seconds)
-    )
-    try:
-        yield
-    finally:
-        sampler.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await sampler
-        await service.aclose()
-
-
-app = FastAPI(title="Netbot", version="0.1.0", lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.include_router(monitoring_router, prefix="/api/v1")
-app.include_router(chat_router, prefix="/api/v1")
-app.include_router(networks_router, prefix="/api/v1")
-app.include_router(networks_admin_router)
-app.include_router(support_router, prefix="/api/v1")
-app.include_router(support_admin_router)
-app.include_router(tickets_router, prefix="/api/v1")
-app.include_router(changes_router, prefix="/api/v1")
-app.include_router(router)
-app.include_router(admin_router)
-
-
-def initialize_database() -> None:
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        for role_name, role_definition in DEFAULT_ROLES.items():
-            role = db.scalar(select(Role).where(Role.name == role_name.value))
-            if role is None:
-                db.add(Role(name=role_name.value, description=role_definition.description))
-            else:
-                role.description = role_definition.description
-        db.commit()
-        if settings.admin_email and settings.admin_password and not db.scalar(
-            select(User).where(User.email == settings.admin_email.lower())
-        ):
-            admin_role = db.scalar(select(Role).where(Role.name == "admin"))
-            db.add(User(email=settings.admin_email.lower(), hashed_password=hash_password(settings.admin_password), roles=[admin_role]))
-            db.commit()
-    finally:
-        db.close()
-
-
-@app.get("/health", tags=["health"])
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+app = create_app()

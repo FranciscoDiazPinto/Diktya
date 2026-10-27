@@ -90,3 +90,7 @@ Pruebas: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mj
 ## Continuación
 
 El bloque de atención al cliente está implementado y documentado en [soporte al cliente](soporte-cliente.md), que actualiza las capacidades disponibles de esta entrega base. Después siguen operaciones técnicas UniFi con confirmación, ejecución durable, verificación y auditoría. La carga CSV queda para la etapa posterior acordada.
+
+## Mantenimiento modular
+
+Ver [arquitectura vigente](arquitectura-modular.md) antes de extender este flujo. Autorización en auth/access y networks/access; diagnóstico en networks/diagnostics; claves en networks/credentials; consultas de tickets en tickets/service. El chat usa esos contratos, no sus tablas. Los errores públicos se traducen a HTTP en una frontera común. No se modificó el esquema SQL ni el contrato público por esta reorganización.
