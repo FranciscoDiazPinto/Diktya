@@ -21,6 +21,18 @@ El dashboard estático puede servirse en otra terminal con `python3 -m http.serv
 
 La documentación interactiva de la API estará en `/docs` al iniciar el servidor.
 
+Sin PostgreSQL se puede omitir `DATABASE_URL`: la API usa SQLite (`netbot.db`).
+
+### Crear un usuario
+
+`python -m app.auth.cli correo@dominio.cl contraseña --role admin --name "Nombre"`
+(roles: `admin`, `operador`, `visor`). Si el correo existe, actualiza su contraseña y rol.
+
+### Dashboard
+
+Servir la carpeta `frontend` en el puerto 5173 (origen permitido por CORS):
+`python -m http.server 5173 --directory frontend` y abrir `http://localhost:5173`.
+
 ## Estructura
 
 - `app/core`: configuración, seguridad, base de datos y logging.

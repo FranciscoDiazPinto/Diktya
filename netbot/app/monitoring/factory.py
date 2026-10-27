@@ -60,4 +60,5 @@ def build_monitoring_service(settings: Settings) -> MonitoringService:
         build_monitoring_provider(settings),
         cache_ttl_seconds=settings.monitoring_cache_ttl_seconds,
         firewall_log_fetch_limit=settings.firewall_log_fetch_limit,
+        history_seconds=settings.monitoring_history_seconds,
     )

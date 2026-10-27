@@ -31,12 +31,19 @@ clientes y firewall. El historial se mantiene solo en memoria hasta cerrar sesi�
 recargar la página; el frontend no guarda conversaciones ni la clave de OpenRouter.
 Las preguntas y los resultados de monitoreo necesarios para responder se procesan en OpenRouter.
 
-El resto del dashboard conserva datos visuales de demostración. Las consultas actuales
-del chatbot sí usan la API de monitoreo.
-# Reservas VLAN
+El dashboard y el chatbot consultan la API de monitoreo.
+## Reservas VLAN
 
 El panel muestra propuestas de reserva para operador y administrador. Confirmar
 envía los campos de evento, propósito y SSID junto a la VLAN elegida; cancelar no
 hace ninguna solicitud. Las reservas activas se muestran debajo del chat y el
 operador puede liberarlas manualmente. La API del backend vuelve a validar el
 permiso, el inventario OPNsense y la disponibilidad antes de guardar.
+
+## Monitoreo
+
+Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
+`/api/v1/monitoring` (`system`, `interfaces`, `interfaces/traffic`, `clients`,
+`firewall/stats` y `firewall/events`) con el token del usuario. Si el token de acceso
+vence, lo renueva con `/auth/refresh`. Las fallas parciales (`degraded`/`unavailable`)
+se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.

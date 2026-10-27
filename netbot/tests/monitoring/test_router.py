@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.monitoring.providers.mock import MockMonitoringProvider
+from app.monitoring.dependencies import require_monitoring_read
 from app.monitoring.router import router
 from app.monitoring.service import MonitoringService
 
@@ -17,6 +18,8 @@ def make_client(scenario="healthy") -> TestClient:
     app.state.monitoring_service = MonitoringService(
         MockMonitoringProvider(scenario=scenario), cache_ttl_seconds=0
     )
+    # La autorización se prueba en tests/monitoring/test_auth.py.
+    app.dependency_overrides[require_monitoring_read] = lambda: None
     return TestClient(app)
 
 
@@ -129,3 +132,11 @@ def test_responses_do_not_leak_raw_opnsense_keys():
         "protoname",
     ):
         assert raw_key not in text
+
+
+def test_traffic_history_endpoint():
+    client = make_client()
+    body = client.get(BASE + "/interfaces/traffic", params={"window": 60}).json()
+    assert body["status"] == "ok"
+    assert {h["interface_id"] for h in body["data"]} == {"wan", "lan", "opt1", "opt2"}
+    assert client.get(BASE + "/interfaces/traffic", params={"window": 5}).status_code == 422

@@ -128,6 +128,18 @@ class VlanInventoryItem(NetbotModel):
     description: str | None = None
     interface_name: str = Field(min_length=1)
 
+class TrafficRatePoint(NetbotModel):
+    """Velocidad media entre dos lecturas consecutivas de los contadores."""
+
+    timestamp: datetime
+    bytes_in_per_second: float = Field(ge=0)
+    bytes_out_per_second: float = Field(ge=0)
+
+
+class InterfaceTrafficHistory(NetbotModel):
+    interface_id: str
+    points: list[TrafficRatePoint] = Field(default_factory=list)
+
 
 # --------------------------------------------------------------------------- #
 # DHCP / clientes

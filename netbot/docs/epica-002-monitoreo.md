@@ -25,6 +25,15 @@ Todos los endpoints devuelven el mismo envoltorio:
 | `data` | Modelo normalizado, o `null` |
 | `issues` | Incidentes por componente: `component`, `kind`, `message`, `optional` |
 
+### Historial de tráfico
+
+`GET /interfaces/traffic?window=300` (10–3600 s) devuelve, por interfaz, puntos con
+`timestamp`, `bytes_in_per_second` y `bytes_out_per_second`. Una tarea en segundo plano
+(arrancada en el lifespan) lee los contadores cada `MONITORING_SAMPLE_INTERVAL_SECONDS` y
+guarda `MONITORING_HISTORY_SECONDS` en memoria; la velocidad es la diferencia entre lecturas
+consecutivas (se descartan los saltos negativos por reinicio de contadores). El historial se
+pierde al reiniciar la API.
+
 HTTP 200 para `ok`/`degraded`; **503** (mismo formato) para `unavailable`. Cada recurso es
 un endpoint independiente, de modo que la caída de uno no afecta a los demás. Un incidente
 con `optional: true` (p. ej. sensor de temperatura no soportado) no degrada el estado.
@@ -63,7 +72,6 @@ Dos puntos concretos a confirmar:
 - Los contadores de tráfico son **acumulados desde el arranque**, no velocidad. Para bps el
   consumidor debe calcular deltas entre lecturas.
 - Eventos con acción distinta de `block`/`pass` (p. ej. `rdr`) se omiten por no encajar en el modelo.
-- **Sin autenticación todavía**: `dependencies.require_monitoring_read` es un punto de
-  integración vacío hasta que exista la Épica 001 (`Permission.MONITORING_READ`).
-  No exponer estos endpoints fuera de la red de desarrollo.
+- **Autenticación**: todos los endpoints exigen un token Bearer de un usuario con el permiso
+  `monitoring:read` (roles admin, operador y visor). Sin token: 401; sin permiso: 403.
 - Mock: `MONITORING_MOCK_SCENARIO=degraded|outage` permite probar el dashboard ante fallos.
