@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     chat_max_tool_rounds: int = Field(3, ge=1)
     chat_max_output_tokens: int = Field(600, ge=1)
 
+    # Secretos Wi-Fi fuera de la BD y del contexto LLM. Claves por referencia opaca.
+    wifi_access_credentials_json: SecretStr | None = None
+    # Sitio que sirve la instancia actual de monitoreo OPNsense/mock.
+    monitoring_site_id: str | None = None
+    network_status_max_age_seconds: float = Field(60.0, gt=0)
+
     # --- OPNsense ---
     # Se acepta OPNSENSE_BASE_URL (nombre actual de .env.example) y OPNSENSE_API_URL.
     opnsense_base_url: Optional[str] = Field(
@@ -68,6 +74,8 @@ class Settings(BaseSettings):
         "opnsense_ca_bundle",
         "openrouter_api_key",
         "openrouter_model",
+        "wifi_access_credentials_json",
+        "monitoring_site_id",
         mode="before",
     )
     @classmethod

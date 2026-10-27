@@ -61,7 +61,7 @@ OPNsense real, definir `MONITORING_PROVIDER=opnsense` y las variables `OPNSENSE_
 
 El endpoint `POST /api/v1/chat/messages` requiere autenticación y `chat:use`. El servidor carga el historial persistente de la conversación y comprueba propietario, rol y ámbito antes de enviar contexto al proveedor. No acepta historial desde el navegador. Las herramientas se filtran por permisos y vuelven a autorizarlos antes de ejecutarse.
 
-Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. Las operaciones UniFi, credenciales Wi-Fi y tickets todavía están pendientes. Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
+Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Las operaciones UniFi siguen pendientes. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
 
 Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en OpenRouter para generar respuestas.
 

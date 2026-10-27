@@ -52,6 +52,7 @@ class FakeMonitoringService:
 @pytest.mark.asyncio
 async def test_registry_contains_only_read_only_monitoring_tools():
     expected = {
+        "get_network_status", "offer_wifi_access", "prepare_support_ticket", "list_support_tickets",
         "get_assigned_networks",
         "get_system",
         "get_interfaces",

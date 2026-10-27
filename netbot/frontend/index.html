@@ -55,7 +55,7 @@
           <a class="nav-item" href="#clients"><span class="nav-icon">◌</span> Clientes <b id="nav-clients">–</b></a>
           <a class="nav-item" href="#firewall"><span class="nav-icon">◇</span> Firewall <b class="alert-count" id="nav-blocked">–</b></a>
           <p class="nav-label nav-label-spaced">Gestion</p>
-          <a class="nav-item is-disabled" title="Disponible en la Épica 005"><span class="nav-icon">□</span> Tickets</a>
+          <a class="nav-item" id="tickets-nav" href="#tickets-panel" hidden><span class="nav-icon">□</span> Tickets</a>
           <a class="nav-item is-disabled" title="Próximamente"><span class="nav-icon">⚙</span> Configuracion</a>
         </nav>
 
@@ -104,6 +104,29 @@
             <article class="panel wide-panel" id="clients"><div class="panel-heading"><div><p class="panel-kicker">DHCP</p><h2>Clientes</h2></div><div class="panel-tools"><input class="search-input" id="clients-search" type="search" placeholder="Buscar nombre, IP o MAC" /><label class="toggle-option"><input type="checkbox" id="clients-active-only" checked /> Solo activos</label></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Equipo</th><th>IP</th><th>MAC</th><th>Interfaz</th><th>Vence</th><th>Estado</th></tr></thead><tbody id="clients-body"><tr><td colspan="6" class="empty-state">Cargando clientes…</td></tr></tbody></table></div></article>
 
             <article class="panel wide-panel" id="firewall"><div class="panel-heading"><div><p class="panel-kicker">FIREWALL</p><h2>Eventos del firewall</h2></div><div class="panel-tools"><div class="period-picker" id="fw-filter"><button class="period active" data-action="">Todos</button><button class="period" data-action="block">Bloqueados</button><button class="period" data-action="pass">Permitidos</button></div></div></div><div class="fw-summary" id="fw-summary"></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Hora</th><th>Acción</th><th>Interfaz</th><th>Origen</th><th>Destino</th><th>Protocolo</th></tr></thead><tbody id="fw-body"><tr><td colspan="6" class="empty-state">Cargando eventos…</td></tr></tbody></table></div></article>
+          </section>
+
+          <section class="panel support-panel" id="support-panel" hidden aria-labelledby="support-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">SOPORTE</p><h2 id="support-heading">Mi acceso y mi red</h2></div></div>
+            <div class="chat-controls">
+              <label for="support-network">Red autorizada</label><select id="support-network"><option value="">Selecciona una red</option></select>
+              <button id="support-status" type="button">Comprobar estado</button>
+              <button id="support-access" type="button">Ver acceso Wi-Fi</button>
+            </div>
+            <p id="support-result" role="status"></p>
+            <div id="wifi-access-panel" class="reservation-card" hidden aria-live="polite"></div>
+            <form id="ticket-form" class="support-form">
+              <h3>Solicitar ayuda técnica</h3>
+              <label for="ticket-summary">Resumen</label><input id="ticket-summary" minlength="3" maxlength="160" required placeholder="No puedo conectarme a mi red" />
+              <label for="ticket-description">Describe el problema, sin contraseñas</label><textarea id="ticket-description" maxlength="2000" required rows="3"></textarea>
+              <button id="ticket-submit" type="submit">Crear ticket</button>
+            </form>
+            <p id="ticket-feedback" role="status"></p>
+          </section>
+
+          <section class="panel support-panel" id="tickets-panel" hidden aria-labelledby="tickets-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">SEGUIMIENTO</p><h2 id="tickets-heading">Tickets autorizados</h2></div><button id="tickets-refresh" type="button">Actualizar</button></div>
+            <div id="tickets-list" class="reservation-list"></div>
           </section>
 
           <section class="panel chat-panel" id="chat" aria-labelledby="chat-heading">

@@ -14,9 +14,11 @@ from app.auth.permissions import Permission
 from app.monitoring.schemas import FirewallAction, MonitoringResponse
 from app.changes.schemas import VlanReservationCreate
 from app.changes.service import InventoryUnavailable, VlanConflict, VlanReservationService
+from app.tickets.schemas import TicketProposal
 
 if TYPE_CHECKING:
     from app.monitoring.service import MonitoringService
+    from .support import CustomerSupport
 
 MAX_TOOL_RESULT_CHARS = 12_000
 
@@ -42,6 +44,11 @@ class FirewallEventsArguments(BaseModel):
 
 class VlanProposalArguments(VlanReservationCreate):
     pass
+
+
+class NetworkArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    network_id: int = Field(gt=0)
 
 
 ToolExecutor = Callable[
@@ -105,6 +112,22 @@ async def _get_available_vlans(service, _: BaseModel):
 
 
 _tools = {
+    "get_network_status": MonitoringTool(
+        "get_network_status", "Consulta el estado comprobable de una red autorizada; distingue falta de datos y fallas. No garantiza Wi-Fi ni Internet.",
+        NetworkArguments, Permission.NETWORKS_READ_OWN, None,
+    ),
+    "offer_wifi_access": MonitoringTool(
+        "offer_wifi_access", "Ofrece un botón protegido para ver el acceso Wi-Fi de una red propia. Nunca devuelve contraseñas al modelo.",
+        NetworkArguments, Permission.WIFI_ACCESS_READ_OWN, None,
+    ),
+    "prepare_support_ticket": MonitoringTool(
+        "prepare_support_ticket", "Prepara un ticket para una red propia. No lo guarda; el usuario confirma en el panel. No incluyas contraseñas.",
+        TicketProposal, Permission.TICKETS_CREATE_OWN, None,
+    ),
+    "list_support_tickets": MonitoringTool(
+        "list_support_tickets", "Consulta los últimos cinco tickets autorizados dentro de esta conversación.",
+        EmptyToolArguments, Permission.TICKETS_READ_OWN, None,
+    ),
     "get_assigned_networks": MonitoringTool(
         name="get_assigned_networks",
         description="Consulta únicamente las redes autorizadas en esta conversación. Es inventario local, no telemetría ni credenciales.",
@@ -179,6 +202,7 @@ async def invoke_tool(
     permissions: frozenset[Permission],
     reservation_service: VlanReservationService | None = None,
     networks: list[dict] | None = None,
+    customer_support: CustomerSupport | None = None,
 ) -> dict[str, Any]:
     if name == "prepare_vlan_reservation":
         if Permission.VLAN_RESERVE not in permissions:
@@ -218,6 +242,13 @@ async def invoke_tool(
     except ValidationError:
         raise ChatToolError("Argumentos de herramienta inválidos.") from None
 
+    if name in {"get_network_status", "offer_wifi_access", "prepare_support_ticket", "list_support_tickets"}:
+        if customer_support is None:
+            raise ChatToolError("Servicio de soporte no disponible.")
+        result = await customer_support.invoke(name, validated_arguments.model_dump(), {n["id"] for n in networks or []})
+        if len(json.dumps(result, ensure_ascii=False)) > MAX_TOOL_RESULT_CHARS:
+            raise ChatToolError("El resultado de soporte es demasiado grande para el chat.")
+        return result
     if name == "get_assigned_networks":
         result = {"source": "netbot_inventory", "operational_status": "unknown", "data": networks or []}
         if len(json.dumps(result, ensure_ascii=False)) > MAX_TOOL_RESULT_CHARS:

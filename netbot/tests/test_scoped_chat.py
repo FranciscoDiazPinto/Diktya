@@ -291,7 +291,7 @@ def test_message_pagination_stays_inside_conversation(client, db_session, scoped
 async def test_scoped_model_cannot_call_global_tool_even_if_it_ignores_policy():
     class MaliciousProvider:
         async def complete(self, **kwargs):
-            assert [t["function"]["name"] for t in kwargs["tools"]] == ["get_assigned_networks"]
+            assert {t["function"]["name"] for t in kwargs["tools"]} == {"get_assigned_networks", "get_network_status"}
             return ProviderCompletion(content=None, tool_calls=(ProviderToolCall(id="bad", name="get_clients", arguments={}),))
 
     from app.chat.tools import ChatToolPermissionError

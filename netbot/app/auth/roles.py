@@ -36,18 +36,22 @@ DEFAULT_ROLES: dict[RoleName, Role] = {
                 Permission.CHAT_USE,
                 Permission.NETWORKS_READ_OWN,
                 Permission.NETWORKS_READ_DETAILS,
+                Permission.WIFI_ACCESS_READ_OWN,
+                Permission.TICKETS_CREATE_OWN,
+                Permission.TICKETS_READ_OWN,
+                Permission.TICKETS_READ_ASSIGNED,
+                Permission.TICKETS_MANAGE_ASSIGNED,
             }
         ),
     ),
     RoleName.VISOR: Role(
         RoleName.VISOR,
-        "Consulta el estado de la red, cambios e incidencias.",
+        "Consulta el estado global de la red y cambios.",
         frozenset(
             {
                 Permission.MONITORING_READ,
                 Permission.CHAT_USE,
                 Permission.CHANGES_READ,
-                Permission.TICKETS_READ,
             }
         ),
     ),
@@ -60,7 +64,8 @@ DEFAULT_ROLES[RoleName.TECNICO] = Role(
 )
 DEFAULT_ROLES[RoleName.CLIENTE] = Role(
     RoleName.CLIENTE, "Atención y consulta de sus propias redes.",
-    frozenset({Permission.CHAT_USE, Permission.NETWORKS_READ_OWN}),
+    frozenset({Permission.CHAT_USE, Permission.NETWORKS_READ_OWN,
+               Permission.WIFI_ACCESS_READ_OWN, Permission.TICKETS_CREATE_OWN, Permission.TICKETS_READ_OWN}),
 )
 
 

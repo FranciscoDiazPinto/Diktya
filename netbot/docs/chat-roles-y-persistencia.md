@@ -4,16 +4,16 @@
 
 Implementa los bloques 2 y 3 del plan: asignaciones a redes, aislamiento por usuario y persistencia de conversaciones. El almacenamiento usa SQLAlchemy y la base configurada en `DATABASE_URL` (PostgreSQL para despliegue; SQLite para desarrollo y pruebas).
 
-No se habilitan todavía credenciales Wi-Fi, diagnóstico operativo por red, tickets ni operaciones UniFi. El inventario local no comprueba conectividad. Ninguna reserva local equivale a crear una VLAN o un SSID en la infraestructura.
+La entrega posterior añadió acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets: ver [soporte al cliente](soporte-cliente.md). Las operaciones UniFi siguen pendientes. El inventario local no comprueba conectividad. Ninguna reserva local equivale a crear una VLAN o un SSID en la infraestructura.
 
 ## Roles efectivos
 
 | Rol | Acceso actual por chat/API |
 |---|---|
-| cliente | Chat propio y resumen de redes asignadas (nombre, evento, SSID). Sin inventario técnico global, credenciales ni cambios. |
-| tecnico | Chat propio y detalle técnico de redes asignadas. Operaciones AP/SSID/VLAN pendientes de integración y autorización por recurso. |
+| cliente | Chat propio, resumen de redes asignadas, acceso Wi-Fi protegido y tickets propios. Sin inventario técnico global ni cambios de red. |
+| tecnico | Chat propio, detalle y diagnóstico parcial de redes asignadas, acceso Wi-Fi y gestión de sus tickets. Operaciones AP/SSID/VLAN pendientes. |
 | operador | Nombre anterior del rol técnico; mismos límites que tecnico. |
-| visor | Consulta interna del monitoreo global; no representa a un cliente final. |
+| visor | Consulta interna del monitoreo global; no representa a un cliente final ni tiene acceso a claves Wi-Fi o tickets. |
 | admin | Monitoreo global, reservas VLAN locales, gestión de usuarios/roles y registro/asignación de redes mediante API. Administración por chat pendiente. |
 
 **Cambio de compatibilidad:** operador pierde `monitoring:read`, las reservas globales y los permisos generales de cambios/tickets. No se deben conservar permisos globales para simular acceso técnico acotado. Sus futuras operaciones deben validar las redes asignadas. Las reservas globales existentes siguen disponibles para admin. Visor conserva su significado interno; no asignarlo a clientes finales.
@@ -87,6 +87,6 @@ No se ha aplicado la migración a la base local del usuario. Se verificó upgrad
 
 Pruebas: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Cubren acceso cruzado (incluido admin), APIs globales denegadas, contexto enviado al modelo, persistencia en una conexión nueva, revocaciones, errores del proveedor, concurrencia y respuestas tardías al cambiar de cuenta.
 
-## Siguiente bloque
+## Continuación
 
-Atención al cliente con entrega protegida de acceso Wi-Fi propio, telemetría específica de su red y tickets persistentes. Después, operaciones técnicas UniFi con confirmación, ejecución durable, verificación y auditoría. La carga CSV queda para la etapa posterior acordada.
+El bloque de atención al cliente está implementado y documentado en [soporte al cliente](soporte-cliente.md), que actualiza las capacidades disponibles de esta entrega base. Después siguen operaciones técnicas UniFi con confirmación, ejecución durable, verificación y auditoría. La carga CSV queda para la etapa posterior acordada.

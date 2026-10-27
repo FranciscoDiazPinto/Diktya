@@ -46,3 +46,9 @@ Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
 `firewall/stats` y `firewall/events`) con el token del usuario. Si el token de acceso
 vence, lo renueva con `/auth/refresh`. Las fallas parciales (`degraded`/`unavailable`)
 se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.
+
+## Soporte al cliente
+
+El panel Mi acceso y mi red permite comprobar una red autorizada y revelar su acceso Wi-Fi fuera del chat durante un minuto. El chat puede ofrecer ese botón y propuestas de ticket con confirmación explícita. Los tickets persisten en el backend; técnicos asignados y administradores pueden actualizar su estado con notas visibles para el cliente.
+
+Los datos mock se rotulan como demostración; interfaz activa no significa Wi-Fi e Internet comprobados. Ver [configuración de secretos, fuentes y tickets](../docs/soporte-cliente.md).

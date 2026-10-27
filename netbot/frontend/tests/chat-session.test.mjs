@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { randomUUID } from 'node:crypto';
 import { canReserveVlans, reservationPayload } from '../chat-reservations.mjs';
 
 // Ejecuta el controlador real sin dependencias de navegador. Los nodos se crean
@@ -24,6 +25,8 @@ class Element {
   querySelector(selector) { return this.children.find((c) => c.className?.split(' ').includes(selector.slice(1))) || null; }
   focus() {}
   reset() {}
+  setAttribute() {}
+  scrollIntoView() {}
 }
 
 const user = (id) => ({ id, email: `${id}@example.com`, roles: ['cliente'], permissions: ['chat:use', 'networks:read:own'] });
@@ -40,6 +43,7 @@ function dashboard(fetch) {
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map((m) => [`#${m[1]}`, new Element()]));
   for (const selector of ['.mobile-menu', '.sidebar']) nodes.set(selector, new Element());
   const storage = new Map();
+  const timers = [];
   const monitoringNodes = [new Element(), new Element()];
   const context = vm.createContext({
     document: {
@@ -49,13 +53,14 @@ function dashboard(fetch) {
     },
     Option: Element,
     localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
-    window: { setInterval() {}, clearInterval() {}, setTimeout() {} },
+    window: { setInterval() {}, clearInterval() {}, setTimeout(callback, delay) { timers.push({ callback, delay }); } },
+    crypto: { randomUUID },
     fetch, canReserveVlans, reservationPayload,
   });
   const source = readFileSync(new URL('../app.js', import.meta.url), 'utf8').replace(/^import .*;\n/, '');
   vm.runInContext(source, context);
-  return { nodes, storage, monitoringNodes, run: (code) => vm.runInContext(code, context),
-    login(id) { context.testUser = user(id); vm.runInContext('setAuthenticated(testUser)', context); } };
+  return { nodes, storage, monitoringNodes, timers, run: (code) => vm.runInContext(code, context),
+    login(id, permissions) { context.testUser = user(id); if (permissions) context.testUser.permissions = permissions; vm.runInContext('setAuthenticated(testUser)', context); } };
 }
 
 test('customer login restores saved chat and sends only conversation identity and version', async () => {
@@ -170,4 +175,72 @@ test('conflict clears rejected context and restores controls for a new authorize
   for (const selector of ['#chat-send', '#chat-message', '#chat-conversation', '#chat-new']) {
     assert.equal(ui.nodes.get(selector).disabled, false, selector);
   }
+});
+
+test('Wi-Fi password is shown outside chat, never stored locally, and hidden after a minute', async () => {
+  const ui = dashboard(async (url) => {
+    if (url.endsWith('/access')) return response({ ssid: 'My Wi-Fi', security: 'wpa2-personal', passphrase: 'test-only-secret' });
+    return response([]);
+  });
+  ui.login('a');
+  await tick();
+  await ui.run('showWifiAccess(1)');
+  const panel = ui.nodes.get('#wifi-access-panel');
+  assert.equal(panel.hidden, false);
+  assert.ok(panel.children.some((n) => n.textContent === 'test-only-secret'));
+  assert.equal(ui.nodes.get('#chat-messages').querySelector('.chat-message'), null);
+  assert.ok(![...ui.storage.values()].some((value) => value.includes('test-only-secret')));
+  ui.timers.find((timer) => timer.delay === 60000).callback();
+  assert.equal(panel.hidden, true);
+  assert.equal(panel.children.length, 0);
+});
+
+test('late Wi-Fi access response is discarded when the user changes accounts', async () => {
+  const pending = deferred();
+  const ui = dashboard(async (url) => url.endsWith('/access') ? pending.promise : response([]));
+  ui.login('a');
+  await tick();
+  const revealing = ui.run('showWifiAccess(1)');
+  ui.run('signOut()');
+  ui.login('b');
+  await tick();
+  pending.resolve(response({ ssid: 'Private-A', security: 'wpa2-personal', passphrase: 'secret-of-a' }));
+  await revealing;
+  assert.equal(ui.nodes.get('#wifi-access-panel').hidden, true);
+  assert.equal(ui.nodes.get('#wifi-access-panel').children.length, 0);
+});
+
+test('changing networks invalidates a pending credential reveal', async () => {
+  const pending = deferred();
+  const ui = dashboard(async (url) => url.endsWith('/access') ? pending.promise : response([]));
+  ui.login('a');
+  await tick();
+  const revealing = ui.run('showWifiAccess(1)');
+  ui.nodes.get('#support-network').events.change();
+  pending.resolve(response({ ssid: 'Previous', security: 'wpa2-personal', passphrase: 'previous-secret' }));
+  await revealing;
+  assert.equal(ui.nodes.get('#wifi-access-panel').children.length, 0);
+});
+
+test('ticket proposals wait for confirmation and retries reuse the request key', async () => {
+  const bodies = [];
+  const ui = dashboard(async (url, options) => {
+    if (url.endsWith('/tickets') && options.method === 'POST') {
+      bodies.push(JSON.parse(options.body));
+      return bodies.length === 1 ? response({ detail: 'Reintenta' }, 503) : response({ id: 42, status: 'open' });
+    }
+    return response([]);
+  });
+  ui.login('a');
+  await tick();
+  ui.run("renderTicketProposal({network_id: 1, summary: 'No veo mi red', description: 'Solicito ayuda'})");
+  assert.equal(bodies.length, 0);
+  const card = ui.nodes.get('#chat-messages').children.at(-1);
+  const confirm = card.children.find((n) => n.textContent === 'Crear ticket');
+  await confirm.events.click();
+  assert.equal(confirm.disabled, false);
+  await confirm.events.click();
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[0].request_key, bodies[1].request_key);
+  assert.match(card.children[0].textContent, /Ticket #42 creado/);
 });

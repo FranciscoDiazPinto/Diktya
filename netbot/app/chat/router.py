@@ -34,6 +34,7 @@ from .models import ChatMessage, Conversation
 from .storage import (conversation_query, owned_conversation, new_conversation,
                       history_for_model, persist_exchange, network_context)
 from .policy import profile_for_user
+from .support import CustomerSupport
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -45,6 +46,7 @@ def get_chat_settings() -> Settings:
 def get_chat_service(
     monitoring_service: MonitoringServiceDep,
     db: Session = Depends(get_db),
+    user: User = Depends(require_permission(Permission.CHAT_USE.value)),
 ) -> ChatService:
     settings = get_chat_settings()
     return ChatService(
@@ -52,6 +54,7 @@ def get_chat_service(
         provider=OpenRouterProvider(settings),
         monitoring_service=monitoring_service,
         reservation_service=VlanReservationService(monitoring_service, db),
+        customer_support=CustomerSupport(db, user, monitoring_service, settings),
     )
 
 

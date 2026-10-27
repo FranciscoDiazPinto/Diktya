@@ -7,6 +7,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import Settings
+from app.networks.support_schemas import WifiAccessAction
+from app.tickets.schemas import TicketProposal
 
 
 class ChatTurn(BaseModel):
@@ -75,6 +77,8 @@ class ChatMessageResponse(BaseModel):
     answer: str = Field(min_length=1)
     tools_used: list[str] = Field(default_factory=list)
     reservation_proposal: VlanReservationProposal | None = None
+    wifi_access_action: WifiAccessAction | None = None
+    ticket_proposal: TicketProposal | None = None
     conversation_id: str | None = None
     version: int | None = None
 

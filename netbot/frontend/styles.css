@@ -85,3 +85,12 @@ button { cursor: pointer; }
 .chat-controls select { max-width: 260px; padding: 8px; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; }
 .chat-controls button, #chat-older { padding: 8px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
 [hidden] { display: none !important; }
+
+.support-panel { margin-top: 16px; }
+.support-form { display: grid; gap: 8px; max-width: 640px; margin-top: 18px; }
+.support-form label { color: var(--muted); font-size: 12px; }
+.support-form input, .support-form textarea, .ticket-update input, .ticket-update select { padding: 10px; color: var(--ink); border: 1px solid var(--line); background: var(--panel); border-radius: 4px; font: inherit; }
+.support-form button, .support-panel button { width: fit-content; padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+.support-panel p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.ticket-update { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.wifi-passphrase { font: 16px var(--mono); user-select: text; }
