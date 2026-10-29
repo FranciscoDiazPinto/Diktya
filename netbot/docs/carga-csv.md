@@ -47,3 +47,16 @@ Faltan adaptador UniFi, plan de cambios, trabajos durables, autorización por re
 ## Verificación
 
 Desde netbot: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Las pruebas cubren parser, autorización, propiedad, expiración, selección, reintentos y rollback de lotes. No sustituyen pruebas con un controlador real.
+
+
+## Planes SSID por chat y CSV (rama chatbot)
+
+Admin y técnico/operador pueden preparar creaciones de SSID sobre VLAN existentes, seleccionando AP explícitos. El administrador configura ámbitos por `POST /api/v1/changes/wifi-scopes` (consultar el prefijo vigente en `/docs`): sitio UniFi, evento, AP autorizados, correspondencias Network ID ↔ interfaz/tag OPNsense, perfiles de seguridad y usuarios autorizados. La concesión no deriva de la asignación a una red de soporte. El panel carga únicamente recursos autorizados presentes en ambos inventarios.
+
+Las herramientas del chat consultan ámbitos/opciones y proponen; no escriben infraestructura ni confirman planes. El usuario prepara y confirma desde el panel. Los planes privados persisten con revisión, caducidad, filas seleccionadas y resultados. El CSV SSID conserva `parent_interface,tag,event_name,purpose,ssid`; AP y perfil se eligen explícitamente en el panel. Es independiente de la reserva CSV local previa, que continúa restringida a admin.
+
+Aplicar `alembic upgrade head` (migración 007). Configuración en `.env.example`: `UNIFI_INVENTORY_MODE=mock` permite ensayar propuestas, nunca escribir. En modo `api`, configurar prefijo HTTPS completo, API key y CA si corresponde; inventario paginado y secretos solo en servidor. La ejecución requiere inventarios reales, `UNIFI_WRITE_ENABLED=true`, `UNIFI_API_CONTRACT=10.6.106` y perfiles WPA2 personales privados. El ejecutor verifica `/info` antes de crear y rechaza versiones diferentes; no se presupone la versión por la URL de Atlas. Contrato público: https://developer.ui.com/network/v10.6.106/createwifibroadcast .
+
+Ejecutar explícitamente `python -m app.changes.cli` desde el backend con su entorno configurado. Confirmar registra aprobación; no inicia un worker en el proceso web. El ejecutor revalida permisos, ámbito, inventario y vigencia, reclama el plan y bloquea simultaneidad por sitio/SSID. Conserva identificador remoto y compara la configuración leída después de crear. `completed` indica configuración coincidente en el controlador: no demuestra difusión efectiva en AP ni conexión a Internet.
+
+Un resultado ambiguo queda `uncertain` con bloqueo durable; una interrupción puede dejar `executing`. No reintentar ni eliminar automáticamente: requieren conciliación manual con el controlador. Aún no hay compensación automática, comando de conciliación, edición de SSID existentes ni validación en hardware real. No declarar cerrada la épica de ejecución/verificación completa por estas pruebas locales. La implementación es propia, basada en el contrato público; no incorpora código, direcciones ni secretos de Atlas.

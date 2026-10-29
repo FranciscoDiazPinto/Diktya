@@ -515,3 +515,25 @@ La selección final de documentos de entrega requiere un manifiesto que enumere 
 ### Requisitos aún por verificar
 
 Se consultó el texto de las guías Word de definición de Fase 1, desarrollo de Fase 2 e informe final de Fase 2 presentes en el repositorio. No se localizó allí una especificación explícita de ramas o exclusión de Markdown. Puede existir en otro apartado, imagen, rúbrica o instrucción del docente. No reorganizar `Fase 1/`, `Fase 2/`, `Arquitectura/` o `netbot/` basándose en una estructura supuesta.
+
+
+## Planes SSID por chat y CSV (rama chatbot)
+
+Admin y técnico/operador pueden preparar creaciones de SSID sobre VLAN existentes, seleccionando AP explícitos. El administrador configura ámbitos por `POST /api/v1/changes/wifi-scopes` (consultar el prefijo vigente en `/docs`): sitio UniFi, evento, AP autorizados, correspondencias Network ID ↔ interfaz/tag OPNsense, perfiles de seguridad y usuarios autorizados. La concesión no deriva de la asignación a una red de soporte. El panel carga únicamente recursos autorizados presentes en ambos inventarios.
+
+Las herramientas del chat consultan ámbitos/opciones y proponen; no escriben infraestructura ni confirman planes. El usuario prepara y confirma desde el panel. Los planes privados persisten con revisión, caducidad, filas seleccionadas y resultados. El CSV SSID conserva `parent_interface,tag,event_name,purpose,ssid`; AP y perfil se eligen explícitamente en el panel. Es independiente de la reserva CSV local previa, que continúa restringida a admin.
+
+Aplicar `alembic upgrade head` (migración 007). Configuración en `.env.example`: `UNIFI_INVENTORY_MODE=mock` permite ensayar propuestas, nunca escribir. En modo `api`, configurar prefijo HTTPS completo, API key y CA si corresponde; inventario paginado y secretos solo en servidor. La ejecución requiere inventarios reales, `UNIFI_WRITE_ENABLED=true`, `UNIFI_API_CONTRACT=10.6.106` y perfiles WPA2 personales privados. El ejecutor verifica `/info` antes de crear y rechaza versiones diferentes; no se presupone la versión por la URL de Atlas. Contrato público: https://developer.ui.com/network/v10.6.106/createwifibroadcast .
+
+Ejecutar explícitamente `python -m app.changes.cli` desde el backend con su entorno configurado. Confirmar registra aprobación; no inicia un worker en el proceso web. El ejecutor revalida permisos, ámbito, inventario y vigencia, reclama el plan y bloquea simultaneidad por sitio/SSID. Conserva identificador remoto y compara la configuración leída después de crear. `completed` indica configuración coincidente en el controlador: no demuestra difusión efectiva en AP ni conexión a Internet.
+
+Un resultado ambiguo queda `uncertain` con bloqueo durable; una interrupción puede dejar `executing`. No reintentar ni eliminar automáticamente: requieren conciliación manual con el controlador. Aún no hay compensación automática, comando de conciliación, edición de SSID existentes ni validación en hardware real. No declarar cerrada la épica de ejecución/verificación completa por estas pruebas locales. La implementación es propia, basada en el contrato público; no incorpora código, direcciones ni secretos de Atlas.
+
+
+### Despliegue local y pruebas previas de Atlas
+
+El autor confirmó que Atlas se probó sobre infraestructura real y que se logró al menos reiniciar/resetear AP. Esta declaración acredita experiencia previa con conectividad y autenticación del producto de referencia; no es una prueba ejecutada ni reproducida en Netbot. Debe distinguirse reinicio de restablecimiento de fábrica antes de implementar una operación concreta: no asumir que ambos fueron validados. Control de AP, inventario y creación/configuración de SSID emplean operaciones y endpoints distintos, cuyos permisos y compatibilidad se validan por separado.
+
+El objetivo de despliegue de Netbot es local: un equipo instalado en el mismo rack, con conectividad autorizada a la red de administración de UniFi y OPNsense. Mantener direcciones base configurables y credenciales/certificados en el entorno del servidor; no depender de una URL pública fija ni incorporar direcciones privadas de Atlas al repositorio. El portal desde el que se genera una API key no determina por sí solo el endpoint que consumirá el equipo local. Comprobar la ruta accesible, el contrato y la versión de cada integración en el entorno objetivo, conservando TLS/CA y permisos por operación.
+
+La instalación local del backend no implica funcionamiento desconectado de Internet: el proveedor LLM configurado puede seguir siendo externo. El control local de red y la ubicación del proveedor de chat son decisiones independientes. No ejecutar cambios en infraestructura real únicamente por consultar Atlas o por integrar esta rama.

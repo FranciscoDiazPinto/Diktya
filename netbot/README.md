@@ -97,3 +97,5 @@ configurado en OpenRouter.
 ### Carga CSV
 
 Admin puede validar la [plantilla y contrato CSV](docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
+
+La rama chatbot incorpora planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado. Aplicar migración 007; consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.

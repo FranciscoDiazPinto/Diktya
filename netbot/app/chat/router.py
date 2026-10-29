@@ -13,6 +13,7 @@ from app.core.config import Settings, get_settings
 from app.monitoring.dependencies import MonitoringServiceDep
 from app.core.database import get_db
 from app.changes.service import VlanReservationService
+from app.changes.ssid_service import SsidPlanService
 
 from .provider import ChatProviderError, ChatProviderNotConfigured, OpenRouterProvider
 from .schemas import ChatInputError, ChatSendRequest, ConversationCreate, ConversationRead, ConversationDetail, ChatMessageResponse
@@ -41,6 +42,7 @@ def get_chat_service(
         monitoring_service=monitoring_service,
         reservation_service=VlanReservationService(monitoring_service, db),
         customer_support=CustomerSupport(db, user, monitoring_service, settings),
+        ssid_context=(SsidPlanService(db, settings, monitoring_service), user),
     )
 
 

@@ -17,6 +17,8 @@ Arquitectura de referencia y alcance futuro:
 
 @Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md
 
-El código actual es un monolito modular FastAPI con frontend estático en módulos ES. React, WebSocket, UniFi y workers durables siguen pendientes; no inferir su implementación desde diagramas históricos. Las reglas compartidas están en AGENTS.md para evitar instrucciones diferentes entre herramientas.
+El código actual es un monolito modular FastAPI con frontend estático en módulos ES. React y WebSocket siguen pendientes; UniFi y los trabajos SSID tienen el alcance y límites indicados abajo; no inferir su implementación desde diagramas históricos. Las reglas compartidas están en AGENTS.md para evitar instrucciones diferentes entre herramientas.
 
-El siguiente bloque técnico usará **VLAN existentes**, con selección explícita de AP y propuestas de creación/modificación de SSID para técnico/admin. Sigue sin ejecutor real. La referencia revisada solo modifica WLAN existentes; no demuestra creación de SSID ni selección aplicada de nuevos AP. Preservar los permisos por recurso, la confirmación HTTP fuera del bucle LLM y la separación de secretos. No modificar la infraestructura ni el repositorio del cliente como consecuencia de consultar esta documentación.
+El siguiente bloque técnico usará **VLAN existentes**, con selección explícita de AP y propuestas de creación/modificación de SSID para técnico/admin. Dispone de ejecutor CLI optativo, pendiente de validación física. La referencia revisada solo modifica WLAN existentes; no demuestra creación de SSID ni selección aplicada de nuevos AP. Preservar los permisos por recurso, la confirmación HTTP fuera del bucle LLM y la separación de secretos. No modificar la infraestructura ni el repositorio del cliente como consecuencia de consultar esta documentación.
+
+Actualización SSID: hay inventario UniFi, planes por chat/CSV y ejecutor CLI optativo para creación bajo contrato 10.6.106. Permanecen pendientes edición, compensación, conciliación automatizada y laboratorio. Los detalles vigentes están en `netbot/docs/carga-csv.md`; esta nota actualiza el estado pendiente descrito arriba.

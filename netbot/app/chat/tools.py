@@ -15,6 +15,7 @@ from app.monitoring.schemas import FirewallAction, MonitoringResponse
 from app.changes.schemas import VlanReservationCreate
 from app.changes.service import InventoryUnavailable, VlanConflict, VlanReservationService
 from app.tickets.schemas import TicketProposal
+from app.changes.ssid_schemas import SsidProposal
 
 if TYPE_CHECKING:
     from app.monitoring.service import MonitoringService
@@ -44,6 +45,11 @@ class FirewallEventsArguments(BaseModel):
 
 class VlanProposalArguments(VlanReservationCreate):
     pass
+
+
+class ScopeArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scope_id: int = Field(gt=0)
 
 
 class NetworkArguments(BaseModel):
@@ -112,6 +118,9 @@ async def _get_available_vlans(service, _: BaseModel):
 
 
 _tools = {
+    "get_wifi_scopes": MonitoringTool("get_wifi_scopes", "Lista ámbitos de aprovisionamiento explícitamente autorizados; no inventes IDs.", EmptyToolArguments, Permission.CHANGES_REQUEST, None),
+    "get_wifi_scope_options": MonitoringTool("get_wifi_scope_options", "Consulta AP, redes/VLAN existentes y perfiles de seguridad permitidos para un ámbito. Indica si son simulados.", ScopeArguments, Permission.CHANGES_REQUEST, None),
+    "prepare_ssid_creation": MonitoringTool("prepare_ssid_creation", "Valida una propuesta de SSID nuevo con AP explícitos y VLAN existente. No guarda, confirma ni ejecuta. Usa el panel para revisión y aprobación. Nunca pidas contraseñas.", SsidProposal, Permission.CHANGES_REQUEST, None),
     "get_network_status": MonitoringTool(
         "get_network_status", "Consulta el estado comprobable de una red autorizada; distingue falta de datos y fallas. No garantiza Wi-Fi ni Internet.",
         NetworkArguments, Permission.NETWORKS_READ_OWN, None,
@@ -203,7 +212,28 @@ async def invoke_tool(
     reservation_service: VlanReservationService | None = None,
     networks: list[dict] | None = None,
     customer_support: CustomerSupport | None = None,
+    ssid_context=None,
 ) -> dict[str, Any]:
+    if name in {"get_wifi_scopes", "get_wifi_scope_options", "prepare_ssid_creation"}:
+        if Permission.CHANGES_REQUEST not in permissions:
+            raise ChatToolPermissionError("Permiso insuficiente para proponer SSID.")
+        if ssid_context is None:
+            raise ChatToolError("Servicio de planes SSID no disponible.")
+        from app.core.errors import ApplicationError
+        try:
+            args = TOOL_REGISTRY[name].arguments_model.model_validate(arguments)
+            service, actor = ssid_context
+            if name == "get_wifi_scopes": result = {"data":service.scopes(actor)}
+            elif name == "get_wifi_scope_options": result = (await service.options(actor,args.scope_id))[0]
+            else: result = await service.propose(actor,args)
+        except ValidationError:
+            raise ChatToolError("Argumentos SSID inválidos.") from None
+        except ApplicationError as exc:
+            # Un fallo no concede datos ni persiste una propuesta en el bucle LLM.
+            return {"status":"unavailable", "message":exc.detail}
+        if len(json.dumps(result,ensure_ascii=False)) > MAX_TOOL_RESULT_CHARS:
+            raise ChatToolError("Reduce el ámbito de consulta SSID.")
+        return result
     if name == "prepare_vlan_reservation":
         if Permission.VLAN_RESERVE not in permissions:
             raise ChatToolPermissionError("Permiso insuficiente para preparar una reserva.")

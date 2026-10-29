@@ -101,3 +101,59 @@ def release_reservation(reservation_id: int, monitoring: MonitoringServiceDep,
         raise HTTPException(status_code=404, detail="Reserva activa no encontrada.") from None
     except ReservationAlreadyReleased:
         raise HTTPException(status_code=409, detail="La reserva ya fue liberada.") from None
+
+
+from .dependencies import get_ssid_service
+from .ssid_service import SsidPlanService
+from .ssid_schemas import ScopeWrite, SsidProposal, SsidCsv, SsidConfirm, SsidPlanRead
+
+
+@router.get('/wifi-scopes')
+def wifi_scopes(actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return service.scopes(actor)
+
+
+@router.post('/wifi-scopes', status_code=201)
+def create_wifi_scope(payload: ScopeWrite, actor: User = Depends(require_permission(Permission.NETWORKS_MANAGE.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return service.save_scope(actor,payload)
+
+
+@router.put('/wifi-scopes/{scope_id}')
+def update_wifi_scope(scope_id: int, payload: ScopeWrite, actor: User = Depends(require_permission(Permission.NETWORKS_MANAGE.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return service.save_scope(actor,payload,scope_id)
+
+
+@router.get('/wifi-scopes/{scope_id}/options')
+async def wifi_scope_options(scope_id: int, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    options,_,_=await service.options(actor,scope_id)
+    return options
+
+
+@router.get('/ssid-plans', response_model=list[SsidPlanRead])
+def ssid_plans(actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return service.list(actor)
+
+
+@router.post('/ssid-plans', response_model=SsidPlanRead, status_code=201)
+async def prepare_ssid_plan(payload: SsidProposal, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return await service.prepare(actor,payload)
+
+
+@router.post('/ssid-plans/csv', response_model=SsidPlanRead, status_code=201)
+async def prepare_ssid_csv(payload: SsidCsv, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return await service.csv(actor,payload)
+
+
+@router.get('/ssid-plans/{plan_id}', response_model=SsidPlanRead)
+def get_ssid_plan(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return service.get(actor,str(plan_id))
+
+
+@router.post('/ssid-plans/{plan_id}/confirm', response_model=SsidPlanRead)
+async def confirm_ssid_plan(plan_id: UUID, payload: SsidConfirm, actor: User = Depends(require_permission(Permission.CHANGES_APPROVE.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return await service.confirm(actor,str(plan_id),payload)
+
+
+@router.post('/ssid-plans/{plan_id}/cancel', response_model=SsidPlanRead)
+def cancel_ssid_plan(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
+    return service.cancel(actor,str(plan_id))

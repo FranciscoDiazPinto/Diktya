@@ -169,6 +169,25 @@
             <div id="tickets-list" class="reservation-list"></div>
           </section>
 
+          <section class="panel support-panel" id="ssid-panel" hidden aria-labelledby="ssid-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">APROVISIONAMIENTO · PROPUESTAS</p><h2 id="ssid-heading">Planes de SSID por ámbito</h2></div><button id="ssid-refresh" type="button">Recuperar planes</button></div>
+            <p class="chat-intro">Prepara una creación o carga CSV con AP concretos y VLAN existentes. Confirmar registra la aprobación. Un ejecutor separado aplica los cambios solo si está configurado; recupera los planes para consultar su estado.</p>
+            <form id="ssid-form" class="support-form">
+              <label for="ssid-scope">Ámbito autorizado</label><select id="ssid-scope"><option value="">Selecciona un ámbito</option></select>
+              <p id="ssid-source" role="status"></p>
+              <fieldset><legend>AP que difundirán el SSID (selección explícita)</legend><div id="ssid-aps"></div></fieldset>
+              <label for="ssid-profile">Perfil de seguridad (sin contraseñas en el chat)</label><select id="ssid-profile"><option value="">Selecciona un perfil</option></select>
+              <label for="ssid-network">Red / VLAN existente</label><select id="ssid-network"><option value="">Selecciona una red</option></select>
+              <label for="ssid-name">Nuevo SSID</label><input id="ssid-name" maxlength="32" placeholder="Clientes-Feria" />
+              <label for="ssid-purpose">Motivo</label><input id="ssid-purpose" maxlength="500" placeholder="Acceso del cliente durante el evento" />
+              <button id="ssid-prepare" type="submit" disabled>Preparar creación individual</button>
+              <label for="ssid-csv">O cargar el CSV de reservas (mismas columnas)</label><input id="ssid-csv" type="file" accept=".csv,text/csv" />
+              <button id="ssid-upload" type="button" disabled>Preparar planes del CSV</button>
+            </form>
+            <p id="ssid-status" role="status"></p>
+            <div id="ssid-plan-list" class="reservation-list"></div>
+          </section>
+
           <section class="panel chat-panel" id="chat" aria-labelledby="chat-heading">
             <div class="panel-heading">
               <div><p class="panel-kicker">ASISTENTE DE REDES</p><h2 id="chat-heading">Conversa con Netbot</h2></div>

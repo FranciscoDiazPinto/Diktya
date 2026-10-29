@@ -43,3 +43,40 @@ class CsvImport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WifiScope(Base):
+    __tablename__ = "wifi_scopes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(160))
+    site_id: Mapped[str] = mapped_column(String(160))
+    resources: Mapped[dict] = mapped_column(JSON)
+
+
+class WifiScopeGrant(Base):
+    __tablename__ = "wifi_scope_grants"
+    scope_id: Mapped[int] = mapped_column(ForeignKey("wifi_scopes.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+
+
+class SsidPlan(Base):
+    __tablename__ = "ssid_plans"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    scope_id: Mapped[int] = mapped_column(ForeignKey("wifi_scopes.id"))
+    status: Mapped[str] = mapped_column(String(16), default="preview")
+    source: Mapped[str] = mapped_column(String(32))
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    revision: Mapped[str] = mapped_column(String(64))
+    rows: Mapped[list] = mapped_column(JSON)
+    selection: Mapped[list] = mapped_column(JSON, default=list)
+    execution_results: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WifiWriteLease(Base):
+    __tablename__ = "wifi_write_leases"
+    resource_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    plan_id: Mapped[str] = mapped_column(ForeignKey("ssid_plans.id"), index=True)

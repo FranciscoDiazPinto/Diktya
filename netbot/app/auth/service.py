@@ -108,3 +108,11 @@ def create_role(data: RoleCreate, db: Session, actor: User) -> RoleRead:
 def user_exists(db: Session, user_id: int) -> bool:
     """Consulta interna mínima para casos de uso ya autorizados, sin exponer ORM."""
     return db.get(User, user_id) is not None
+
+
+def execution_actor(db: Session, user_id: int) -> User:
+    """Identidad vigente del solicitante de un trabajo ya persistido; no recibe roles externos."""
+    actor = db.get(User, user_id)
+    if actor is None:
+        raise NotFound('Solicitante no encontrado.')
+    return actor

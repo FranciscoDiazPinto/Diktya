@@ -41,7 +41,7 @@ flowchart TD
 | tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
 | monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
-| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). No ejecuta configuración de infraestructura. |
+| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). Incluye planes SSID privados, ámbitos/concesiones, inventario UniFi y ejecutor CLI separado, deshabilitado por defecto. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
 | core | Configuración, conexión SQL y errores de aplicación. No coordina dominios. |
 
@@ -128,3 +128,7 @@ Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.t
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
 Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, aprovisionamiento CSV en UniFi y notificaciones externas. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
+
+Los modelos WifiScope, WifiScopeGrant, SsidPlan y WifiWriteLease pertenecen a changes (migración 007). `ssid_service` coordina autorización/SQL; `wifi_inventory` consulta UniFi y `ssid_executor` aplica el contrato 10.6.106. `changes.cli` usa bootstrap sin importar la app HTTP. Véase [operación y límites](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot).
+
+El despliegue objetivo es un equipo local en el rack, con acceso a UniFi/OPNsense por la red de administración y endpoints configurables. Las pruebas reales de control de AP declaradas por el autor corresponden a Atlas, no a Netbot; véase [contexto de despliegue](contexto-desarrollo.md#despliegue-local-y-pruebas-previas-de-atlas). Un backend local puede seguir utilizando un proveedor LLM externo.

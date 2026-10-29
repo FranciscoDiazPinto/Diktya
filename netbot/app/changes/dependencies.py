@@ -32,3 +32,11 @@ async def read_csv_body(request: Request, settings: Settings = Depends(get_setti
             raise PayloadTooLarge("El CSV supera el tamaño máximo permitido.")
         content.extend(chunk)
     return bytes(content)
+
+
+from .ssid_service import SsidPlanService
+
+
+def get_ssid_service(monitoring: MonitoringServiceDep, db: Session = Depends(get_db),
+                     settings: Settings = Depends(get_settings)) -> SsidPlanService:
+    return SsidPlanService(db, settings, monitoring)

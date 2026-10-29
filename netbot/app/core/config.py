@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # Redes cuyo acceso se publica deliberadamente sin cuenta. Vacío = ninguna.
     guest_wifi_network_ids: list[int] = Field(default_factory=list)
 
+    # Inventario oficial UniFi: URL completa hasta /integration/v1, sin secretos en MD.
+    unifi_inventory_mode: Literal["disabled", "mock", "api"] = "disabled"
+    unifi_api_base_url: str | None = None
+    unifi_api_key: SecretStr | None = None
+    unifi_ca_bundle: str | None = None
+    unifi_write_enabled: bool = False
+    unifi_api_contract: str | None = None
+    ssid_security_profiles_json: SecretStr | None = None
+    unifi_timeout_seconds: float = Field(10.0, gt=0, le=60)
+
     # --- Chatbot ---
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str | None = None
