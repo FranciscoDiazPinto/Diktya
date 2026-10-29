@@ -39,6 +39,10 @@ export function createSupport({ document, window, Option, state, api, chatMessag
       supportNetworkSelect.value = String(networkId);
       wifiAccessPanel.replaceChildren(textNode('strong', `SSID: ${access.ssid}`), textNode('p', `Seguridad: ${access.security}`));
       wifiAccessPanel.append(textNode('p', access.passphrase === null ? 'Red abierta, sin contraseña.' : access.passphrase, 'wifi-passphrase'));
+      if (access.qr_data_url) {
+        const qr = document.createElement('img'); qr.src = access.qr_data_url;
+        qr.alt = `QR para conectarte a ${access.ssid}`; qr.className = 'wifi-qr'; wifiAccessPanel.append(qr);
+      }
       wifiAccessPanel.append(textNode('p', 'Este acceso se oculta en un minuto y no se guarda en el historial.'));
       const hide = textNode('button', 'Ocultar acceso');
       hide.type = 'button';

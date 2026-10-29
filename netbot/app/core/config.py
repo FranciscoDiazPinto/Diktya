@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     monitoring_sample_interval_seconds: float = Field(5.0, gt=0)
     monitoring_history_seconds: float = Field(3600.0, gt=0)
 
+    # Redes cuyo acceso se publica deliberadamente sin cuenta. Vacío = ninguna.
+    guest_wifi_network_ids: list[int] = Field(default_factory=list)
+
     # --- Chatbot ---
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str | None = None

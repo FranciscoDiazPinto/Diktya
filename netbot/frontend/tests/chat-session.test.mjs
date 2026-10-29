@@ -288,3 +288,43 @@ test('two composed dashboards keep session and conversation state independent', 
   assert.equal(second.nodes.get('#user-name').textContent, 'b');
   assert.notEqual(first.controller.api, second.controller.api);
 });
+
+test('administrator maintains Wi-Fi recipients per network and logout clears contact fields', async () => {
+  const calls = [];
+  const ui = dashboard(async (url, options) => {
+    const path = new URL(url).pathname; calls.push({path, options});
+    if (path === '/api/v1/networks') return response([{id:1, name:'Cliente', ssid:'Client'}]);
+    if (path.endsWith('/recipients')) return response(options.method === 'PUT' ? JSON.parse(options.body).recipients : [{email:'client@example.com', phone:'+56912345678'}]);
+    return response([]);
+  });
+  ui.login('admin', ['networks:manage']); await tick();
+  assert.equal(ui.nodes.get('#wifi-recipients-panel').hidden, false);
+  const select = ui.nodes.get('#wifi-recipients-network'); select.value = '1';
+  await select.events.change();
+  const contacts = ui.nodes.get('#wifi-recipients-contacts');
+  assert.equal(contacts.value, 'client@example.com;+56912345678');
+  contacts.value = 'updated@example.com;\n;+56987654321';
+  await ui.nodes.get('#wifi-recipients-form').events.submit({preventDefault() {}});
+  const saved = calls.find(c => c.options.method === 'PUT');
+  assert.equal(saved.path, '/admin/networks/1/recipients');
+  assert.deepEqual(JSON.parse(saved.options.body), {recipients:[{email:'updated@example.com', phone:null}, {email:null, phone:'+56987654321'}]});
+  ui.controller.session.signOut();
+  assert.equal(contacts.value, '');
+  assert.equal(ui.nodes.get('#wifi-recipients-panel').hidden, true);
+  assert.ok(![...ui.storage.values()].some(value => value.includes('updated@example.com')));
+});
+
+test('late recipient list from another network never replaces the selected network contacts', async () => {
+  const pending = deferred();
+  const ui = dashboard(async url => {
+    if (url.endsWith('/networks')) return response([{id:1}, {id:2}]);
+    if (url.endsWith('/1/recipients')) return pending.promise;
+    if (url.endsWith('/2/recipients')) return response([{email:'second@example.com', phone:null}]);
+    return response([]);
+  });
+  ui.login('admin', ['networks:manage']); await tick();
+  const select = ui.nodes.get('#wifi-recipients-network'); select.value = '1';
+  const first = select.events.change(); select.value = '2'; await select.events.change();
+  pending.resolve(response([{email:'first@example.com', phone:null}])); await first;
+  assert.equal(ui.nodes.get('#wifi-recipients-contacts').value, 'second@example.com;');
+});

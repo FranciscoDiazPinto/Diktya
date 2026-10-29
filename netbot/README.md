@@ -18,7 +18,9 @@ Netbot combina una API con FastAPI, PostgreSQL y Alembic con un dashboard web es
 
 Para usar el chatbot, definir `OPENROUTER_API_KEY` y `OPENROUTER_MODEL` en el `.env` local. La clave se usa solo desde el backend; nunca debe incluirse en el frontend ni guardarse en Git. Sin esos valores, la API devuelve un error de servicio y no contacta a OpenRouter.
 
-El dashboard estático puede servirse en otra terminal con `python3 -m http.server 5173 --directory frontend`. Iniciar sesión con un usuario `cliente`, `tecnico`, `operador`, `visor` o `admin`. Las conversaciones se guardan en la base por usuario y se recuperan al iniciar sesión. Cliente y técnico acceden únicamente a redes asignadas; visor es un rol interno de monitoreo global.
+La entrada abre un chat de invitados sin cuenta. «Iniciar sesión · Equipo» lleva al login y, tras autenticarse, al dashboard. La atención temporal se limpia con confirmación o tras 60 segundos sin respuesta. Para recuperar credenciales de cliente se compara su correo o teléfono con los destinatarios registrados por el administrador. El portal de invitados solo publica redes abiertas de `GUEST_WIFI_NETWORK_IDS`; ver [autoatención y configuración QR](docs/atencion-invitados.md).
+
+El dashboard estático puede servirse en otra terminal con `python3 -m http.server 5173 --directory frontend`. Iniciar sesión con un usuario `cliente`, `tecnico`, `operador`, `visor` o `admin`. Las conversaciones autenticadas se guardan en la base por usuario y se recuperan al iniciar sesión. Cliente y técnico acceden únicamente a redes asignadas; visor es un rol interno de monitoreo global.
 
 La documentación interactiva de la API estará en `/docs` al iniciar el servidor.
 
@@ -53,6 +55,8 @@ Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-mod
 - `tests`: pruebas automatizadas.
 
 ## Migraciones
+
+La recuperación por contacto requiere la migración `006_network_recipients`. El administrador mantiene los contactos por red desde el dashboard, sin crear cuentas de cliente.
 
 Crear una migración con `alembic revision --autogenerate -m "descripcion"`, revisarla y aplicarla con `alembic upgrade head` antes del arranque. Producción comprueba las revisiones de Alembic y no crea tablas automáticamente. Solo development/test conservan create_all como ayuda local. Bases heredadas con tablas creadas fuera de Alembic necesitan conciliar su estado antes de migrar.
 

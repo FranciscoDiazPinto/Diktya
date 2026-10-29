@@ -2,14 +2,14 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.core.errors import (ApplicationError, Unauthenticated, AccessDenied,
-                             NotFound, Conflict, InvalidInput, ServiceUnavailable, PayloadTooLarge)
+                             NotFound, Conflict, InvalidInput, ServiceUnavailable, PayloadTooLarge, RateLimited)
 
 STATUS_CODES = {Unauthenticated: 401, AccessDenied: 403, NotFound: 404,
-                Conflict: 409, InvalidInput: 400, ServiceUnavailable: 503, PayloadTooLarge: 413}
+                Conflict: 409, InvalidInput: 400, ServiceUnavailable: 503, PayloadTooLarge: 413, RateLimited: 429}
 
 async def application_error_handler(request: Request, exc: ApplicationError):
     headers = {}
-    if request.url.path.endswith('/access'):
+    if request.url.path.endswith('/access') or request.url.path.startswith('/api/v1/guest/'):
         headers = {'Cache-Control': 'no-store, private', 'Pragma': 'no-cache'}
     return JSONResponse(status_code=STATUS_CODES.get(type(exc), 500),
                         content={'detail': exc.detail}, headers=headers)

@@ -22,3 +22,13 @@ class NetworkAssignment(Base):
 
     network_id: Mapped[int] = mapped_column(ForeignKey("networks.id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class NetworkRecipient(Base):
+    """Contacto que recibió credenciales para una red; no es un usuario de Netbot."""
+    __tablename__ = "network_recipients"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    network_id: Mapped[int] = mapped_column(ForeignKey("networks.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str | None] = mapped_column(String(320), index=True)
+    phone: Mapped[str | None] = mapped_column(String(16), index=True)

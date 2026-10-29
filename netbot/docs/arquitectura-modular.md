@@ -1,5 +1,7 @@
 # Arquitectura modular vigente
 
+La entrada pública incluye [autoatención de invitados y QR Wi-Fi](atencion-invitados.md). `chat/guest.py` posee sesiones en memoria con tokens aleatorios e historial del servidor; `guest_router.py` es una frontera HTTP pública separada. No acepta historial ni identidad del navegador y no ofrece herramientas al modelo. El ciclo de vida elimina sesiones vencidas cada segundo y al apagar la instancia. `networks/recipients.py` posee el registro y comparación de destinatarios sin cuenta. El formulario de recuperación compara correo o teléfono fuera del LLM y vincula el contacto a la sesión efímera; cada entrega reautoriza contra el registro. `networks/guest_access.py` solo publica anónimamente redes abiertas de `GUEST_WIFI_NETWORK_IDS`; `wifi_qr.py` genera el QR localmente. `frontend/modules/guest.mjs` controla resolución, confirmación y limpieza tras 60 segundos sin actividad, sin persistencia del navegador.
+
 Esta guía describe el código implementado. Es el punto de entrada técnico junto con [AGENTS.md](../../AGENTS.md). El [documento de referencia](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo, separado del estado real.
 
 ## Organización

@@ -21,10 +21,10 @@ export function createSession({ document, state, api, FormData, showToast, onAut
     api.clearTokens();
     state.user = null;
     state.session += 1;
-    onSignedOut();
     appShell.classList.add('is-hidden');
     loginScreen.style.display = '';
     loginForm.reset();
+    onSignedOut();
     if (message) showToast(message);
   }
 

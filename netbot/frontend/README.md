@@ -1,5 +1,7 @@
 # Frontend
 
+La entrada es el chat temporal de invitados. `modules/guest.mjs` controla el QR, la confirmación y la limpieza a los 60 segundos, sin almacenamiento del navegador. El compositor cambia entre invitados, login y dashboard. Ver [configuración de autoatención](../docs/atencion-invitados.md).
+
 Prototipo del centro de monitoreo de Netbot. Esta primera versión no requiere
 dependencias ni build: abre `index.html` directamente en el navegador.
 

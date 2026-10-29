@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from app.bootstrap import initialize_database
 from app.core.config import get_settings
+from app.chat.guest import expire_guest_sessions, sessions
 from app.monitoring.factory import build_monitoring_service
 from app.monitoring.service import MonitoringService
 
@@ -29,9 +30,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     sampler = asyncio.create_task(
         sample_traffic_forever(service, get_settings().monitoring_sample_interval_seconds)
     )
+    guest_expiry = asyncio.create_task(expire_guest_sessions())
     try:
         yield
     finally:
+        guest_expiry.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await guest_expiry
+        sessions.clear()
         sampler.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await sampler

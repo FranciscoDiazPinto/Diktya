@@ -37,6 +37,7 @@ class WifiAccessRead(BaseModel):
     ssid: str
     security: str
     passphrase: str | None
+    qr_data_url: str | None = None
 
 
 class WifiAccessAction(BaseModel):
