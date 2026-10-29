@@ -4,6 +4,8 @@ La entrada pública incluye [autoatención de invitados y QR Wi-Fi](atencion-inv
 
 Esta guía describe el código implementado. Es el punto de entrada técnico junto con [AGENTS.md](../../AGENTS.md). El [documento de referencia](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo, separado del estado real.
 
+Para continuar las integraciones se dispone de una [síntesis técnica de Atlas](contexto-desarrollo.md#contexto), con [contratos observados](contexto-desarrollo.md#integraciones), [decisiones propias](contexto-desarrollo.md#continuidad) y [evidencia](contexto-desarrollo.md#evidencias). No introduce dependencias hacia el producto del cliente ni cambia el stack. El siguiente bloque aprobado es SSID/AP con **VLAN existentes**, todavía sin ejecución real en Netbot.
+
 ## Organización
 
 Netbot es un monolito modular: una API FastAPI, una base SQL compartida y un frontend estático con módulos ES. Cada funcionalidad tiene propietario y una API interna. Compartir base de datos no autoriza a consultar tablas de otro módulo.

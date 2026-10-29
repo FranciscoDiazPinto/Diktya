@@ -5,6 +5,8 @@
 1. [Guía compartida del repositorio](../../AGENTS.md).
 2. [Arquitectura modular vigente](arquitectura-modular.md): módulos, dependencias, contratos, transacciones y extensión.
 3. [Inicio local y comandos](../README.md).
+   Para mantenimiento de ramas y preparación de entregas, consultar [organización del repositorio](contexto-desarrollo.md#organizacion). La estructura académica exacta está pendiente de verificar; no aplicar exclusiones globales de Markdown.
+4. [Conocimiento de integración extraído de Atlas](contexto-desarrollo.md#contexto): síntesis independiente, procedencia y límites del otro desarrollo. Para cambios de red continuar con [contratos](contexto-desarrollo.md#integraciones), [decisiones](contexto-desarrollo.md#continuidad) y [matriz de evidencia](contexto-desarrollo.md#evidencias).
 
 ## Contratos funcionales
 
@@ -14,6 +16,8 @@
 - [Autenticación original](epica-001-autenticacion-roles.md).
 - [Monitoreo](epica-002-monitoreo.md).
 - [Frontend modular](../frontend/README.md).
+- [Atención sin cuenta, QR y recuperación por contacto](atencion-invitados.md).
+- [Gestión de SSID/AP con VLAN existentes: diseño pendiente](contexto-desarrollo.md#ssid).
 
 ## Referencias históricas y objetivos
 

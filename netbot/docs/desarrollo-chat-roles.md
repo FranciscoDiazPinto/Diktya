@@ -14,6 +14,10 @@ Acuerdo de alcance: 27 de octubre de 2026.
 
 ## Roles y alcance
 
+El alcance solicitado para cambios individuales de SSID/AP/VLAN después del CSV está detallado en [gestión de SSID por chat](contexto-desarrollo.md#ssid). Es un diseño pendiente de implementación y de confirmar la versión/API del controlador; no describe capacidades ya ejecutables.
+
+El 29 de octubre se confirmó usar **VLAN existentes**, sin crear nuevas en OPNsense. La revisión estática del desarrollo independiente se resume en [conocimiento de Atlas](contexto-desarrollo.md#contexto) y [continuidad de Netbot](contexto-desarrollo.md#continuidad). Se conservan el stack académico y la implementación independiente; la referencia no agrega capacidades a Netbot automáticamente.
+
 - Cliente: consultar únicamente su acceso Wi-Fi y el estado de sus redes asignadas; crear y consultar sus tickets. Sin monitoreo global ni cambios de red.
 - Técnico: diagnosticar y gestionar tickets de sus sitios/eventos asignados; reiniciar y adoptar APs, crear SSIDs y aprovisionar VLANs dentro de ese ámbito.
 - Administrador: capacidades técnicas y gestión de usuarios, activación y asignación de roles. El acceso a conversaciones ajenas requiere un permiso independiente y auditoría.
