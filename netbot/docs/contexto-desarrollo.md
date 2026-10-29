@@ -199,6 +199,10 @@ Decisiones y recomendaciones para implementar con diseño propio. Contexto y pro
 
 ### Decisiones ya tomadas para Netbot
 
+Confirmación adicional del usuario el 29 de octubre de 2026: se utilizará la API oficial de UniFi con una API key generada desde su portal. Administrador y técnico deben poder **crear SSID nuevos tanto por carga CSV como por chat**, elegir AP específicos y asociar VLAN existentes. No limitar el alcance a modificar WLAN ya creadas por las limitaciones del cliente Atlas revisado. El formulario/lote y el chat deben compartir las mismas validaciones, confirmación y ejecución.
+
+«Portal de UniFi» identifica dónde se administra/genera la clave, pero aún no fija si su ámbito es la consola Network local o Site Manager ni cuál es la URL de conexión. Confirmar ese ámbito y la versión/documentación del controlador antes de seleccionar transporte. No usar ni pedir la clave en conversación o Markdown.
+
 1. Conservar el monolito modular Python/FastAPI, SQLAlchemy/Alembic y frontend ES. No migrar a TypeScript, React, Prisma o BullMQ para reproducir el producto de referencia.
 2. Técnico/operador y administrador deben poder solicitar creación/modificación de SSID, elegir AP explícitos y asociar una **VLAN existente**. Crear VLAN nuevas, DHCP, NAT y reglas OPNsense queda fuera de este bloque.
 3. Permisos más asignaciones por recurso, no solo rol. Hace falta definir ámbito de aprovisionamiento para nuevas redes, además de las asignaciones a redes ya existentes.
@@ -225,7 +229,7 @@ Decisiones y recomendaciones para implementar con diseño propio. Contexto y pro
 Registrar en un documento de decisión propio:
 
 - Versión exacta de UniFi Network, tipo de consola y capacidades de su API para crear WLAN y seleccionar AP. El snapshot aclara que la referencia usó UniFi OS/EFG; no fija la versión del laboratorio o despliegue académico.
-- Acceso directo autorizado a la consola o a una API intermediaria con contrato disponible. No asumir la dependencia ATLAS del cliente ni trasladar sus reglas de topología a Netbot.
+- API oficial UniFi con API key del portal, según confirmación del usuario. Precisar si corresponde a Network local o Site Manager y su URL base; no asumir una API intermediaria ATLAS ni trasladar las reglas de topología del cliente a Netbot.
 - Autenticación con permisos mínimos, CA/TLS y transporte. Los secretos se suministran por un canal de entorno protegido; no se piden ni se guardan en MD.
 - Identidad estable de sitios/AP/redes y correspondencia VLAN OPNsense↔Network UniFi. Cómo se asignan esos recursos a técnico/evento sin otorgar todo un sitio implícitamente.
 - Perfil de seguridad soportado para nuevas WLAN y gestión del secreto en el servidor. No degradar a red abierta por faltar configuración.
@@ -308,6 +312,8 @@ Actualización tras revisar el otro desarrollo: consultar [contexto de integraci
 ### Comportamiento esperado
 
 Técnicos, operadores y administradores deben poder solicitar nuevos SSID y modificar su distribución después de la carga inicial. La carga CSV no será un requisito para cada cambio posterior: las operaciones individuales usarán el mismo plan, autorización y mecanismo de ejecución que los lotes.
+
+La carga CSV inicial también debe permitir **crear SSID nuevos** para administrador y técnico dentro de sus recursos autorizados. Es un objetivo pendiente: el contrato implementado de CSV continúa restringido a admin y a reservas locales hasta que se desarrollen y prueben los permisos por recurso y el aprovisionamiento común. No habilitarlo solamente cambiando un botón o una política de prompt.
 
 Ejemplo: «Crea Feria-Clientes en los AP Hall y Sala Norte, usando la VLAN 120 del evento Feria». Netbot consulta el inventario autorizado, solicita los datos faltantes y muestra una propuesta con el sitio, evento, nombre del SSID, VLAN exacta, AP seleccionados y perfil de seguridad. El usuario confirma la propuesta desde la interfaz. La respuesta final distingue confirmación, ejecución y verificación.
 
