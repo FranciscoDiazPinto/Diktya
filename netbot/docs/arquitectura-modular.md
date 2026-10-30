@@ -36,7 +36,7 @@ flowchart TD
 
 | Módulo | Propiedad y contratos |
 |---|---|
-| auth | Usuarios/roles/tokens. `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
+| auth | Usuarios/roles/tokens y auditoría de identidad append-only (008). `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
 | networks | Inventario y asignaciones (`service.py`); autorización por recurso (`access.py`); configuración (`configuration.py`); claves (`credentials.py`); diagnóstico (`diagnostics.py`); registro de auditoría (`audit.py`). |
 | tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
 | monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
@@ -93,7 +93,7 @@ Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las
 
 | Archivo en modules/ | Responsabilidad |
 |---|---|
-| api.mjs | HTTP, tokens, una renovación compartida y rechazo de respuestas de otra época de sesión. |
+| api.mjs | HTTP, tokens, renovación solo explícita, cierre ante 401 y rechazo de respuestas de otra época de sesión. |
 | session.mjs | Login/logout/perfil; notifica autenticación y salida al compositor. |
 | chat.mjs | Conversación, versión, selección, historial y mensajes. |
 | monitoring.mjs | Estado privado de métricas, polling y representación del dashboard. |
@@ -132,3 +132,5 @@ Implementado: autenticación, aislamiento y persistencia de chat, reservas local
 Los modelos WifiScope, WifiScopeGrant, SsidPlan y WifiWriteLease pertenecen a changes (migración 007). `ssid_service` coordina autorización/SQL; `wifi_inventory` consulta UniFi y `ssid_executor` aplica el contrato 10.6.106. `changes.cli` usa bootstrap sin importar la app HTTP. Véase [operación y límites](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot).
 
 El despliegue objetivo es un equipo local en el rack, con acceso a UniFi/OPNsense por la red de administración y endpoints configurables. Las pruebas reales de control de AP declaradas por el autor corresponden a Atlas, no a Netbot; véase [contexto de despliegue](contexto-desarrollo.md#despliegue-local-y-pruebas-previas-de-atlas). Un backend local puede seguir utilizando un proveedor LLM externo.
+
+La épica 001 incorpora auditoría de identidad, sesiones JWT vinculadas a refresh revocable, protección concurrente del último admin y expiración sin renovación automática del navegador. `auth.audit` posee el registro y middleware ASGI de denegaciones; los casos de uso conservan sus transacciones. Ver [contrato y evidencia de cierre](epica-001-autenticacion-roles.md).

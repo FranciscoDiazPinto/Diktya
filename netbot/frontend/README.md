@@ -46,7 +46,7 @@ permiso, el inventario OPNsense y la disponibilidad antes de guardar.
 Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
 `/api/v1/monitoring` (`system`, `interfaces`, `interfaces/traffic`, `clients`,
 `firewall/stats` y `firewall/events`) con el token del usuario. Si el token de acceso
-vence, lo renueva con `/auth/refresh`. Las fallas parciales (`degraded`/`unavailable`)
+vence, limpia la sesión y muestra el login; no renueva automáticamente ni repite escrituras. Las fallas parciales (`degraded`/`unavailable`)
 se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.
 
 ## Soporte al cliente

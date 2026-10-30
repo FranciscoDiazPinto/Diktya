@@ -8,6 +8,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.auth.models import User
+from app.auth.audit import queue_denial
 from app.auth.permissions import Permission
 from app.auth.access import require_user_permission
 from app.auth.roles import effective_permissions
@@ -38,6 +39,7 @@ class SsidPlanService:
         scope = self.db.get(WifiScope, scope_id)
         admin = Permission.NETWORKS_MANAGE in effective_permissions(actor)
         if scope is None or (not admin and not self.db.get(WifiScopeGrant, (scope_id,actor.id))):
+            queue_denial(actor.id, permission, reason='wifi_scope')
             raise NotFound('Ámbito de aprovisionamiento no encontrado.')
         return scope
 

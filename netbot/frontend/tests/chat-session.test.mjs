@@ -156,18 +156,25 @@ test('late token renewal cannot replace the credentials of another session', asy
   assert.equal(JSON.parse(ui.storage.get('netbot_tokens')).access_token, 'token-b');
 });
 
-test('simultaneous expired requests share one refresh and keep POST payload', async () => {
-  let refreshCount = 0;
+test('expired requests end the session, clear tokens and never refresh or repeat a POST', async () => {
+  const calls = [];
   const ui = dashboard(async (url, options) => {
-    if (url.endsWith('/auth/refresh')) { refreshCount += 1; await tick(); return response({ access_token: 'fresh', refresh_token: 'rotated' }); }
-    if (options.headers.Authorization === 'Bearer old') return response({ detail: 'expired' }, 401);
-    return response({ method: options.method, body: options.body });
+    calls.push({path: new URL(url).pathname, options});
+    if (url.endsWith('/auth/logout')) return response(null, 204);
+    return response({detail:'expired'}, 401);
   });
-  ui.storage.set('netbot_tokens', JSON.stringify({ access_token: 'old', refresh_token: 'refresh' }));
-  const result = await ui.run("Promise.all([authedRequest('/one', {method: 'POST', body: 'payload'}), authedRequest('/two')])");
-  assert.equal(refreshCount, 1);
-  assert.equal(result[0].method, 'POST');
-  assert.equal(result[0].body, 'payload');
+  ui.storage.set('netbot_tokens', JSON.stringify({access_token:'old',refresh_token:'refresh'}));
+  const results = await Promise.allSettled([
+    ui.run("authedRequest('/one', {method:'POST',body:'payload'})"),
+    ui.run("authedRequest('/two')"),
+  ]);
+  assert.ok(results.every(result=>result.status==='rejected'));
+  assert.equal(ui.storage.has('netbot_tokens'),false);
+  assert.equal(calls.filter(c=>c.path==='/one').length,1);
+  assert.ok(!calls.some(c=>c.path==='/auth/refresh'));
+  assert.equal(ui.nodes.get('#login-screen').style.display,'');
+  assert.equal(ui.nodes.get('#guest-screen').hidden,true);
+  assert.match(ui.nodes.get('#login-error').textContent,/sesión expiró/);
 });
 
 test('conflict clears rejected context and restores controls for a new authorized chat', async () => {

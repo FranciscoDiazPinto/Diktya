@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -9,7 +9,7 @@ from app.core.database import get_db
 from .dependencies import get_current_user, require_permission
 from .models import User
 from . import service
-from .schemas import LoginRequest, RefreshRequest, RoleCreate, RoleRead, TokenResponse, UserCreate, UserRead, UserUpdate
+from .schemas import AuthAuditRead, LoginRequest, RefreshRequest, RoleCreate, RoleRead, TokenResponse, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 admin_router = APIRouter(prefix="/admin", tags=["administration"])
@@ -58,3 +58,9 @@ def list_roles(db: Session = Depends(get_db), actor: User = Depends(require_perm
 @admin_router.post("/roles", response_model=RoleRead, status_code=status.HTTP_201_CREATED)
 def create_role(data: RoleCreate, db: Session = Depends(get_db), actor: User = Depends(require_permission("roles:manage"))) -> RoleRead:
     return service.create_role(data, db, actor)
+
+
+@admin_router.get("/auth-audit", response_model=list[AuthAuditRead])
+def list_auth_audit(db: Session = Depends(get_db), actor: User = Depends(require_permission("auth:audit:read")),
+                    limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0)):
+    return service.list_audit(db, actor, limit=limit, offset=offset)

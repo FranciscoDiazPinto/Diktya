@@ -1,4 +1,5 @@
 from app.core.errors import NotFound
+from app.auth.audit import queue_denial
 from app.auth.access import require_user_permission
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,6 +24,7 @@ def accessible_networks(db: Session, user: User) -> list[Network]:
 def require_network(db: Session, user: User, network_id: int) -> Network:
     network = next((n for n in accessible_networks(db, user) if n.id == network_id), None)
     if network is None:
+        queue_denial(user.id, Permission.NETWORKS_READ_OWN, reason="network_scope")
         raise NotFound("Red no encontrada.")
     return network
 

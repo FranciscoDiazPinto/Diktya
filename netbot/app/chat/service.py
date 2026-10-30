@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from app.auth.audit import queue_denial
+
 import json
 from typing import Any
 
@@ -113,6 +115,7 @@ class ChatService:
                         self._ssid_context,
                     )
                 except ChatToolPermissionError:
+                    queue_denial(permission="chat:tool", reason="tool_permission")
                     raise
                 except ChatToolError:
                     raise ChatProviderError(

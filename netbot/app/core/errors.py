@@ -1,8 +1,9 @@
 """Errores públicos de aplicación. Sin dependencia de FastAPI ni transporte."""
 
 class ApplicationError(Exception):
-    def __init__(self, detail: str):
+    def __init__(self, detail: str, *, field: str | None = None):
         self.detail = detail
+        self.field = field
         super().__init__(detail)
 
 class Unauthenticated(ApplicationError): pass

@@ -14,12 +14,12 @@ import { createCsvImports } from './csv-imports.mjs';
 
 export function createDashboard({document, window, localStorage, fetch, Option, crypto, FormData}) {
   const state = {user: null, session: 0};
-  const api = createApi({fetch, localStorage, state});
+  let chat, session;
+  const api = createApi({fetch, localStorage, state, onSessionExpired: () => session.expire()});
   const guest = createGuest({document, window, api, Option});
   const wifiRecipients = createWifiRecipients({document, Option, state, api});
   const dom = createDom({document, window});
   const chatMessages = document.querySelector('#chat-messages');
-  let chat, session;
   const captureChat = () => chat.capture();
   const isChatCurrent = (context) => chat.isCurrent(context);
   const support = createSupport({document, window, Option, state, api, chatMessages, ...dom,
@@ -35,9 +35,9 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
   const monitoring = createMonitoring({document, window, sessionState: state, api, format, ...dom,
     signOut: (message) => session.signOut(message)});
   const features = [monitoring, reservations, support, tickets, chat, csvImports, wifiRecipients, ssidPlans];
-  session = createSession({document, state, api, FormData, ...dom,
+  session = createSession({document, window, state, api, FormData, ...dom,
     onAuthenticated(user) { guest.stop(); for (const feature of features) feature.reset(); for (const feature of features) feature.configureUser(user); },
-    onSignedOut() { for (const feature of features) feature.reset(); guest.start(); }});
+    onSignedOut({expired} = {}) { for (const feature of features) feature.reset(); if (expired) guest.stop(); else guest.start(); }});
   const sidebar = document.querySelector('.sidebar');
   document.querySelectorAll('.nav-item[href]').forEach((item) => item.addEventListener('click', () => {
     document.querySelector('.nav-item.active')?.classList.remove('active'); item.classList.add('active'); sidebar.classList.remove('open');
