@@ -45,6 +45,19 @@ def provider_settings():
 
 
 @pytest.mark.asyncio
+async def test_provider_omits_tool_configuration_for_guest_requests():
+    import json
+
+    def respond(request):
+        payload = json.loads(request.content)
+        assert not {"tools", "tool_choice", "parallel_tool_calls"} & payload.keys()
+        return httpx.Response(200, json={"choices": [{"message": {"content": "Hola"}}]})
+
+    provider = OpenRouterProvider(provider_settings(), transport=httpx.MockTransport(respond))
+    assert (await provider.complete(messages=[{"role": "user", "content": "Hola"}], tools=[])).content == "Hola"
+
+
+@pytest.mark.asyncio
 async def test_provider_sends_chat_completion_request():
     seen = {}
 

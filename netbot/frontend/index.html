@@ -11,7 +11,33 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <section class="login-screen" id="login-screen">
+    <section id="guest-screen" class="guest-screen" aria-labelledby="guest-heading">
+      <header class="guest-header"><a class="guest-brand" href="./">netbot<span>autoatención</span></a><button id="guest-login" type="button">Iniciar sesión · Equipo</button></header>
+      <main class="guest-layout">
+        <div class="guest-welcome"><p class="eyebrow">ESTAMOS PARA AYUDARTE</p><h1 id="guest-heading">Conéctate.<br />Nosotros te guiamos.</h1><p>¿No encuentras el correo con tus credenciales? Recupera el QR de tu red usando tu correo o teléfono registrado, sin crear una cuenta.</p><p class="guest-privacy">Tu atención y el QR se limpian después de un minuto sin respuesta. Ingresa tus datos solo en el formulario de recuperación, fuera del chat. Las consultas generales al asistente se procesan en OpenRouter.</p></div>
+        <section class="panel guest-chat" aria-label="Chat de invitados">
+          <div class="panel-heading"><h2>Hola, soy Netbot</h2><span class="chat-scope">Sin cuenta</span></div>
+          <div id="guest-messages" class="chat-messages" role="log" aria-live="polite" aria-relevant="additions"></div>
+          <form id="guest-identify-form" class="reservation-card" hidden autocomplete="off">
+            <label for="guest-contact">Correo o teléfono registrado para recibir tus credenciales</label>
+            <input id="guest-contact" type="text" maxlength="320" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Correo o teléfono con código de país: +56912345678" required />
+            <p>Compararemos este dato con los destinatarios de la red. No necesitas una cuenta de Netbot. No lo escribas en el chat.</p>
+            <button id="guest-identify-submit" type="submit">Buscar mi acceso</button>
+            <p id="guest-identify-error" role="status"></p>
+          </form>
+          <div id="guest-wifi" class="reservation-card" hidden>
+            <label for="guest-network">Red disponible para esta atención</label><select id="guest-network"></select>
+            <button id="guest-show-qr" type="button">Mostrar QR para conectarme</button>
+            <div id="guest-qr" aria-live="polite"></div>
+          </div>
+          <div id="guest-resolution" class="guest-resolution" hidden><p id="guest-question"></p><div class="reservation-actions"><button id="guest-yes" type="button">Sí, se resolvió</button><button id="guest-no" type="button">Necesito más ayuda</button></div></div>
+          <form id="guest-form" class="chat-form"><label class="visually-hidden" for="guest-message">Tu consulta</label><textarea id="guest-message" maxlength="2000" rows="2" placeholder="Ej.: ¿Cómo me conecto al Wi-Fi?" required></textarea><button id="guest-send" class="chat-send" type="submit">Enviar →</button></form>
+          <p id="guest-status" class="chat-status" role="status"></p>
+          <div class="guest-actions"><button id="guest-wifi-button" type="button">Recuperar mi acceso Wi-Fi</button><button id="guest-portal-button" type="button">Portal de invitados</button><button id="guest-finish" type="button">Finalizar atención</button></div>
+        </section>
+      </main>
+    </section>
+    <section class="login-screen" id="login-screen" style="display:none">
       <div class="login-aside">
         <div class="brand login-brand">
           <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -22,6 +48,7 @@
       </div>
       <div class="login-form-wrap">
         <form class="login-form" id="login-form">
+          <button id="guest-back" type="button">← Volver al chat de invitados</button>
           <p class="eyebrow">BIENVENIDO DE VUELTA</p>
           <h2>Iniciar sesion</h2>
           <p class="login-copy">Ingresa tus credenciales para acceder al centro de monitoreo.</p>
@@ -29,7 +56,7 @@
           <input id="email" name="email" type="email" autocomplete="email" placeholder="nombre@empresa.cl" required />
           <label for="password">Contraseña</label>
           <div class="password-field"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required /><button type="button" id="toggle-password" aria-label="Mostrar contraseña">Mostrar</button></div>
-          <div class="login-options"><label class="remember-option"><input type="checkbox" id="remember" checked /> <span>Recordar sesion</span></label><a href="#support">¿Necesitas ayuda?</a></div>
+          <div class="login-options"><span>La sesión caduca automáticamente.</span><a href="#support">¿Necesitas ayuda?</a></div>
           <p class="login-error" id="login-error" role="alert"></p>
           <button class="login-submit" type="submit" id="login-submit">Ingresar <span>→</span></button>
           <p class="login-note">La conexion se realiza de forma segura con la API de Netbot.</p>
@@ -124,9 +151,41 @@
             <p id="ticket-feedback" role="status"></p>
           </section>
 
+          <section class="panel support-panel" id="wifi-recipients-panel" hidden aria-labelledby="wifi-recipients-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">ADMINISTRACIÓN</p><h2 id="wifi-recipients-heading">Destinatarios de credenciales Wi-Fi</h2></div></div>
+            <p class="chat-intro">Asocia contactos con su red para recuperar el QR sin una cuenta. Una coincidencia de correo o teléfono permite obtener el acceso de esa red.</p>
+            <form id="wifi-recipients-form" class="support-form">
+              <label for="wifi-recipients-network">Red del cliente</label><select id="wifi-recipients-network"><option value="">Selecciona una red</option></select>
+              <label for="wifi-recipients-contacts">Destinatarios: una línea por cliente, correo;teléfono</label>
+              <textarea id="wifi-recipients-contacts" rows="5" maxlength="200000" placeholder="cliente@ejemplo.cl;+56912345678&#10;otro@ejemplo.cl;&#10;;+56987654321"></textarea>
+              <p>Se requiere correo o teléfono en cada línea. Teléfonos con código de país. Guardar reemplaza la lista de la red seleccionada; una lista vacía revoca su recuperación.</p>
+              <button id="wifi-recipients-save" type="submit" disabled>Guardar destinatarios de esta red</button>
+            </form>
+            <p id="wifi-recipients-status" role="status"></p>
+          </section>
+
           <section class="panel support-panel" id="tickets-panel" hidden aria-labelledby="tickets-heading">
             <div class="panel-heading"><div><p class="panel-kicker">SEGUIMIENTO</p><h2 id="tickets-heading">Tickets autorizados</h2></div><button id="tickets-refresh" type="button">Actualizar</button></div>
             <div id="tickets-list" class="reservation-list"></div>
+          </section>
+
+          <section class="panel support-panel" id="ssid-panel" hidden aria-labelledby="ssid-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">APROVISIONAMIENTO · PROPUESTAS</p><h2 id="ssid-heading">Planes de SSID por ámbito</h2></div><button id="ssid-refresh" type="button">Recuperar planes</button></div>
+            <p class="chat-intro">Prepara una creación o carga CSV con AP concretos y VLAN existentes. Confirmar registra la aprobación. Un ejecutor separado aplica los cambios solo si está configurado; recupera los planes para consultar su estado.</p>
+            <form id="ssid-form" class="support-form">
+              <label for="ssid-scope">Ámbito autorizado</label><select id="ssid-scope"><option value="">Selecciona un ámbito</option></select>
+              <p id="ssid-source" role="status"></p>
+              <fieldset><legend>AP que difundirán el SSID (selección explícita)</legend><div id="ssid-aps"></div></fieldset>
+              <label for="ssid-profile">Perfil de seguridad (sin contraseñas en el chat)</label><select id="ssid-profile"><option value="">Selecciona un perfil</option></select>
+              <label for="ssid-network">Red / VLAN existente</label><select id="ssid-network"><option value="">Selecciona una red</option></select>
+              <label for="ssid-name">Nuevo SSID</label><input id="ssid-name" maxlength="32" placeholder="Clientes-Feria" />
+              <label for="ssid-purpose">Motivo</label><input id="ssid-purpose" maxlength="500" placeholder="Acceso del cliente durante el evento" />
+              <button id="ssid-prepare" type="submit" disabled>Preparar creación individual</button>
+              <label for="ssid-csv">O cargar el CSV de reservas (mismas columnas)</label><input id="ssid-csv" type="file" accept=".csv,text/csv" />
+              <button id="ssid-upload" type="button" disabled>Preparar planes del CSV</button>
+            </form>
+            <p id="ssid-status" role="status"></p>
+            <div id="ssid-plan-list" class="reservation-list"></div>
           </section>
 
           <section class="panel chat-panel" id="chat" aria-labelledby="chat-heading">
@@ -135,6 +194,26 @@
               <span class="chat-scope" id="chat-scope">Asistente</span>
             </div>
             <p class="chat-intro">Consulta las redes que tienes autorizadas. Tus conversaciones se guardan en tu cuenta. Las consultas y los datos necesarios se procesan en OpenRouter. No envíes contraseñas por el chat.</p>
+            <section id="csv-panel" class="csv-panel" hidden aria-labelledby="csv-heading">
+              <h3 id="csv-heading">Carga de SSIDs y reservas por CSV</h3>
+              <p>Valida el archivo y confirma las filas que deseas reservar. Esta acción guarda reservas locales; no crea SSIDs ni modifica la red.</p>
+              <a href="./examples/ssid-reservas.csv" download>Descargar plantilla CSV</a>
+              <p id="csv-limits">UTF-8, separado por coma o punto y coma. Sin contraseñas.</p>
+              <form id="csv-form" class="chat-controls">
+                <label for="csv-file">Archivo CSV</label><input id="csv-file" type="file" accept=".csv,text/csv" required />
+                <button id="csv-upload" type="submit">Validar CSV</button>
+              </form>
+              <div class="chat-controls"><label for="csv-history">Cargas anteriores</label><select id="csv-history"><option value="">Selecciona una carga</option></select></div>
+              <p id="csv-status" role="status" aria-live="polite"></p>
+              <div id="csv-preview" hidden>
+                <p id="csv-summary"></p>
+                <label class="toggle-option"><input type="checkbox" id="csv-select-all" /> Seleccionar todas las filas válidas</label>
+                <div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Validación del CSV por fila</caption><thead><tr><th>Seleccionar</th><th>Fila</th><th>Interfaz</th><th>VLAN</th><th>SSID</th><th>Evento</th><th>Propósito</th><th>Validación</th></tr></thead><tbody id="csv-rows"></tbody></table></div>
+                <p id="csv-selection"></p>
+                <div class="chat-controls"><button id="csv-confirm" type="button">Confirmar reservas seleccionadas</button><button id="csv-cancel" type="button">Cancelar carga</button></div>
+                <div id="csv-results" aria-live="polite"></div>
+              </div>
+            </section>
             <div class="chat-controls">
               <label for="chat-conversation">Conversación</label>
               <select id="chat-conversation"><option value="">Nueva conversación</option></select>

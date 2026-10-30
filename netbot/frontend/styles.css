@@ -94,3 +94,41 @@ button { cursor: pointer; }
 .support-panel p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 .ticket-update { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .wifi-passphrase { font: 16px var(--mono); user-select: text; }
+.csv-panel { margin-top: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 5px; }
+.csv-panel h3 { margin: 0 0 10px; font-size: 14px; }
+.csv-panel p, .csv-panel a { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.csv-panel .data-table td { white-space: normal; min-width: 65px; overflow-wrap: anywhere; }
+.csv-panel .data-table td:last-child { min-width: 200px; }
+.csv-panel input[type=file] { max-width: 100%; font-size: 12px; }
+.csv-panel button { padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+.csv-panel button:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Entrada pública y atención temporal para tótems. */
+[hidden] { display: none !important; }
+.guest-screen { min-height: 100vh; padding: 30px clamp(18px, 5vw, 80px); }
+.guest-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.guest-brand { color: var(--ink); text-decoration: none; font-size: 28px; font-weight: 700; }
+.guest-brand span { display: block; font: 10px var(--mono); color: var(--muted); letter-spacing: 2px; }
+.guest-screen button, #guest-back { min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--panel); }
+.guest-screen button:focus-visible { outline: 3px solid var(--navy); outline-offset: 3px; }
+.guest-layout { max-width: 1250px; margin: 70px auto 30px; display: grid; grid-template-columns: .85fr 1.15fr; gap: clamp(25px, 5vw, 80px); align-items: start; }
+.guest-welcome h1 { margin: 18px 0; font-size: clamp(36px, 4vw, 58px); line-height: 1.1; letter-spacing: -2px; }
+.guest-welcome > p { line-height: 1.7; }
+.guest-welcome .guest-privacy { max-width: 420px; color: var(--muted); font-size: 13px; }
+.guest-chat { padding: 26px; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 50px #17201d08; }
+.guest-chat .chat-messages { min-height: 180px; max-height: 36vh; }
+.guest-chat .chat-message p { font-size: 15px; }
+.guest-chat .chat-form textarea { font-size: 16px; }
+.guest-chat .chat-send, .guest-chat #guest-yes { color: var(--ink); background: var(--lime); }
+.guest-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+.guest-resolution { margin: 16px 0; padding: 14px; background: #e3efd4; border-radius: 8px; }
+.guest-resolution p { margin: 0 0 12px; font-size: 14px; }
+.guest-resolution .reservation-actions { flex-wrap: wrap; }
+#guest-wifi { margin-top: 16px; }
+#guest-network { max-width: 100%; min-height: 44px; font: inherit; }
+#guest-identify-form { margin-top: 16px; }
+#guest-contact { width: 100%; min-height: 48px; padding: 10px; border: 1px solid var(--line); border-radius: 5px; font: 16px var(--display); }
+#guest-identify-error { color: #a04438; }
+#guest-qr { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.wifi-qr { display: block; width: min(260px, 100%); height: auto; aspect-ratio: 1; background: white; }
+@media (max-width: 800px) { .guest-layout { grid-template-columns: 1fr; margin-top: 35px; gap: 20px; } .guest-welcome h1 { font-size: 36px; } .guest-chat { padding: 18px; } .guest-header button { font-size: 12px; } }

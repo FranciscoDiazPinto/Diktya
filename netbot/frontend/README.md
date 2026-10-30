@@ -1,5 +1,7 @@
 # Frontend
 
+La entrada es el chat temporal de invitados. `modules/guest.mjs` controla el QR, la confirmación y la limpieza a los 60 segundos, sin almacenamiento del navegador. El compositor cambia entre invitados, login y dashboard. Ver [configuración de autoatención](../docs/atencion-invitados.md).
+
 Prototipo del centro de monitoreo de Netbot. Esta primera versión no requiere
 dependencias ni build: abre `index.html` directamente en el navegador.
 
@@ -44,7 +46,7 @@ permiso, el inventario OPNsense y la disponibilidad antes de guardar.
 Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
 `/api/v1/monitoring` (`system`, `interfaces`, `interfaces/traffic`, `clients`,
 `firewall/stats` y `firewall/events`) con el token del usuario. Si el token de acceso
-vence, lo renueva con `/auth/refresh`. Las fallas parciales (`degraded`/`unavailable`)
+vence, limpia la sesión y muestra el login; no renueva automáticamente ni repite escrituras. Las fallas parciales (`degraded`/`unavailable`)
 se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.
 
 ## Soporte al cliente
@@ -60,3 +62,7 @@ El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El composi
 Cada controlador mantiene estado privado; identidad y época de sesión son el único estado compartido. No añadir lógica de funcionalidad a app.js/dashboard ni importar el compositor desde otro módulo. Usar el cliente API común y preservar los controles que descartan respuestas tardías de otra cuenta/selección.
 
 Las pruebas (`node --test frontend/tests/*.test.mjs`) importan los mismos módulos ES que el navegador con entorno inyectado; no concatenan app.js ni reemplazan sus imports. Ver [guía modular](../docs/arquitectura-modular.md) y [AGENTS.md](../../AGENTS.md).
+
+### Carga CSV
+
+Admin puede validar la [plantilla y contrato CSV](../docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.

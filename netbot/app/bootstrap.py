@@ -10,6 +10,7 @@ from app.model_registry import register_models
 from app.auth.models import Role, User
 from app.auth.roles import DEFAULT_ROLES
 from app.auth.security import hash_password
+from app.auth.audit import record_event
 
 def initialize_database(config: Settings | None = None, bind: Engine | None = None) -> None:
     """Preparación explícita. Producción exige migraciones previas; nunca create_all."""
@@ -39,7 +40,10 @@ def initialize_database(config: Settings | None = None, bind: Engine | None = No
             select(User).where(User.email == config.admin_email.lower())
         ):
             admin_role = db.scalar(select(Role).where(Role.name == "admin"))
-            db.add(User(email=config.admin_email.lower(), hashed_password=hash_password(config.admin_password), roles=[admin_role]))
+            user = User(email=config.admin_email.lower(), hashed_password=hash_password(config.admin_password), roles=[admin_role])
+            db.add(user)
+            db.flush()
+            record_event(db, "user.created", target_id=user.id, details={"roles": ["admin"]}, source="bootstrap")
             db.commit()
     finally:
         db.close()

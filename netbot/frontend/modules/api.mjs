@@ -1,5 +1,5 @@
 
-export function createApi({ fetch, localStorage, state }) {
+export function createApi({ fetch, localStorage, state, onSessionExpired = () => {} }) {
   const API_BASE = localStorage.getItem('netbot_api_url') || 'http://localhost:8000';
   const MONITORING = '/api/v1/monitoring';
   const getStoredTokens = () => {
@@ -47,12 +47,10 @@ export function createApi({ fetch, localStorage, state }) {
       return response;
     } catch (error) {
       if (session !== state.session || error.status !== 401) throw error;
-      const current = getStoredTokens();
-      const fresh = current?.access_token && current.access_token !== tokens?.access_token ? current : await refreshTokens();
-      if (session !== state.session) throw new ApiError('La sesión cambió.', 0);
-      const response = await apiRequest(path, options, fresh.access_token);
-      if (session !== state.session) throw new ApiError('La sesión cambió.', 0);
-      return response;
+      // El DoD de login exige volver a autenticarse al expirar; no renovar
+      // silenciosamente ni repetir una escritura POST después de un 401.
+      onSessionExpired();
+      throw error;
     }
   }
 

@@ -14,6 +14,10 @@ Acuerdo de alcance: 27 de octubre de 2026.
 
 ## Roles y alcance
 
+El alcance de SSID usa VLAN existentes, sin crear nuevas en OPNsense. Los planes, permisos, selección de AP y límites del ejecutor se describen en [aprovisionamiento por chat/CSV](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot).
+
+
+
 - Cliente: consultar únicamente su acceso Wi-Fi y el estado de sus redes asignadas; crear y consultar sus tickets. Sin monitoreo global ni cambios de red.
 - Técnico: diagnosticar y gestionar tickets de sus sitios/eventos asignados; reiniciar y adoptar APs, crear SSIDs y aprovisionar VLANs dentro de ese ámbito.
 - Administrador: capacidades técnicas y gestión de usuarios, activación y asignación de roles. El acceso a conversaciones ajenas requiere un permiso independiente y auditoría.
@@ -53,7 +57,7 @@ La integración conserva el dashboard con monitoreo en vivo, el chatbot y las re
 
 Se agregó soporte con entrega protegida de acceso Wi-Fi desde secretos del entorno, diagnóstico acotado por interfaz y tickets persistentes con confirmación y seguimiento. Ver [soporte al cliente](soporte-cliente.md). La disponibilidad completa de SSID/AP/Internet sigue sin poder confirmarse con la fuente actual.
 
-El siguiente bloque es integrar las operaciones técnicas UniFi con permisos por recurso, confirmación, trabajos durables, verificación y auditoría; después, administración por chat. La carga CSV sigue para la etapa posterior acordada.
+El siguiente bloque es integrar las operaciones técnicas UniFi con permisos por recurso, confirmación, trabajos durables, verificación y auditoría; después, administración por chat. La primera etapa CSV incorpora validación, vista previa privada y reservas locales confirmadas. El aprovisionamiento sigue pendiente; ver [carga CSV](carga-csv.md).
 
 ## Refactorización modular
 

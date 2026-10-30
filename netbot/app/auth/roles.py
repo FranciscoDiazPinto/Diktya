@@ -34,6 +34,9 @@ DEFAULT_ROLES: dict[RoleName, Role] = {
         frozenset(
             {
                 Permission.CHAT_USE,
+                Permission.CHANGES_REQUEST,
+                Permission.CHANGES_APPROVE,
+                Permission.CHANGES_EXECUTE,
                 Permission.NETWORKS_READ_OWN,
                 Permission.NETWORKS_READ_DETAILS,
                 Permission.WIFI_ACCESS_READ_OWN,

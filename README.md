@@ -11,7 +11,7 @@ Asistente para consultar y gestionar soporte de redes de eventos, con permisos p
 - Tickets internos persistentes con confirmación, seguimiento y gestión por técnicos asignados.
 - Reservas VLAN locales con confirmación. No aprovisionan VLANs ni SSIDs en la infraestructura.
 
-Pendientes: integración UniFi, reinicio/adopción de APs, aprovisionamiento SSID/VLAN, trabajos durables, verificación/compensación, administración por chat, CSV y notificaciones externas. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
+Pendientes: integración UniFi, reinicio/adopción de APs, aprovisionamiento SSID/VLAN, trabajos durables, verificación/compensación, administración por chat, aprovisionamiento CSV y notificaciones externas. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
 
 ## Desarrollo y arquitectura
 
@@ -48,3 +48,7 @@ El equipo trabaja bajo **Scrum**, con las siguientes prácticas:
 Cada módulo posee sus datos y servicios. Los routers adaptan HTTP; los casos de uso autorizan, consultan y confirman operaciones; los adaptadores externos normalizan sus respuestas. El chat coordina servicios públicos y prepara propuestas con herramientas acotadas por permisos. La aplicación se compone en main/routes/lifecycle, sin dependencias inversas desde los dominios.
 
 El frontend tiene controladores por funcionalidad y un compositor pequeño. Los cambios deben mantener sus límites y pasar las pruebas de arquitectura e aislamiento.
+
+## Avance de carga CSV
+
+Validación, vista previa privada, selección y reservas locales implementadas. El aprovisionamiento real de SSIDs/VLAN sigue pendiente. Ver [contrato y límites CSV](netbot/docs/carga-csv.md).

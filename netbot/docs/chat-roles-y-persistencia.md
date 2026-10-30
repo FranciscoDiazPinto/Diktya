@@ -75,7 +75,7 @@ Incluso admin recibe 404 al intentar leer o continuar una conversación ajena. N
 
 Cada conversación registra una huella de roles, permisos y redes accesibles. Cuando cambia ese conjunto, los chats del contexto anterior se conservan en la base pero se ocultan y no se envían al modelo. Esto es conservador: también un aumento de acceso exige iniciar un chat nuevo. Una conversación vuelve a ser accesible si se restablece exactamente el mismo contexto de autorización. No se elimina historial automáticamente.
 
-Al completar la llamada al proveedor se vuelven a comprobar usuario activo y contexto de autorización. Una revocación durante la consulta descarta la respuesta (403). Dos respuestas concurrentes no sobrescriben el historial: la segunda actualización incompatible se rechaza con 409. Las herramientas actuales son de consulta o propuesta; antes de habilitar escrituras habrá que reautorizar también cada ejecución en la cola de trabajos.
+Al completar la llamada al proveedor se vuelven a comprobar usuario activo y contexto de autorización. Una revocación durante la consulta descarta la respuesta (403). Dos respuestas concurrentes no sobrescriben el historial: la segunda actualización incompatible se rechaza con 409. Las herramientas actuales son de consulta o propuesta; los planes SSID reautorizan también al ejecutar desde su CLI.
 
 Cerrar sesión o cambiar de cuenta invalida respuestas pendientes en la interfaz, limpia mensajes y propuestas visibles e impide que una renovación tardía sustituya tokens de otra cuenta. Las llamadas simultáneas comparten una sola renovación de token.
 
@@ -94,3 +94,5 @@ El bloque de atención al cliente está implementado y documentado en [soporte a
 ## Mantenimiento modular
 
 Ver [arquitectura vigente](arquitectura-modular.md) antes de extender este flujo. Autorización en auth/access y networks/access; diagnóstico en networks/diagnostics; claves en networks/credentials; consultas de tickets en tickets/service. El chat usa esos contratos, no sus tablas. Los errores públicos se traducen a HTTP en una frontera común. No se modificó el esquema SQL ni el contrato público por esta reorganización.
+
+Desde migración 008, cambios de roles/actividad/contraseña invalidan sesiones previas: se responde 401 al token antiguo. Tras nuevo login sigue aplicándose la separación del historial por contexto de autorización. Véase [identidad, auditoría y expiración](epica-001-autenticacion-roles.md).

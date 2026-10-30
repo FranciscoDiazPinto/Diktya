@@ -66,11 +66,10 @@ class OpenRouterProvider:
         payload = {
             "model": model,
             "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto",
-            "parallel_tool_calls": False,
             "max_tokens": self._settings.chat_max_output_tokens,
         }
+        if tools:
+            payload.update(tools=tools, tool_choice="auto", parallel_tool_calls=False)
         headers = {
             "Authorization": f"Bearer {api_key.get_secret_value()}",
             "Content-Type": "application/json",

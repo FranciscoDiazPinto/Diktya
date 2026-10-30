@@ -8,7 +8,7 @@ El sistema implementado es un monolito modular FastAPI con PostgreSQL/SQLite y f
 
 El punto de entrada HTTP, el ciclo de vida, la preparación de la base y el registro de modelos están separados. Producción exige migraciones aplicadas antes del arranque; solo development/test admiten create_all. El frontend separa sesión/API, chat, monitoreo, soporte, tickets y reservas.
 
-El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. UniFi, React, WebSocket, ejecución durable, verificación/compensación y CSV son objetivos, no capacidades ya disponibles.
+El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. UniFi, React, WebSocket, ejecución durable, verificación/compensación y aprovisionamiento CSV son objetivos, no capacidades ya disponibles.
 
 ## Diseño de referencia histórico
 
@@ -393,7 +393,7 @@ Participantes: Usuario (Web), Frontend (React), Backend (FastAPI), PostgreSQL, U
 
 **Puntos clave:** validar el CSV (formato y datos); reservar las VLANs antes de aplicar; mostrar vista previa y pedir confirmación; verificar y entregar un resumen final.
 
-> El diagrama no especifica las columnas del CSV. Hay que definirlas (por ejemplo: `ssid`, `vlan_id`, `seguridad`, `contraseña`, `sitio`) antes de implementar.
+> El diagrama histórico no define columnas. La primera etapa usa `parent_interface,tag,event_name,purpose,ssid`, sin contraseñas; ver el contrato vigente de carga CSV.
 
 ### 8.4 Incidente, ticket y notificación
 
@@ -444,7 +444,7 @@ Conviene resolver estos puntos antes de implementar:
 6. **No hay HTTPS en el contenedor del frontend.** El despliegue expone el frontend en el puerto 80. En producción hace falta TLS, por ejemplo con un reverse proxy como Nginx o Traefik delante.
 7. **Falta definir la autenticación.** Existe "gestionar roles / credenciales", pero ningún diagrama dice cómo se autentica el usuario (JWT, sesiones, SSO) ni qué roles existen.
 8. **El LLM no aparece en el despliegue.** Hay que contemplar su API key, la salida a Internet desde el backend, los límites de uso y qué hacer si el proveedor no responde.
-9. **Formato del CSV sin definir** (ver sección 8.3).
+9. **Aprovisionamiento CSV pendiente**; formato de reservas definido (ver sección 8.3).
 
 ---
 
@@ -479,3 +479,7 @@ Este documento no depende de ellos, pero estas son las fuentes originales:
 | `Documento_05_-_Documento_de_Diseño_image8.png` | Diagrama de casos de uso |
 | `Documento_05_-_Documento_de_Diseño_image9.png` | Modelo E-R propuesto |
 | `Documento_05_-_Documento_de_Diseño_image10.png` | Diagrama de clases |
+
+## Avance de carga CSV
+
+Validación, vista previa privada, selección y reservas locales implementadas. El aprovisionamiento real de SSIDs/VLAN sigue pendiente. Ver [contrato y límites CSV](../netbot/docs/carga-csv.md).

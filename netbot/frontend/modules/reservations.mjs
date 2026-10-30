@@ -84,5 +84,5 @@ export function createReservations({ document, state, api, chatMessages, textNod
   }
 
 
-  return { configureUser, reset, renderReservationProposal };
+  return { configureUser, reset, renderReservationProposal, refresh: refreshReservations };
 }

@@ -5,6 +5,7 @@ from app.core.config import get_settings
 from app.http_errors import register_error_handlers
 from app.lifecycle import lifespan
 from app.routes import register_routes
+from app.auth.audit import AuthAuditMiddleware
 
 
 def create_app() -> FastAPI:
@@ -13,6 +14,7 @@ def create_app() -> FastAPI:
     app.add_middleware(CORSMiddleware,
         allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
         allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(AuthAuditMiddleware)
     register_error_handlers(app)
     register_routes(app)
 

@@ -32,7 +32,7 @@ def test_domains_do_not_import_http_composition():
 
 def test_http_and_database_logic_stay_on_their_respective_layers():
     for _, path, tree in domain_sources():
-        http_boundary = path.name in {"routes.py", "router.py", "support_router.py", "dependencies.py"}
+        http_boundary = path.name in {"routes.py", "router.py", "support_router.py", "guest_router.py", "dependencies.py"}
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("fastapi"):
                 assert http_boundary, f"FastAPI fuera del adaptador: {path}"

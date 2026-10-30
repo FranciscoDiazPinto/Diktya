@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     monitoring_sample_interval_seconds: float = Field(5.0, gt=0)
     monitoring_history_seconds: float = Field(3600.0, gt=0)
 
+    # Redes cuyo acceso se publica deliberadamente sin cuenta. Vacío = ninguna.
+    guest_wifi_network_ids: list[int] = Field(default_factory=list)
+
+    # Inventario oficial UniFi: URL completa hasta /integration/v1, sin secretos en MD.
+    unifi_inventory_mode: Literal["disabled", "mock", "api"] = "disabled"
+    unifi_api_base_url: str | None = None
+    unifi_api_key: SecretStr | None = None
+    unifi_ca_bundle: str | None = None
+    unifi_write_enabled: bool = False
+    unifi_api_contract: str | None = None
+    ssid_security_profiles_json: SecretStr | None = None
+    unifi_timeout_seconds: float = Field(10.0, gt=0, le=60)
+
     # --- Chatbot ---
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str | None = None
@@ -53,6 +66,11 @@ class Settings(BaseSettings):
     # Sitio que sirve la instancia actual de monitoreo OPNsense/mock.
     monitoring_site_id: str | None = None
     network_status_max_age_seconds: float = Field(60.0, gt=0)
+
+    csv_max_bytes: int = Field(1_048_576, ge=1024, le=10_485_760)
+    csv_max_rows: int = Field(500, ge=1, le=1000)
+    csv_preview_ttl_seconds: int = Field(900, ge=30, le=86400)
+    csv_inventory_max_age_seconds: float = Field(60.0, gt=0, le=3600)
 
     # --- OPNsense ---
     # Se acepta OPNSENSE_BASE_URL (nombre actual de .env.example) y OPNSENSE_API_URL.

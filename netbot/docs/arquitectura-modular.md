@@ -1,6 +1,9 @@
 # Arquitectura modular vigente
 
+La entrada pública incluye [autoatención de invitados y QR Wi-Fi](atencion-invitados.md). `chat/guest.py` posee sesiones en memoria con tokens aleatorios e historial del servidor; `guest_router.py` es una frontera HTTP pública separada. No acepta historial ni identidad del navegador y no ofrece herramientas al modelo. El ciclo de vida elimina sesiones vencidas cada segundo y al apagar la instancia. `networks/recipients.py` posee el registro y comparación de destinatarios sin cuenta. El formulario de recuperación compara correo o teléfono fuera del LLM y vincula el contacto a la sesión efímera; cada entrega reautoriza contra el registro. `networks/guest_access.py` solo publica anónimamente redes abiertas de `GUEST_WIFI_NETWORK_IDS`; `wifi_qr.py` genera el QR localmente. `frontend/modules/guest.mjs` controla resolución, confirmación y limpieza tras 60 segundos sin actividad, sin persistencia del navegador.
+
 Esta guía describe el código implementado. Es el punto de entrada técnico junto con [AGENTS.md](../../AGENTS.md). El [documento de referencia](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo, separado del estado real.
+
 
 ## Organización
 
@@ -32,12 +35,12 @@ flowchart TD
 
 | Módulo | Propiedad y contratos |
 |---|---|
-| auth | Usuarios/roles/tokens. `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
+| auth | Usuarios/roles/tokens y auditoría de identidad append-only (008). `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
 | networks | Inventario y asignaciones (`service.py`); autorización por recurso (`access.py`); configuración (`configuration.py`); claves (`credentials.py`); diagnóstico (`diagnostics.py`); registro de auditoría (`audit.py`). |
 | tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
 | monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
-| changes | Reservas VLAN locales confirmadas y liberación. No ejecuta configuración de infraestructura. |
+| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). Incluye planes SSID privados, ámbitos/concesiones, inventario UniFi y ejecutor CLI separado, deshabilitado por defecto. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
 | core | Configuración, conexión SQL y errores de aplicación. No coordina dominios. |
 
@@ -69,7 +72,7 @@ Cada operación de escritura tiene un dueño de transacción. Usuarios, inventar
 
 Las herramientas de chat solo consultan o preparan propuestas. No llamar una operación que haga commit dentro del bucle del LLM. La creación del ticket o reserva ocurre por una solicitud API explícita; así un fallo del proveedor o conflicto de conversación no deja una escritura oculta.
 
-Los schemas de respuesta conservan los contratos públicos. Esta refactorización no cambia tablas ni requiere una nueva migración.
+Los schemas de respuesta conservan los contratos públicos. La refactorización modular no cambió tablas. La funcionalidad CSV posterior agrega `CsvImport` mediante la migración 005; su confirmación posee la transacción del lote completo. Ver [contrato CSV](carga-csv.md).
 
 ## Composición y ciclo de vida
 
@@ -89,13 +92,14 @@ Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las
 
 | Archivo en modules/ | Responsabilidad |
 |---|---|
-| api.mjs | HTTP, tokens, una renovación compartida y rechazo de respuestas de otra época de sesión. |
+| api.mjs | HTTP, tokens, renovación solo explícita, cierre ante 401 y rechazo de respuestas de otra época de sesión. |
 | session.mjs | Login/logout/perfil; notifica autenticación y salida al compositor. |
 | chat.mjs | Conversación, versión, selección, historial y mensajes. |
 | monitoring.mjs | Estado privado de métricas, polling y representación del dashboard. |
 | support.mjs | Diagnóstico personal y panel temporal de acceso Wi-Fi. |
 | tickets.mjs | Formulario, confirmación, listado y seguimiento de tickets. |
 | reservations.mjs | Propuestas, confirmación y liberación de reservas locales. |
+| csv-imports.mjs | Archivo, vista previa, selección, recuperación y confirmación explícita de reservas por CSV. |
 | dom.mjs / format.mjs | Utilidades de vista y formato, sin reglas de permisos. |
 
 Solo identidad y época de sesión se comparten. Cada controlador conserva su estado; callbacks explícitos conectan acciones del chat con soporte, tickets o reservas. No importar dashboard desde una funcionalidad ni agregar variables globales para comunicar módulos.
@@ -122,4 +126,11 @@ Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.t
 
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
-Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, CSV y notificaciones externas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
+Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, aprovisionamiento CSV en UniFi y notificaciones externas. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
+
+Los modelos WifiScope, WifiScopeGrant, SsidPlan y WifiWriteLease pertenecen a changes (migración 007). `ssid_service` coordina autorización/SQL; `wifi_inventory` consulta UniFi y `ssid_executor` aplica el contrato 10.6.106. `changes.cli` usa bootstrap sin importar la app HTTP. Véase [operación y límites](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot).
+
+
+La épica 001 incorpora auditoría de identidad, sesiones JWT vinculadas a refresh revocable, protección concurrente del último admin y expiración sin renovación automática del navegador. `auth.audit` posee el registro y middleware ASGI de denegaciones; los casos de uso conservan sus transacciones. Ver [contrato y evidencia de cierre](epica-001-autenticacion-roles.md).
+
+El despliegue objetivo es un equipo local en el rack, con acceso a UniFi/OPNsense por la red de administración y endpoints configurables. Un backend local puede seguir utilizando un proveedor LLM externo. Ver [configuración y límites de aprovisionamiento](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot); la validación física de Netbot sigue pendiente.

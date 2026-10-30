@@ -172,9 +172,11 @@ def test_revocation_hides_previous_context_and_blocks_continuation(client, scope
 def test_role_downgrade_cannot_reuse_global_history_with_old_access_token(client, scoped):
     users, headers, _, service = scoped
     cid = send(client, headers["admin"]).json()["conversation_id"]
+    assert client.post("/admin/users", headers=headers["admin"], json={
+        "email":"backup-admin@example.com", "password":"backup-password", "roles":["admin"]}).status_code == 201
     assert client.patch(f"/admin/users/{users['admin'].id}", json={"roles": ["cliente"]}, headers=headers["admin"]).status_code == 200
-    assert send(client, headers["admin"], conversation_id=cid).status_code == 404
-    assert client.get("/api/v1/monitoring/system", headers=headers["admin"]).status_code == 403
+    assert send(client, headers["admin"], conversation_id=cid).status_code == 401
+    assert client.get("/api/v1/monitoring/system", headers=headers["admin"]).status_code == 401
     assert len(service.calls) == 1
 
 

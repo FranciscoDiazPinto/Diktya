@@ -156,18 +156,25 @@ test('late token renewal cannot replace the credentials of another session', asy
   assert.equal(JSON.parse(ui.storage.get('netbot_tokens')).access_token, 'token-b');
 });
 
-test('simultaneous expired requests share one refresh and keep POST payload', async () => {
-  let refreshCount = 0;
+test('expired requests end the session, clear tokens and never refresh or repeat a POST', async () => {
+  const calls = [];
   const ui = dashboard(async (url, options) => {
-    if (url.endsWith('/auth/refresh')) { refreshCount += 1; await tick(); return response({ access_token: 'fresh', refresh_token: 'rotated' }); }
-    if (options.headers.Authorization === 'Bearer old') return response({ detail: 'expired' }, 401);
-    return response({ method: options.method, body: options.body });
+    calls.push({path: new URL(url).pathname, options});
+    if (url.endsWith('/auth/logout')) return response(null, 204);
+    return response({detail:'expired'}, 401);
   });
-  ui.storage.set('netbot_tokens', JSON.stringify({ access_token: 'old', refresh_token: 'refresh' }));
-  const result = await ui.run("Promise.all([authedRequest('/one', {method: 'POST', body: 'payload'}), authedRequest('/two')])");
-  assert.equal(refreshCount, 1);
-  assert.equal(result[0].method, 'POST');
-  assert.equal(result[0].body, 'payload');
+  ui.storage.set('netbot_tokens', JSON.stringify({access_token:'old',refresh_token:'refresh'}));
+  const results = await Promise.allSettled([
+    ui.run("authedRequest('/one', {method:'POST',body:'payload'})"),
+    ui.run("authedRequest('/two')"),
+  ]);
+  assert.ok(results.every(result=>result.status==='rejected'));
+  assert.equal(ui.storage.has('netbot_tokens'),false);
+  assert.equal(calls.filter(c=>c.path==='/one').length,1);
+  assert.ok(!calls.some(c=>c.path==='/auth/refresh'));
+  assert.equal(ui.nodes.get('#login-screen').style.display,'');
+  assert.equal(ui.nodes.get('#guest-screen').hidden,true);
+  assert.match(ui.nodes.get('#login-error').textContent,/sesión expiró/);
 });
 
 test('conflict clears rejected context and restores controls for a new authorized chat', async () => {
@@ -287,4 +294,44 @@ test('two composed dashboards keep session and conversation state independent', 
   assert.equal(second.nodes.get('#chat-send').disabled, false);
   assert.equal(second.nodes.get('#user-name').textContent, 'b');
   assert.notEqual(first.controller.api, second.controller.api);
+});
+
+test('administrator maintains Wi-Fi recipients per network and logout clears contact fields', async () => {
+  const calls = [];
+  const ui = dashboard(async (url, options) => {
+    const path = new URL(url).pathname; calls.push({path, options});
+    if (path === '/api/v1/networks') return response([{id:1, name:'Cliente', ssid:'Client'}]);
+    if (path.endsWith('/recipients')) return response(options.method === 'PUT' ? JSON.parse(options.body).recipients : [{email:'client@example.com', phone:'+56912345678'}]);
+    return response([]);
+  });
+  ui.login('admin', ['networks:manage']); await tick();
+  assert.equal(ui.nodes.get('#wifi-recipients-panel').hidden, false);
+  const select = ui.nodes.get('#wifi-recipients-network'); select.value = '1';
+  await select.events.change();
+  const contacts = ui.nodes.get('#wifi-recipients-contacts');
+  assert.equal(contacts.value, 'client@example.com;+56912345678');
+  contacts.value = 'updated@example.com;\n;+56987654321';
+  await ui.nodes.get('#wifi-recipients-form').events.submit({preventDefault() {}});
+  const saved = calls.find(c => c.options.method === 'PUT');
+  assert.equal(saved.path, '/admin/networks/1/recipients');
+  assert.deepEqual(JSON.parse(saved.options.body), {recipients:[{email:'updated@example.com', phone:null}, {email:null, phone:'+56987654321'}]});
+  ui.controller.session.signOut();
+  assert.equal(contacts.value, '');
+  assert.equal(ui.nodes.get('#wifi-recipients-panel').hidden, true);
+  assert.ok(![...ui.storage.values()].some(value => value.includes('updated@example.com')));
+});
+
+test('late recipient list from another network never replaces the selected network contacts', async () => {
+  const pending = deferred();
+  const ui = dashboard(async url => {
+    if (url.endsWith('/networks')) return response([{id:1}, {id:2}]);
+    if (url.endsWith('/1/recipients')) return pending.promise;
+    if (url.endsWith('/2/recipients')) return response([{email:'second@example.com', phone:null}]);
+    return response([]);
+  });
+  ui.login('admin', ['networks:manage']); await tick();
+  const select = ui.nodes.get('#wifi-recipients-network'); select.value = '1';
+  const first = select.events.change(); select.value = '2'; await select.events.change();
+  pending.resolve(response([{email:'first@example.com', phone:null}])); await first;
+  assert.equal(ui.nodes.get('#wifi-recipients-contacts').value, 'second@example.com;');
 });

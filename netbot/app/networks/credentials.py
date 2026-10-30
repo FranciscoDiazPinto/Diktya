@@ -12,6 +12,7 @@ from .models import Network
 from .support_models import NetworkSupportConfig
 from .support_schemas import WifiCredential, WifiAccessRead, WifiAccessAction
 from .audit import record_audit
+from .wifi_qr import wifi_qr_data_url
 
 def credential_for(network: Network, config: NetworkSupportConfig | None, settings: Settings) -> WifiCredential:
     error = ServiceUnavailable("El acceso Wi-Fi no está configurado para esta red. Contacta a soporte.")
@@ -50,4 +51,5 @@ def reveal_wifi(db: Session, user: User, network_id: int, settings: Settings) ->
     record_audit(db, user.id, network_id, "wifi_access.revealed")
     db.commit()
     return WifiAccessRead(network_id=network_id, ssid=credential.ssid, security=credential.security,
+                          qr_data_url=wifi_qr_data_url(credential),
                           passphrase=credential.passphrase.get_secret_value() if credential.security != "open" and credential.passphrase else None)

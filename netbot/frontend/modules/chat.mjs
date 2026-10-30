@@ -1,6 +1,6 @@
 import { canReserveVlans } from '../chat-reservations.mjs';
 
-export function createChat({ document, Option, state, api, onConversationChanged, onNetworksLoaded, renderReservationProposal, renderAccessAction, renderTicketProposal }) {
+export function createChat({ document, Option, state, api, onConversationChanged, onNetworksLoaded, renderReservationProposal, renderAccessAction, renderTicketProposal, renderSsidProposal }) {
   const $ = (selector) => document.querySelector(selector);
   const { authedRequest } = api;
   const chatForm = document.querySelector('#chat-form');
@@ -177,6 +177,7 @@ export function createChat({ document, Option, state, api, onConversationChanged
       appendChatMessage('assistant', response.answer);
       if (response.reservation_proposal && canReserveVlans(state.user?.roles || [])) renderReservationProposal(response.reservation_proposal);
       if (response.wifi_access_action) renderAccessAction(response.wifi_access_action);
+      if (response.ssid_proposal) renderSsidProposal(response.ssid_proposal);
       if (response.ticket_proposal) renderTicketProposal(response.ticket_proposal);
       setChatStatus('Consulta guardada.');
     } catch (error) {
