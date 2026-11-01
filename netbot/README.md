@@ -44,7 +44,7 @@ Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-mod
 
 - `app/core`: configuración, seguridad, base de datos y logging.
 - `app/auth`: usuarios, roles y permisos (Épica 001).
-- `app/monitoring`: proveedores OPNsense/mock y dashboard (Épica 002). Ver `docs/epica-002-monitoreo.md`.
+- `app/monitoring`: proveedores OPNsense/UniFi/mock, inventario, alertas y planos (Épica 002). Ver `docs/epica-002-monitoreo.md`.
 - `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
 - `app/networks`: registro local y asignación de acceso por red.
 - `app/changes`: reservas VLAN locales confirmadas; ejecución real y rollback pendientes.
@@ -60,17 +60,20 @@ La recuperación por contacto requiere la migración `006_network_recipients`. E
 
 Crear una migración con `alembic revision --autogenerate -m "descripcion"`, revisarla y aplicarla con `alembic upgrade head` antes del arranque. Producción comprueba las revisiones de Alembic y no crea tablas automáticamente. Solo development/test conservan create_all como ayuda local. Bases heredadas con tablas creadas fuera de Alembic necesitan conciliar su estado antes de migrar.
 
-## Monitoreo sin hardware
+## Monitoreo
 
-Por defecto `MONITORING_PROVIDER=mock`: la API sirve datos simulados y coherentes en
-`/api/v1/monitoring/{system,interfaces,clients,firewall/stats,firewall/events}`. Para usar
-OPNsense real, definir `MONITORING_PROVIDER=opnsense` y las variables `OPNSENSE_*` en `.env`.
+Por defecto consulta las fuentes reales: definir las variables `OPNSENSE_*` y `UNIFI_*` en `.env`.
+Sin credenciales la API arranca igual: la fuente figura como no configurada y el dashboard indica
+qué falta, sin inventar datos. Si una fuente cae, se conserva el último dato conocido marcado como
+desactualizado. `MONITORING_PROVIDER=mock` activa datos simulados solo si se pide de forma
+explícita, y se rotulan como tales. Ver [la guía de la épica](docs/epica-002-monitoreo.md). La
+migración `007_monitoring_inventory` crea las tablas de inventario, alertas y planos.
 
 ## Chatbot
 
 El endpoint `POST /api/v1/chat/messages` requiere autenticación y `chat:use`. El servidor carga el historial persistente de la conversación y comprueba propietario, rol y ámbito antes de enviar contexto al proveedor. No acepta historial desde el navegador. Las herramientas se filtran por permisos y vuelven a autorizarlos antes de ejecutarse.
 
-Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Las operaciones UniFi siguen pendientes. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
+Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Las operaciones de escritura en UniFi siguen pendientes. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
 
 Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en OpenRouter para generar respuestas.
 

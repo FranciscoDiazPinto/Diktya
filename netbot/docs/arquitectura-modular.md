@@ -24,7 +24,8 @@ flowchart TD
     CHAT --> LLM[Contrato ChatProvider / OpenRouter]
     NET --> MON
     TICK --> NET
-    MON --> ADAPT[Adaptadores mock / OPNsense]
+    MON --> ADAPT[Adaptadores mock / OPNsense / UniFi]
+    MON --> DB
     AUTH --> DB[(SQL: tablas propias de cada módulo)]
     CHAT --> DB
     NET --> DB
@@ -39,7 +40,7 @@ flowchart TD
 | auth | Usuarios/roles/tokens. `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
 | networks | Inventario y asignaciones (`service.py`); autorización por recurso (`access.py`); configuración (`configuration.py`); claves (`credentials.py`); diagnóstico (`diagnostics.py`); registro de auditoría (`audit.py`). |
 | tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
-| monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
+| monitoring | Contratos `InfrastructureSource` y `NetworkMonitoringProvider`, normalización, servicio/cache/historial, fábrica de adaptadores mock/OPNsense/UniFi, inventario persistido y colector (`inventory.py`), alertas (`alerts.py`) y planos (`plans.py`). Tablas `monitoring_*`, migración 007. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
 | changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). No ejecuta configuración de infraestructura. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
@@ -79,7 +80,7 @@ Los schemas de respuesta conservan los contratos públicos. La refactorización 
 
 - `main.create_app()` construye HTTP y registra adaptadores; no consulta la base ni crea tablas al importar.
 - `routes.py` registra routers; `http_errors.py` registra la traducción de errores.
-- `lifecycle.py` inicia/cierra monitoreo y su tarea de muestreo en memoria.
+- `lifecycle.py` inicia/cierra monitoreo y sus tareas en memoria de muestreo y recolección de inventario.
 - `bootstrap.initialize_database()` registra metadata y prepara roles/admin; la CLI lo usa sin cargar FastAPI.
 - `model_registry.register_models()` registra modelos para bootstrap y Alembic.
 
@@ -97,6 +98,7 @@ Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las
 | session.mjs | Login/logout/perfil; notifica autenticación y salida al compositor. |
 | chat.mjs | Conversación, versión, selección, historial y mensajes. |
 | monitoring.mjs | Estado privado de métricas, polling y representación del dashboard. |
+| inventory.mjs | Resumen, dispositivos, alertas, SSID/VLAN y planos de cobertura. |
 | support.mjs | Diagnóstico personal y panel temporal de acceso Wi-Fi. |
 | tickets.mjs | Formulario, confirmación, listado y seguimiento de tickets. |
 | reservations.mjs | Propuestas, confirmación y liberación de reservas locales. |
@@ -117,7 +119,7 @@ Las decisiones visuales no sustituyen autorización del backend. Los resultados 
 6. Agregar ruta/herramienta/vista como adaptadores. Una herramienta nueva debe declarar permiso y validar argumentos.
 7. Ejecutar pruebas pertinentes, actualizar estas guías y los contratos funcionales afectados.
 
-UniFi debería tener un adaptador propio. Las operaciones AP/SSID/VLAN deben pasar por plan confirmado, trabajo durable, autorización al ejecutar, verificación y auditoría. Un proceso de muestreo en memoria no cumple ese contrato. Los roles delimitan capacidades; no es necesario crear un proceso/worker por cada rol.
+La lectura de UniFi ya tiene adaptador propio en `monitoring/providers/unifi`. Las operaciones de escritura AP/SSID/VLAN deben pasar por plan confirmado, trabajo durable, autorización al ejecutar, verificación y auditoría. Un proceso de muestreo en memoria no cumple ese contrato. Los roles delimitan capacidades; no es necesario crear un proceso/worker por cada rol.
 
 ## Verificación y alcance real
 
@@ -127,4 +129,4 @@ Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.t
 
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
-Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, aprovisionamiento CSV en UniFi y notificaciones externas. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
+Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/UniFi/mock de solo lectura con inventario, alertas y planos, acceso Wi-Fi protegido y tickets internos. Falta validar el monitoreo contra equipos reales. Pendiente: escrituras UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, aprovisionamiento CSV en UniFi y notificaciones externas. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.

@@ -60,6 +60,11 @@ class ProviderServerError(MonitoringError):
     public_message = "OPNsense respondió con un error interno (HTTP 5xx)."
 
 
+class ProviderRateLimitError(MonitoringError):
+    kind = IssueKind.RATE_LIMIT
+    public_message = "La fuente limitó la frecuencia de consultas (HTTP 429)."
+
+
 class ProviderInvalidResponseError(MonitoringError):
     kind = IssueKind.INVALID_RESPONSE
     public_message = "OPNsense devolvió una respuesta inesperada o ilegible."

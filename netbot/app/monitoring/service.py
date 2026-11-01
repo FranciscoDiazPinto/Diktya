@@ -71,6 +71,10 @@ class MonitoringService:
         self._history_seconds = history_seconds
         self._samples: deque[_TrafficSample] = deque()
 
+    @property
+    def provider(self) -> NetworkMonitoringProvider:
+        return self._provider
+
     async def aclose(self) -> None:
         await self._provider.aclose()
 

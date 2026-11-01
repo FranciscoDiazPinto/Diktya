@@ -132,3 +132,24 @@ button { cursor: pointer; }
 #guest-qr { display: grid; justify-items: center; gap: 12px; text-align: center; }
 .wifi-qr { display: block; width: min(260px, 100%); height: auto; aspect-ratio: 1; background: white; }
 @media (max-width: 800px) { .guest-layout { grid-template-columns: 1fr; margin-top: 35px; gap: 20px; } .guest-welcome h1 { font-size: 36px; } .guest-chat { padding: 18px; } .guest-header button { font-size: 12px; } }
+
+/* Inventario, alertas y planos */
+.inventory-kpis { grid-template-columns: repeat(6, 1fr); }
+.inventory-stale { margin: 0 0 12px; padding: 10px 14px; color: #7a5a24; background: #f8ecd4; border: 1px solid #ecd3a3; border-radius: 5px; font-size: 12px; }
+.inventory-sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.source-chip { padding: 5px 9px; border: 1px solid var(--line); border-radius: 4px; font: 10px var(--mono); }
+.inventory-pager { display: flex; align-items: center; justify-content: end; gap: 12px; margin-top: 12px; font: 10px var(--mono); }
+.pill.warn { color: #8a6420; background: #f8ecd4; }
+.plan-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; margin-top: 12px; }
+.plan-stage { position: relative; align-self: start; border: 1px solid var(--line); line-height: 0; cursor: crosshair; }
+.plan-stage img { display: block; width: 100%; height: auto; }
+.plan-marker { position: absolute; width: 16px; height: 16px; padding: 0; border: 2px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); background: #a9aca6; box-shadow: 0 0 0 1px var(--ink); cursor: pointer; }
+.plan-marker.online { background: #6fae62; }
+.plan-marker.degraded { background: var(--orange); }
+.plan-marker.offline { background: #d3503c; }
+.plan-marker.selected { outline: 2px solid var(--navy); outline-offset: 2px; }
+.plan-side h3 { margin: 0 0 8px; font-size: 12px; }
+.plan-side button { display: block; width: 100%; margin-bottom: 6px; text-align: left; }
+.plan-side button.selected { outline: 2px solid var(--navy); }
+.plan-side #plan-unplaced { margin-bottom: 16px; }
+@media (max-width: 900px) { .inventory-kpis { grid-template-columns: repeat(2, 1fr); }.plan-layout { grid-template-columns: 1fr; } }

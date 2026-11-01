@@ -1,9 +1,7 @@
 """Payloads representativos de la API de OPNsense usados por las pruebas.
 
-IMPORTANTE: las formas de `system_resources` (memory.total/used) y de los endpoints
-documentados están verificadas contra la documentación/código de OPNsense; el resto
-(system_time, temperatura, interfaces, leases, firewall) reproducen la forma
-observada/esperada y deben contrastarse con un OPNsense real (ver docs/).
+Las formas se contrastaron con el código de OPNsense core; ver la tabla de verificación
+en docs/epica-002-monitoreo.md. Eso no sustituye probar la versión que se despliegue.
 """
 
 CPU_EVENT = {"total": 14, "user": 6, "nice": 0, "sys": 7, "intr": 1, "idle": 86}
@@ -233,23 +231,33 @@ FIREWALL_LOG = [
     {"__timestamp__": "garbage", "action": "block", "src": "1.2.3.4", "dst": "5.6.7.8"},
 ]
 
+# pfstatistics.py publica {"total": N, "rate": R} y claves con guion; no incluye `Status`.
 PF_INFO = {
     "info": {
-        "status": "Enabled",
         "state-table": {
-            "current entries": "1523",
-            "searches": "98765",
-            "inserts": "12345",
-            "removals": "10822",
+            "current-entries": {"total": 1523},
+            "searches": {"total": 98765, "rate": 12.0},
+            "inserts": {"total": 12345, "rate": 2.0},
+            "removals": {"total": 10822, "rate": 2.0},
         },
-        "counters": {"match": "50000", "bad-offset": "0", "fragment": "2", "short": "0"},
+        "counters": {
+            "match": {"total": 50000, "rate": 5.0},
+            "bad-offset": {"total": 0, "rate": 0.0},
+            "fragment": {"total": 2, "rate": 0.0},
+            "short": {"total": 0, "rate": 0.0},
+        },
     }
 }
 
-FIREWALL_STATS = {
+# `pfctl -vvsI`: incluye grupos como "all", que agregan a sus miembros.
+PF_INTERFACES = {
     "interfaces": {
+        "all": {"in4_pass_packets": 99999, "in4_block_packets": 99999},
+        "enc": {"in4_pass_packets": 7, "in4_block_packets": 7},
         "igc0": {
+            "references": 12,
             "in4_pass_packets": 1000,
+            "in4_pass_bytes": 900000,
             "in4_block_packets": 40,
             "out4_pass_packets": 900,
             "out4_block_packets": 2,

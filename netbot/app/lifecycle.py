@@ -7,8 +7,10 @@ from collections.abc import AsyncIterator
 from fastapi import FastAPI
 from app.bootstrap import initialize_database
 from app.core.config import get_settings
+from app.core.database import SessionLocal
 from app.chat.guest import expire_guest_sessions, sessions
-from app.monitoring.factory import build_monitoring_service
+from app.monitoring.factory import build_monitoring_service, build_unifi_source
+from app.monitoring.inventory import InventoryCollector
 from app.monitoring.service import MonitoringService
 
 logger = logging.getLogger("netbot")
@@ -25,15 +27,27 @@ async def sample_traffic_forever(service: MonitoringService, interval: float) ->
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     initialize_database()
-    service = build_monitoring_service(get_settings())
+    settings = get_settings()
+    service = build_monitoring_service(settings)
     app.state.monitoring_service = service
     sampler = asyncio.create_task(
-        sample_traffic_forever(service, get_settings().monitoring_sample_interval_seconds)
+        sample_traffic_forever(service, settings.monitoring_sample_interval_seconds)
     )
     guest_expiry = asyncio.create_task(expire_guest_sessions())
+    unifi = build_unifi_source(settings)
+    collector = None
+    if settings.monitoring_collector_enabled:
+        sources = [service.provider, *([unifi] if unifi else [])]
+        collector = asyncio.create_task(InventoryCollector(sources, SessionLocal, settings).run_forever())
     try:
         yield
     finally:
+        if collector:
+            collector.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await collector
+        if unifi:
+            await unifi.aclose()
         guest_expiry.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await guest_expiry
