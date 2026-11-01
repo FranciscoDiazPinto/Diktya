@@ -25,6 +25,7 @@ class NetbotModel(BaseModel):
 
 class IssueKind(StrEnum):
     CONFIGURATION = "configuration"
+    NOT_CONFIGURED = "not_configured"  # faltan credenciales: no es una caída
     AUTHENTICATION = "authentication"
     PERMISSION = "permission"
     NOT_SUPPORTED = "not_supported"

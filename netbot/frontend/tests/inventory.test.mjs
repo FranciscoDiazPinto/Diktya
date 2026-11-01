@@ -13,7 +13,7 @@ class Element {
 const text = (node) => [node.textContent, ...node.children.map(text)].join(' ');
 const summary = (extra = {}) => ({ access_points_total: 2, access_points_online: 1, access_points_offline: 1, vlans_active: 3, ssids_active: 2,
   availability_percent: 99.5, availability_window_hours: 24, active_alerts: 1, last_update_at: '2026-11-01T12:00:00Z', stale: false,
-  sources: [{ source: 'unifi', status: 'ok', version: '10.6.106', stale: false, last_error_message: null }], ...extra });
+  sources: [{ source: 'unifi', status: 'ok', version: '10.6.106', stale: false, last_success_at: '2026-11-01T12:00:00Z', last_error_message: null }], ...extra });
 const device = { id: 7, name: '<img src=x onerror=alert(1)>', device_type: 'ap', ip_address: '10.0.0.2', model: 'U7', state: 'offline', stale: false, last_online_at: null, alerts: [{ message: 'AP caído' }] };
 const responses = (path) => {
   if (path.includes('/summary')) return summary();
@@ -60,7 +60,7 @@ test('el texto externo no se interpreta como HTML y un SSID sin VLAN no inventa 
 });
 
 test('avisa cuando los datos están desactualizados y cuando se pierde la API', async () => {
-  const ui = setup(async (path) => (path.includes('/summary') ? summary({ stale: true, sources: [{ source: 'opnsense', status: 'unavailable', stale: true, last_error_message: 'Sin respuesta' }] }) : responses(path)));
+  const ui = setup(async (path) => (path.includes('/summary') ? summary({ stale: true, sources: [{ source: 'opnsense', status: 'unavailable', stale: true, last_success_at: '2026-11-01T11:00:00Z', last_error_message: 'Sin respuesta' }] }) : responses(path)));
   await ui.controller.configureUser({ permissions: ['monitoring:read'] });
   assert.equal(ui.$('#inventory-stale').hidden, false);
   assert.ok(ui.$('#inventory-stale').textContent.includes('OPNsense'));
@@ -113,4 +113,20 @@ test('una respuesta tardía de otra sesión se descarta', async () => {
   release();
   await pending;
   assert.equal(ui.$('#inventory-kpis').children.length, 0);
+});
+
+test('sin ninguna lectura muestra que no hay datos, no ceros ni "sin alertas"', async () => {
+  const empty = { items: [], total: 0, limit: 25, offset: 0 };
+  const ui = setup(async (path) => {
+    if (path.includes('/summary')) return summary({ access_points_total: 0, access_points_online: 0, access_points_offline: 0, vlans_active: 0, ssids_active: 0, availability_percent: null, active_alerts: 0, last_update_at: null, stale: true,
+      sources: [{ source: 'opnsense', status: 'unavailable', stale: true, last_success_at: null, last_error_message: 'Falta configurar: OPNSENSE_API_KEY' }] });
+    return path.endsWith('/plans') ? [] : empty;
+  });
+  await ui.controller.configureUser({ permissions: ['monitoring:read'] });
+  assert.equal(text(ui.$('#inventory-kpis')).includes('0'), false);
+  assert.equal(ui.$('#inventory-updated').textContent, 'Sin datos');
+  assert.ok(ui.$('#inventory-stale').textContent.includes('Sin datos de OPNsense'));
+  assert.ok(text(ui.$('#inventory-sources')).includes('Falta configurar'));
+  assert.equal(text(ui.$('#alerts-body')).includes('Sin alertas activas'), false);
+  assert.ok(text(ui.$('#devices-body')).includes('Sin datos de las fuentes'));
 });

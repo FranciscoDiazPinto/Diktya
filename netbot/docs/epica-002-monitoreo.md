@@ -14,7 +14,7 @@ router (FastAPI)  ->  MonitoringService  ->  NetworkMonitoringProvider (ABC)
 
 - `providers/opnsense/mappers.py` y `providers/unifi/mappers.py` son los **únicos** módulos que
   conocen el formato de cada fuente. El resto del sistema solo ve los modelos de `schemas.py`.
-- Cambiar entre real y simulado es solo configuración (`MONITORING_PROVIDER`, `UNIFI_ENABLED`).
+- Las fuentes reales son el valor por defecto. El simulador exige `MONITORING_PROVIDER=mock`.
 - OPNsense, UniFi y el simulador implementan la interfaz común `InfrastructureSource`.
 
 ### Inventario persistido
@@ -31,6 +31,17 @@ Es una tarea en memoria de una instancia, no una cola durable: ejecutar un solo 
   rota deja el SSID sin VLAN en vez de asignarle la red por defecto.
 - **Disponibilidad**: tiempo en línea sobre tiempo observado, por hora. Un silencio mayor a tres
   intervalos no suma: no es línea ni caída.
+
+### Cuando no hay información
+
+Nunca se recurre a datos inventados. Según el caso:
+
+| Situación | Comportamiento |
+|---|---|
+| Faltan credenciales | La API arranca, `/health` indica `not_configured` y qué variables faltan. Sin alerta: no hay conexión perdida. |
+| La fuente nunca respondió | Los recursos en vivo responden 503; el dashboard muestra «sin datos», no ceros. |
+| La fuente dejó de responder | Último dato conocido con `stale: true`, reintentos y alerta de conexión perdida. |
+| Falla una sección | Esa sección conserva sus datos; el resto se actualiza. |
 
 ### Alertas
 
@@ -138,4 +149,4 @@ desplegar, y registrar versiones y resultado. Tampoco se probó el transporte `c
 - Eventos con acción distinta de `block`/`pass` (p. ej. `rdr`) se omiten por no encajar en el modelo.
 - **Autenticación**: todos los endpoints exigen un token Bearer de un usuario con el permiso
   `monitoring:read` (roles admin, operador y visor). Sin token: 401; sin permiso: 403.
-- Mock: `MONITORING_MOCK_SCENARIO=degraded|outage` permite probar el dashboard ante fallos.
+- Mock: con `MONITORING_PROVIDER=mock`, `MONITORING_MOCK_SCENARIO=degraded|outage` permite probar el dashboard ante fallos.

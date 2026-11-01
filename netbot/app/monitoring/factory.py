@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from app.core.config import Settings
 
-from .providers.base import NetworkMonitoringProvider
+from .providers.base import InfrastructureSource, NetworkMonitoringProvider
 from .providers.mock import MockMonitoringProvider
 from .providers.opnsense import (
     DnsmasqLeaseProvider,
@@ -14,6 +14,7 @@ from .providers.opnsense import (
     OPNsenseClient,
     OPNsenseMonitoringProvider,
 )
+from .providers.unconfigured import UnconfiguredProvider
 from .providers.unifi import UnifiClient, UnifiMonitoringProvider, unifi_base_url
 from .service import MonitoringService
 
@@ -35,7 +36,9 @@ def build_monitoring_provider(settings: Settings) -> NetworkMonitoringProvider:
         )
         return MockMonitoringProvider(scenario=settings.monitoring_mock_scenario)
 
-    assert settings.opnsense_base_url and settings.opnsense_api_key and settings.opnsense_api_secret
+    if settings.opnsense_missing:
+        logger.warning("OPNsense sin configurar; faltan: %s", ", ".join(settings.opnsense_missing))
+        return UnconfiguredProvider("opnsense", settings.opnsense_missing)
     client = OPNsenseClient(
         settings.opnsense_base_url,
         settings.opnsense_api_key,
@@ -53,10 +56,12 @@ def build_monitoring_provider(settings: Settings) -> NetworkMonitoringProvider:
     return OPNsenseMonitoringProvider(client, dhcp, log_timezone=ZoneInfo(settings.opnsense_timezone))
 
 
-def build_unifi_source(settings: Settings) -> UnifiMonitoringProvider | None:
+def build_unifi_source(settings: Settings) -> InfrastructureSource | None:
     if not settings.unifi_enabled:
         return None
-    assert settings.unifi_api_key
+    if settings.unifi_missing:
+        logger.warning("UniFi sin configurar; faltan: %s", ", ".join(settings.unifi_missing))
+        return UnconfiguredProvider("unifi", settings.unifi_missing)
     client = UnifiClient(
         unifi_base_url(transport=settings.unifi_transport, base_url=settings.unifi_base_url,
                        console_id=settings.unifi_console_id),

@@ -116,19 +116,22 @@ export function createMonitoring({ document, window, sessionState, api, format, 
     const worst = statuses.includes('unavailable') ? 'unavailable' : statuses.includes('degraded') ? 'degraded' : 'ok';
     const source = metrics.data.system?.source || entries[0]?.[1].source;
     const sourceName = source === 'mock' ? 'Simulador' : source === 'opnsense' ? 'OPNsense' : 'Sin fuente';
+    const notConfigured = entries.some(([, r]) => r.issues.some((issue) => issue.kind === 'not_configured'));
 
     $('#source-name').textContent = sourceName;
-    $('#source-detail').textContent = worst === 'ok' ? `Operativo · ${clockTime(metrics.lastSync)}` : worst === 'degraded' ? 'Datos parciales' : 'Fuente con fallas';
+    $('#source-detail').textContent = worst === 'ok' ? `Operativo · ${clockTime(metrics.lastSync)}` : worst === 'degraded' ? 'Datos parciales' : notConfigured ? 'Sin configurar' : 'Fuente con fallas';
     $('#source-dot').className = `status-dot ${worst}`;
     $('#live-badge').className = `live-badge ${worst}`;
     $('#live-badge').innerHTML = `<i></i> ${worst === 'ok' ? 'En vivo' : worst === 'degraded' ? 'Parcial' : 'Sin datos'}`;
-    $('#footer-status').innerHTML = `${worst === 'ok' ? 'Todos los sistemas operativos' : worst === 'degraded' ? 'Algunos componentes con fallas' : 'Fuente de monitoreo no disponible'} <i class="status-dot ${worst}"></i>${source === 'mock' ? ' · datos simulados' : ''}`;
+    $('#footer-status').innerHTML = `${worst === 'ok' ? 'Todos los sistemas operativos' : worst === 'degraded' ? 'Algunos componentes con fallas' : notConfigured ? 'Fuente de monitoreo sin configurar' : 'Fuente de monitoreo no disponible'} <i class="status-dot ${worst}"></i>${source === 'mock' ? ' · datos simulados' : ''}`;
 
-    const problems = entries.flatMap(([key, r]) => r.issues.filter((issue) => !issue.optional).map((issue) => ({ key, ...issue })));
+    const seen = new Set(); // sin configurar, todos los recursos repiten el mismo mensaje
+    const problems = entries.flatMap(([key, r]) => r.issues.filter((issue) => !issue.optional).map((issue) => ({ key, ...issue })))
+      .filter((issue) => { if (seen.has(issue.message)) return false; seen.add(issue.message); return true; });
     const banner = $('#issues-banner');
     banner.classList.toggle('is-hidden', !problems.length);
     banner.className = `issues-banner ${problems.length ? '' : 'is-hidden'} ${statuses.includes('unavailable') ? 'critical' : ''}`;
-    banner.innerHTML = problems.length ? `<strong>Problemas al recolectar datos</strong><ul>${problems.map((p) => `<li><b>${escapeHtml(RESOURCE_LABELS[p.key] || p.key)}</b> · ${escapeHtml(p.component)}: ${escapeHtml(p.message)}</li>`).join('')}</ul>` : '';
+    banner.innerHTML = problems.length ? `<strong>Problemas al recolectar datos</strong><ul>${problems.map((p) => `<li>${p.kind === 'not_configured' ? escapeHtml(p.message) : `<b>${escapeHtml(RESOURCE_LABELS[p.key] || p.key)}</b> · ${escapeHtml(p.component)}: ${escapeHtml(p.message)}`}</li>`).join('')}</ul>` : '';
   }
 
   function renderFatal(message) {
@@ -159,7 +162,7 @@ export function createMonitoring({ document, window, sessionState, api, format, 
 
     if (interfaces.data) {
       const up = interfaces.data.filter((i) => i.status === 'up');
-      const down = interfaces.data.filter((i) => i.status !== 'up');
+      const down = interfaces.data.filter((i) => i.status === 'down');
       $('#stat-interfaces').innerHTML = `${up.length}<span> / ${interfaces.data.length}</span>`;
       setMeta('stat-interfaces-meta', down.length ? `<span>${down.length} caida${down.length > 1 ? 's' : ''}</span> ${escapeHtml(down.map((i) => i.description || i.name).join(', '))}` : '<span>Todas operativas</span>', down.length ? 'negative' : 'positive');
       $('#nav-interfaces').textContent = interfaces.data.length;
@@ -248,7 +251,8 @@ export function createMonitoring({ document, window, sessionState, api, format, 
   function renderSystem() {
     const system = metrics.data.system.data;
     if (!system) {
-      ['#sys-cpu', '#sys-mem', '#sys-temp', '#sys-uptime'].forEach((id) => { $(id).textContent = '–'; });
+      ['#sys-cpu', '#sys-mem', '#sys-temp', '#sys-uptime', '#sys-mem-detail', '#sys-temp-detail', '#sys-version'].forEach((id) => { $(id).textContent = '–'; });
+      ['sys-cpu-bar', 'sys-mem-bar', 'sys-temp-bar'].forEach((id) => setBar(id, 0));
       $('#sys-host').textContent = 'Sin datos del sistema';
       return;
     }

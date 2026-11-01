@@ -201,10 +201,13 @@ class InventoryCollector:
         state.last_error_message = (issue.message if issue else "La fuente no entregó datos.")[:255]
         delay = self.retry_delay(state.consecutive_failures)
         state.next_attempt_at = now + timedelta(seconds=delay)
-        logger.warning("Fuente %s no disponible (%s, intento %d); reintento en %.0f s", state.source,
-                       state.last_error_kind, state.consecutive_failures, delay)
+        unconfigured = state.last_error_kind == IssueKind.NOT_CONFIGURED.value
+        logger.log(logging.DEBUG if unconfigured else logging.WARNING,
+                   "Fuente %s no disponible (%s, intento %d); reintento en %.0f s", state.source,
+                   state.last_error_kind, state.consecutive_failures, delay)
         conditions = []
-        if state.consecutive_failures >= self._settings.monitoring_source_failure_threshold:
+        # Una integración sin credenciales nunca estuvo conectada: no hay conexión perdida.
+        if not unconfigured and state.consecutive_failures >= self._settings.monitoring_source_failure_threshold:
             conditions.append(AlertCondition(f"source:{state.source}:unavailable", "source", AlertSeverity.CRITICAL,
                                              f"Se perdió la conexión con {state.source}: {state.last_error_message}"))
         sync_alerts(db, source=state.source, categories={"source"}, conditions=conditions, now=now)

@@ -10,7 +10,8 @@ const SOURCE_LABELS = { opnsense: 'OPNsense', unifi: 'UniFi', mock: 'Simulador' 
 export function createInventory({ document, window, Option, state, api, textNode }) {
   const $ = (selector) => document.querySelector(selector);
   const MONITORING = '/api/v1/monitoring';
-  const local = { timer: null, offset: 0, canManage: false, plan: null, planUrl: null, selected: null, planToken: 0 };
+  const local = { timer: null, offset: 0, canManage: false, plan: null, planUrl: null, selected: null, planToken: 0, hasData: false };
+  const NO_DATA = 'Sin datos de las fuentes todavía.';
   const dateTime = (value) => (value ? new Date(value).toLocaleString('es-CL') : '–');
 
   const cell = (value, className) => textNode('td', value, className);
@@ -20,7 +21,7 @@ export function createInventory({ document, window, Option, state, api, textNode
 
   function reset() {
     stop();
-    local.offset = 0; local.canManage = false; local.plan = null; local.selected = null; local.planToken += 1;
+    local.offset = 0; local.canManage = false; local.plan = null; local.selected = null; local.planToken += 1; local.hasData = false;
     releaseImage();
     $('#plan-stage').hidden = true;
     $('#plan-markers').replaceChildren();
@@ -58,6 +59,7 @@ export function createInventory({ document, window, Option, state, api, textNode
       ]);
       if (session !== state.session) return;
       if (stateFilter !== $('#devices-state').value || typeFilter !== $('#devices-type').value) return;
+      local.hasData = summary.last_update_at != null;
       renderSummary(summary);
       renderDevices(devices);
       renderAlerts(alerts);
@@ -80,18 +82,23 @@ export function createInventory({ document, window, Option, state, api, textNode
       ['SSID activos', data.ssids_active],
       [`Disponibilidad ${data.availability_window_hours} h`, availability],
       ['Alertas activas', data.active_alerts],
-    ];
+    ].map(([label, value]) => [label, local.hasData ? value : '–']); // sin lecturas, cero sería falso
     $('#inventory-kpis').replaceChildren(...items.map(([label, value]) => {
       const box = document.createElement('div');
       box.append(textNode('small', label), textNode('strong', String(value)));
       return box;
     }));
-    $('#inventory-updated').textContent = dateTime(data.last_update_at);
+    $('#inventory-updated').textContent = data.last_update_at ? dateTime(data.last_update_at) : 'Sin datos';
     $('#nav-alerts').textContent = String(data.active_alerts);
-    const affected = data.sources.filter((source) => source.stale).map((source) => SOURCE_LABELS[source.source] || source.source);
+    const label = (source) => SOURCE_LABELS[source.source] || source.source;
+    const never = data.sources.filter((source) => !source.last_success_at).map(label);
+    const outdated = data.sources.filter((source) => source.stale && source.last_success_at).map(label);
     const banner = $('#inventory-stale');
-    banner.hidden = !affected.length;
-    banner.textContent = affected.length ? `Datos desactualizados de ${affected.join(', ')}: se muestran los últimos conocidos.` : '';
+    banner.hidden = !never.length && !outdated.length;
+    banner.textContent = [
+      never.length ? `Sin datos de ${never.join(', ')}.` : '',
+      outdated.length ? `Datos desactualizados de ${outdated.join(', ')}: se muestran los últimos conocidos.` : '',
+    ].filter(Boolean).join(' ');
     $('#inventory-sources').replaceChildren(...data.sources.map((source) => {
       const detail = source.status === 'ok' ? 'Operativa' : source.status === 'degraded' ? 'Parcial' : 'No disponible';
       const version = source.version ? ` ${source.version}` : '';
@@ -107,7 +114,7 @@ export function createInventory({ document, window, Option, state, api, textNode
       cell(device.ip_address || '–', 'mono'),
       pill(device.stale ? `${STATE_LABELS[device.state]} (desactualizado)` : STATE_LABELS[device.state], STATE_PILL[device.state]),
       cell(dateTime(device.last_online_at), 'mono'),
-    )) : [emptyRow(5, 'Sin dispositivos para este filtro.')]));
+    )) : [emptyRow(5, local.hasData ? 'Sin dispositivos para este filtro.' : NO_DATA)]));
     const last = Math.min(page.offset + page.items.length, page.total);
     $('#devices-page').textContent = page.total ? `${page.offset + 1}–${last} de ${page.total}` : '0 de 0';
     $('#devices-prev').disabled = page.offset === 0;
@@ -119,17 +126,17 @@ export function createInventory({ document, window, Option, state, api, textNode
       pill(alert.severity === 'critical' ? 'Crítica' : 'Advertencia', alert.severity === 'critical' ? 'block' : 'warn'),
       cell(alert.device_name || SOURCE_LABELS[alert.source] || alert.source), cell(alert.message),
       cell(dateTime(alert.detected_at), 'mono'),
-    )) : [emptyRow(4, 'Sin alertas activas.')]));
+    )) : [emptyRow(4, local.hasData ? 'Sin alertas activas.' : `${NO_DATA} No se puede evaluar la red.`)]));
   }
 
   function renderWireless(ssids, vlans) {
     $('#ssids-body').replaceChildren(...(ssids.items.length ? ssids.items.map((ssid) => row(
       cell(ssid.name), pill(ssid.enabled ? 'Activo' : 'Inactivo', ssid.enabled ? 'ok' : 'off'),
       cell(ssid.security || '–', 'mono'), cell(ssid.vlan_tag ?? 'Sin resolver', 'mono'),
-    )) : [emptyRow(4, 'Sin SSID registrados.')]));
+    )) : [emptyRow(4, local.hasData ? 'Sin SSID registrados.' : NO_DATA)]));
     $('#vlans-body').replaceChildren(...(vlans.items.length ? vlans.items.map((vlan) => row(
       cell(vlan.tag, 'mono'), cell(vlan.name || '–'), cell(SOURCE_LABELS[vlan.source] || vlan.source),
-    )) : [emptyRow(3, 'Sin VLAN registradas.')]));
+    )) : [emptyRow(3, local.hasData ? 'Sin VLAN registradas.' : NO_DATA)]));
   }
 
   // ------------------------------------------------------------------ //
@@ -193,7 +200,7 @@ export function createInventory({ document, window, Option, state, api, textNode
       button.type = 'button';
       button.addEventListener('click', () => selectDevice(ap.device_id));
       return button;
-    }) : [textNode('p', 'Todos los AP están ubicados.', 'empty-state')]));
+    }) : [textNode('p', placed.length ? 'Todos los AP están ubicados.' : 'Sin AP en el inventario.', 'empty-state')]));
   }
 
   async function selectDevice(id) {

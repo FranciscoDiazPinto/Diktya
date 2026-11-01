@@ -190,6 +190,17 @@ async def test_availability_counts_only_observed_time(lab):
     assert inventory.summary(lab.db, lab.settings).availability_percent == 50.0
 
 
+async def test_unconfigured_source_never_raises_a_lost_connection_alert(lab):
+    missing = CollectionResult(None, [CollectionIssue(component="mock", kind=IssueKind.NOT_CONFIGURED,
+                                                      message="Falta configurar: X")])
+    await lab.cycle(missing)
+    await lab.cycle(missing, advance=60)
+    await lab.cycle(missing, advance=120)
+    assert lab.alerts() == []
+    health = inventory.source_health(lab.db, lab.settings)[0]
+    assert health.status == MonitoringStatus.UNAVAILABLE and health.last_error_kind == "not_configured"
+
+
 def test_source_never_collected_is_reported(lab):
     health = inventory.source_health(lab.db, lab.settings)
     assert health[0].status == MonitoringStatus.UNAVAILABLE and health[0].stale is True

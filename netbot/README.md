@@ -60,13 +60,14 @@ La recuperación por contacto requiere la migración `006_network_recipients`. E
 
 Crear una migración con `alembic revision --autogenerate -m "descripcion"`, revisarla y aplicarla con `alembic upgrade head` antes del arranque. Producción comprueba las revisiones de Alembic y no crea tablas automáticamente. Solo development/test conservan create_all como ayuda local. Bases heredadas con tablas creadas fuera de Alembic necesitan conciliar su estado antes de migrar.
 
-## Monitoreo sin hardware
+## Monitoreo
 
-Por defecto `MONITORING_PROVIDER=mock`: la API sirve datos simulados y coherentes en
-`/api/v1/monitoring`. Para usar OPNsense real, definir `MONITORING_PROVIDER=opnsense` y las
-variables `OPNSENSE_*` en `.env`. Para sumar UniFi, `UNIFI_ENABLED=true`, `UNIFI_BASE_URL` y
-`UNIFI_API_KEY`. Ver [la guía de la épica](docs/epica-002-monitoreo.md). La migración
-`007_monitoring_inventory` crea las tablas de inventario, alertas y planos.
+Por defecto consulta las fuentes reales: definir las variables `OPNSENSE_*` y `UNIFI_*` en `.env`.
+Sin credenciales la API arranca igual: la fuente figura como no configurada y el dashboard indica
+qué falta, sin inventar datos. Si una fuente cae, se conserva el último dato conocido marcado como
+desactualizado. `MONITORING_PROVIDER=mock` activa datos simulados solo si se pide de forma
+explícita, y se rotulan como tales. Ver [la guía de la épica](docs/epica-002-monitoreo.md). La
+migración `007_monitoring_inventory` crea las tablas de inventario, alertas y planos.
 
 ## Chatbot
 

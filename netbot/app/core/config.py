@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,null"
 
     # --- Monitoreo (Épica 002) ---
-    # "mock" es el valor por defecto: el entorno local no tiene hardware de red.
-    monitoring_provider: Literal["mock", "opnsense"] = "mock"
+    # Fuente real por defecto. "mock" solo se usa si se pide de forma explícita.
+    monitoring_provider: Literal["mock", "opnsense"] = "opnsense"
     monitoring_cache_ttl_seconds: float = Field(5.0, ge=0)
     monitoring_mock_scenario: Literal["healthy", "degraded", "outage"] = "healthy"
     firewall_log_fetch_limit: int = Field(500, ge=1, le=5000)
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     opnsense_timezone: str = "UTC"
 
     # --- UniFi Network (API oficial, solo lectura) ---
-    unifi_enabled: bool = False
+    unifi_enabled: bool = True
     unifi_transport: Literal["direct", "connector"] = "direct"
     unifi_base_url: Optional[str] = None  # direct: https://<consola>
     unifi_console_id: Optional[str] = None  # connector: ID en Site Manager
@@ -131,36 +131,27 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _require_unifi_credentials(self) -> "Settings":
-        if not self.unifi_enabled:
-            return self
-        target = ("UNIFI_CONSOLE_ID", self.unifi_console_id) if self.unifi_transport == "connector" \
-            else ("UNIFI_BASE_URL", self.unifi_base_url)
-        missing = [name for name, value in (target, ("UNIFI_API_KEY", self.unifi_api_key)) if value is None]
-        if missing:
-            raise ValueError("UNIFI_ENABLED=true requiere definir: " + ", ".join(missing))
-        if self.unifi_transport == "direct" and not self.unifi_base_url.lower().startswith(("http://", "https://")):  # type: ignore[union-attr]
-            raise ValueError("UNIFI_BASE_URL debe empezar con http:// o https://")
+    def _check_integration_urls(self) -> "Settings":
+        """Sin credenciales la API arranca e informa la fuente como no configurada; una URL
+        mal escrita, en cambio, es un error que conviene detener al inicio."""
+        for name, url in (("OPNSENSE_BASE_URL", self.opnsense_base_url), ("UNIFI_BASE_URL", self.unifi_base_url)):
+            if url is not None and not url.lower().startswith(("http://", "https://")):
+                raise ValueError(f"{name} debe empezar con http:// o https://")
         return self
 
-    @model_validator(mode="after")
-    def _require_opnsense_credentials(self) -> "Settings":
-        if self.monitoring_provider != "opnsense":
-            return self
-        missing = [
-            name
-            for name, value in (
-                ("OPNSENSE_BASE_URL", self.opnsense_base_url),
-                ("OPNSENSE_API_KEY", self.opnsense_api_key),
-                ("OPNSENSE_API_SECRET", self.opnsense_api_secret),
-            )
-            if value is None
-        ]
-        if missing:
-            raise ValueError("MONITORING_PROVIDER=opnsense requiere definir: " + ", ".join(missing))
-        if not self.opnsense_base_url.lower().startswith(("http://", "https://")):  # type: ignore[union-attr]
-            raise ValueError("OPNSENSE_BASE_URL debe empezar con http:// o https://")
-        return self
+    @property
+    def opnsense_missing(self) -> list[str]:
+        return [name for name, value in (
+            ("OPNSENSE_BASE_URL", self.opnsense_base_url),
+            ("OPNSENSE_API_KEY", self.opnsense_api_key),
+            ("OPNSENSE_API_SECRET", self.opnsense_api_secret),
+        ) if value is None]
+
+    @property
+    def unifi_missing(self) -> list[str]:
+        target = ("UNIFI_CONSOLE_ID", self.unifi_console_id) if self.unifi_transport == "connector" \
+            else ("UNIFI_BASE_URL", self.unifi_base_url)
+        return [name for name, value in (target, ("UNIFI_API_KEY", self.unifi_api_key)) if value is None]
 
 
 @lru_cache
