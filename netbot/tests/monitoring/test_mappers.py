@@ -158,8 +158,8 @@ def test_firewall_events_normalized_sorted_and_filtered():
 
 
 def test_firewall_statistics():
-    stats = m.parse_firewall_statistics(fx.FIREWALL_STATS, fx.PF_INFO)
-    assert stats.pf_enabled is True
+    stats = m.parse_firewall_statistics(fx.PF_INTERFACES, fx.PF_INFO)
+    assert stats.pf_enabled is None  # OPNsense no publica `Status`: no se supone
     assert stats.states.current_entries == 1523
     assert stats.counters["match"] == 50000
     assert stats.packets_passed == 1000 + 900 + 500 + 450
@@ -193,3 +193,11 @@ def test_vlan_inventory_normalizes_search_rows():
 def test_vlan_inventory_rejects_malformed_rows(payload):
     with pytest.raises(ValueError):
         m.parse_vlan_inventory(payload)
+
+
+def test_firewall_log_local_time_uses_the_configured_zone():
+    from datetime import timedelta, timezone
+
+    raw = {"__timestamp__": "2026-10-04T12:00:05", "action": "block", "src": "1.2.3.4", "dst": "5.6.7.8"}
+    event = m.parse_firewall_event(raw, timezone(timedelta(hours=-3)))
+    assert event.timestamp.utcoffset() == timedelta(hours=-3)

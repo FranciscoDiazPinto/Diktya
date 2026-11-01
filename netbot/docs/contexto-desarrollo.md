@@ -216,7 +216,7 @@ Confirmación adicional del usuario el 29 de octubre de 2026: se utilizará la A
 | Área | Implementado en Netbot | Trabajo siguiente |
 |---|---|---|
 | Identidad y ámbitos | Roles, usuario activo, asignaciones por red y chat privado con historial del servidor. | Ámbito explícito sitio/evento/AP/VLAN para crear nuevas redes y reautorizar trabajos pendientes. |
-| UniFi | Sin adaptador operativo. | Contrato Python propio de inventario y aprovisionamiento, implementación de laboratorio y matriz de capacidades por versión. |
+| UniFi | Adaptador propio de solo lectura para inventario y alertas; sin validar contra equipos reales. | Contrato de aprovisionamiento, implementación de laboratorio y matriz de capacidades por versión. |
 | OPNsense | Monitoreo e inventario VLAN con proveedor mock/real, errores tipados y datos parciales. | Correspondencia autorizada con Networks UniFi existentes; no crear VLAN ni reemplazar el cliente por el stub de referencia. |
 | CSV | Validación, vistas previas privadas, confirmación y reservas locales, migración 005. | Preparar despliegues sobre filas/reservas elegidas, con seguridad/AP explícitos y resultados por operación. |
 | Plan individual | Diseño en `contexto-desarrollo.md#ssid`. | Propuesta tipada, baseline completo, versión, vencimiento y confirmación vinculada al actor. |

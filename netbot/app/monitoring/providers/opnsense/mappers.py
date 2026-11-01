@@ -9,9 +9,8 @@ no tumbe la recolección.
 import ipaddress
 import logging
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from typing import Any
 
 from ...schemas import (
@@ -521,7 +520,7 @@ _BLOCK_ACTIONS = {"block", "drop", "reject"}
 _PROTO_NUMBERS = {"1": "icmp", "6": "tcp", "17": "udp", "58": "ipv6-icmp"}
 
 
-def _parse_event_time(raw: dict[str, Any]) -> datetime | None:
+def _parse_event_time(raw: dict[str, Any], default_tz: tzinfo) -> datetime | None:
     value = raw.get("__timestamp__") or raw.get("timestamp")
     if isinstance(value, (int, float)):
         return datetime.fromtimestamp(value, tz=timezone.utc)
@@ -530,11 +529,12 @@ def _parse_event_time(raw: dict[str, Any]) -> datetime | None:
             parsed = datetime.fromisoformat(value.strip())
         except ValueError:
             return None
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        # read_log.py recorta el desfase positivo: la hora llega local y sin zona.
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=default_tz)
     return None
 
 
-def parse_firewall_event(raw: dict[str, Any]) -> FirewallEvent | None:
+def parse_firewall_event(raw: dict[str, Any], default_tz: tzinfo = timezone.utc) -> FirewallEvent | None:
     action_text = str(raw.get("action", "")).strip().lower()
     if action_text in _BLOCK_ACTIONS:
         action = FirewallAction.BLOCK
@@ -542,7 +542,7 @@ def parse_firewall_event(raw: dict[str, Any]) -> FirewallEvent | None:
         action = FirewallAction.PASS
     else:
         return None  # rdr/nat/match: fuera del modelo block|pass
-    timestamp = _parse_event_time(raw)
+    timestamp = _parse_event_time(raw, default_tz)
     source = _valid_ip(raw.get("src"))
     destination = _valid_ip(raw.get("dst"))
     if timestamp is None or source is None or destination is None:
@@ -567,12 +567,14 @@ def parse_firewall_event(raw: dict[str, Any]) -> FirewallEvent | None:
         return None
 
 
-def parse_firewall_events(payload: Any, limit: int) -> list[FirewallEvent]:
+def parse_firewall_events(
+    payload: Any, limit: int, *, default_tz: tzinfo | None = None
+) -> list[FirewallEvent]:
     """/api/diagnostics/firewall/log -> eventos más recientes primero, máximo `limit`."""
     events: list[FirewallEvent] = []
     skipped = 0
     for raw in extract_rows(payload):
-        event = parse_firewall_event(raw)
+        event = parse_firewall_event(raw, default_tz or timezone.utc)
         if event is None:
             skipped += 1
         else:
@@ -585,25 +587,31 @@ def parse_firewall_events(payload: Any, limit: int) -> list[FirewallEvent]:
     return events[:limit]
 
 
-def _sum_numeric_leaves(node: Any, wanted: Iterable[str], path: str = "") -> int | None:
-    """Suma hojas numéricas cuya ruta contiene todos los fragmentos de `wanted`."""
-    wanted = tuple(wanted)
+def _sum_pf_interface_packets(payload: Any, action: str) -> int | None:
+    """Suma paquetes `action` de /pf_statistics/interfaces (`pfctl -vvsI`).
+
+    pfctl lista también grupos ("all", "enc", ...) que agregan a sus miembros: solo se
+    cuentan dispositivos, cuyo nombre termina en un número (igc0, igc1_vlan20).
+    """
+    if not isinstance(payload, dict):
+        return None
+    rows = payload.get("interfaces", payload)
+    if not isinstance(rows, dict):
+        return None
     total: int | None = None
-    if isinstance(node, dict):
-        for key, child in node.items():
-            sub = _sum_numeric_leaves(child, wanted, f"{path}/{key}".lower())
-            if sub is not None:
-                total = (total or 0) + sub
-    elif isinstance(node, list):
-        for child in node:
-            sub = _sum_numeric_leaves(child, wanted, path)
-            if sub is not None:
-                total = (total or 0) + sub
-    else:
-        number = to_counter(node)
-        if number is not None and all(w in path for w in wanted):
-            return number
+    for name, row in rows.items():
+        if not isinstance(row, dict) or not str(name)[-1:].isdigit():
+            continue
+        for key, value in row.items():
+            number = to_counter(value)
+            if number is not None and key.endswith(f"_{action}_packets"):
+                total = (total or 0) + number
     return total
+
+
+def _pf_total(entry: Any) -> int | None:
+    """pfstatistics.py publica cada contador como {"total": N, "rate": R}."""
+    return to_counter(entry.get("total") if isinstance(entry, dict) else entry)
 
 
 def parse_pf_info(payload: Any) -> tuple[bool | None, StateTableStats | None, dict[str, int]]:
@@ -626,7 +634,7 @@ def parse_pf_info(payload: Any) -> tuple[bool | None, StateTableStats | None, di
     raw_counters = info.get("counters")
     if isinstance(raw_counters, dict):
         for key, value in raw_counters.items():
-            number = to_counter(value)
+            number = _pf_total(value)
             if number is not None:
                 counters[str(key)] = number
     return enabled, states, counters
@@ -634,20 +642,20 @@ def parse_pf_info(payload: Any) -> tuple[bool | None, StateTableStats | None, di
 
 def _state_table(table: dict[str, Any]) -> StateTableStats | None:
     stats = StateTableStats(
-        current_entries=to_counter(table.get("current entries")),
-        searches=to_counter(table.get("searches")),
-        inserts=to_counter(table.get("inserts")),
-        removals=to_counter(table.get("removals")),
+        current_entries=_pf_total(table.get("current-entries")),
+        searches=_pf_total(table.get("searches")),
+        inserts=_pf_total(table.get("inserts")),
+        removals=_pf_total(table.get("removals")),
     )
     return stats if any(v is not None for v in stats.model_dump().values()) else None
 
 
-def parse_firewall_statistics(stats_payload: Any, pf_payload: Any) -> FirewallStatistics:
+def parse_firewall_statistics(interfaces_payload: Any, pf_payload: Any) -> FirewallStatistics:
     enabled, states, counters = parse_pf_info(pf_payload)
     return FirewallStatistics(
         pf_enabled=enabled,
         states=states,
         counters=counters,
-        packets_passed=_sum_numeric_leaves(stats_payload, ("pass", "packets")),
-        packets_blocked=_sum_numeric_leaves(stats_payload, ("block", "packets")),
+        packets_passed=_sum_pf_interface_packets(interfaces_payload, "pass"),
+        packets_blocked=_sum_pf_interface_packets(interfaces_payload, "block"),
     )

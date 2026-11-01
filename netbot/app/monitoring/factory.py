@@ -1,7 +1,8 @@
-"""Construcción del proveedor de monitoreo según la configuración (mock u OPNsense)."""
+"""Construcción de proveedores según la configuración."""
 
 import logging
 import ssl
+from zoneinfo import ZoneInfo
 
 from app.core.config import Settings
 
@@ -13,21 +14,18 @@ from .providers.opnsense import (
     OPNsenseClient,
     OPNsenseMonitoringProvider,
 )
+from .providers.unifi import UnifiClient, UnifiMonitoringProvider, unifi_base_url
 from .service import MonitoringService
 
 logger = logging.getLogger("netbot.monitoring.factory")
 
 
-def _tls_verify(settings: Settings) -> bool | ssl.SSLContext:
-    if not settings.opnsense_verify_tls:
-        logger.warning(
-            "OPNSENSE_VERIFY_TLS=false: no se verifica el certificado de OPNsense. "
-            "Use OPNSENSE_CA_BUNDLE con el certificado propio en lugar de desactivarlo."
-        )
+def _tls_verify(name: str, verify: bool, ca_bundle: str | None) -> bool | ssl.SSLContext:
+    if not verify:
+        logger.warning("%s_VERIFY_TLS=false: no se verifica el certificado. "
+                       "Use %s_CA_BUNDLE con el certificado propio en lugar de desactivarlo.", name, name)
         return False
-    if settings.opnsense_ca_bundle:
-        return ssl.create_default_context(cafile=settings.opnsense_ca_bundle)
-    return True
+    return ssl.create_default_context(cafile=ca_bundle) if ca_bundle else True
 
 
 def build_monitoring_provider(settings: Settings) -> NetworkMonitoringProvider:
@@ -42,7 +40,7 @@ def build_monitoring_provider(settings: Settings) -> NetworkMonitoringProvider:
         settings.opnsense_base_url,
         settings.opnsense_api_key,
         settings.opnsense_api_secret,
-        verify=_tls_verify(settings),
+        verify=_tls_verify("OPNSENSE", settings.opnsense_verify_tls, settings.opnsense_ca_bundle),
         timeout=settings.opnsense_timeout_seconds,
         connect_timeout=settings.opnsense_connect_timeout_seconds,
     )
@@ -52,7 +50,23 @@ def build_monitoring_provider(settings: Settings) -> NetworkMonitoringProvider:
         else DnsmasqLeaseProvider(client)
     )
     logger.info("Monitoreo con proveedor OPNsense (DHCP: %s)", settings.opnsense_dhcp_backend)
-    return OPNsenseMonitoringProvider(client, dhcp)
+    return OPNsenseMonitoringProvider(client, dhcp, log_timezone=ZoneInfo(settings.opnsense_timezone))
+
+
+def build_unifi_source(settings: Settings) -> UnifiMonitoringProvider | None:
+    if not settings.unifi_enabled:
+        return None
+    assert settings.unifi_api_key
+    client = UnifiClient(
+        unifi_base_url(transport=settings.unifi_transport, base_url=settings.unifi_base_url,
+                       console_id=settings.unifi_console_id),
+        settings.unifi_api_key,
+        verify=_tls_verify("UNIFI", settings.unifi_verify_tls, settings.unifi_ca_bundle),
+        timeout=settings.unifi_timeout_seconds,
+        connect_timeout=settings.unifi_connect_timeout_seconds,
+    )
+    logger.info("Inventario UniFi habilitado (transporte: %s)", settings.unifi_transport)
+    return UnifiMonitoringProvider(client, site=settings.unifi_site)
 
 
 def build_monitoring_service(settings: Settings) -> MonitoringService:

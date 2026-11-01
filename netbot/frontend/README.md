@@ -49,6 +49,11 @@ Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
 vence, lo renueva con `/auth/refresh`. Las fallas parciales (`degraded`/`unavailable`)
 se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.
 
+El módulo `inventory.mjs` consulta cada 15 s el resumen, los dispositivos con filtros por estado y
+tipo, las alertas y los SSID/VLAN, y avisa si los datos están desactualizados o si se perdió la API.
+También muestra los planos: cada AP con color según su estado y los demás como «sin ubicar».
+Cargar planos y ubicar APs solo aparece con `networks:manage`.
+
 ## Soporte al cliente
 
 El panel Mi acceso y mi red permite comprobar una red autorizada y revelar su acceso Wi-Fi fuera del chat durante un minuto. El chat puede ofrecer ese botón y propuestas de ticket con confirmación explícita. Los tickets persisten en el backend; técnicos asignados y administradores pueden actualizar su estado con notas visibles para el cliente.
@@ -57,7 +62,7 @@ Los datos mock se rotulan como demostración; interfaz activa no significa Wi-Fi
 
 ## Organización del código
 
-El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
+El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, inventory, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
 
 Cada controlador mantiene estado privado; identidad y época de sesión son el único estado compartido. No añadir lógica de funcionalidad a app.js/dashboard ni importar el compositor desde otro módulo. Usar el cliente API común y preservar los controles que descartan respuestas tardías de otra cuenta/selección.
 

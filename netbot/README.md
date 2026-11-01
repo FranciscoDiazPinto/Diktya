@@ -44,7 +44,7 @@ Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-mod
 
 - `app/core`: configuración, seguridad, base de datos y logging.
 - `app/auth`: usuarios, roles y permisos (Épica 001).
-- `app/monitoring`: proveedores OPNsense/mock y dashboard (Épica 002). Ver `docs/epica-002-monitoreo.md`.
+- `app/monitoring`: proveedores OPNsense/UniFi/mock, inventario, alertas y planos (Épica 002). Ver `docs/epica-002-monitoreo.md`.
 - `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
 - `app/networks`: registro local y asignación de acceso por red.
 - `app/changes`: reservas VLAN locales confirmadas; ejecución real y rollback pendientes.
@@ -63,14 +63,16 @@ Crear una migración con `alembic revision --autogenerate -m "descripcion"`, rev
 ## Monitoreo sin hardware
 
 Por defecto `MONITORING_PROVIDER=mock`: la API sirve datos simulados y coherentes en
-`/api/v1/monitoring/{system,interfaces,clients,firewall/stats,firewall/events}`. Para usar
-OPNsense real, definir `MONITORING_PROVIDER=opnsense` y las variables `OPNSENSE_*` en `.env`.
+`/api/v1/monitoring`. Para usar OPNsense real, definir `MONITORING_PROVIDER=opnsense` y las
+variables `OPNSENSE_*` en `.env`. Para sumar UniFi, `UNIFI_ENABLED=true`, `UNIFI_BASE_URL` y
+`UNIFI_API_KEY`. Ver [la guía de la épica](docs/epica-002-monitoreo.md). La migración
+`007_monitoring_inventory` crea las tablas de inventario, alertas y planos.
 
 ## Chatbot
 
 El endpoint `POST /api/v1/chat/messages` requiere autenticación y `chat:use`. El servidor carga el historial persistente de la conversación y comprueba propietario, rol y ámbito antes de enviar contexto al proveedor. No acepta historial desde el navegador. Las herramientas se filtran por permisos y vuelven a autorizarlos antes de ejecutarse.
 
-Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Las operaciones UniFi siguen pendientes. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
+Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Las operaciones de escritura en UniFi siguen pendientes. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
 
 Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en OpenRouter para generar respuestas.
 
