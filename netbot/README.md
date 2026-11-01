@@ -48,7 +48,7 @@ Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-mod
 - `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
 - `app/networks`: registro local y asignación de acceso por red.
 - `app/changes`: reservas VLAN locales confirmadas; ejecución real y rollback pendientes.
-- `app/tickets`: tickets internos y seguimiento; notificaciones externas pendientes.
+- `app/tickets`: tickets internos y de incidentes, criticidad, notificaciones y seguimiento (Épica 005). Ver `docs/soporte-cliente.md`.
 - `app/agents`: espacio reservado; workers durables pendientes.
 - `migrations`: historial de migraciones de Alembic.
 - `docs`: ERS, diagramas PlantUML y decisiones de arquitectura.

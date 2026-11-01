@@ -47,3 +47,7 @@ def authorized_network_data(db: Session, user: User) -> list[NetworkRead | Netwo
 
 def assert_network_access(db: Session, user: User, network_id: int) -> None:
     require_network(db, user, network_id)
+
+
+def assigned_user_ids(db: Session, network_id: int) -> set[int]:
+    return set(db.scalars(select(NetworkAssignment.user_id).where(NetworkAssignment.network_id == network_id)))

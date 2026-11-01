@@ -108,3 +108,14 @@ def create_role(data: RoleCreate, db: Session, actor: User) -> RoleRead:
 def user_exists(db: Session, user_id: int) -> bool:
     """Consulta interna mínima para casos de uso ya autorizados, sin exponer ORM."""
     return db.get(User, user_id) is not None
+
+
+def active_staff(db: Session) -> list[dict]:
+    """Contactos del equipo técnico: contrato para notificar sin exponer el modelo User."""
+    users = db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all()
+    staff = []
+    for user in users:
+        roles = {role.name for role in user.roles}
+        if roles & {"admin", "tecnico", "operador"}:
+            staff.append({"id": user.id, "email": user.email, "admin": "admin" in roles})
+    return staff

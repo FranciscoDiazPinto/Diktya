@@ -54,6 +54,10 @@ tipo, las alertas y los SSID/VLAN, y avisa si los datos están desactualizados o
 También muestra los planos: cada AP con color según su estado y los demás como «sin ubicar».
 Cargar planos y ubicar APs solo aparece con `networks:manage`.
 
+## Tickets y notificaciones
+
+El panel de tickets filtra por estado, criticidad y responsable. Quien gestiona tickets puede asignárselos, comentar, ajustar la criticidad y crear tickets técnicos; `visor` solo consulta los de infraestructura. `notifications.mjs` muestra la bandeja del equipo técnico cada 20 s y destaca Alta y Crítica.
+
 ## Soporte al cliente
 
 El panel Mi acceso y mi red permite comprobar una red autorizada y revelar su acceso Wi-Fi fuera del chat durante un minuto. El chat puede ofrecer ese botón y propuestas de ticket con confirmación explícita. Los tickets persisten en el backend; técnicos asignados y administradores pueden actualizar su estado con notas visibles para el cliente.
@@ -62,7 +66,7 @@ Los datos mock se rotulan como demostración; interfaz activa no significa Wi-Fi
 
 ## Organización del código
 
-El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, inventory, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
+El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, inventory, notifications, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
 
 Cada controlador mantiene estado privado; identidad y época de sesión son el único estado compartido. No añadir lógica de funcionalidad a app.js/dashboard ni importar el compositor desde otro módulo. Usar el cliente API común y preservar los controles que descartan respuestas tardías de otra cuenta/selección.
 

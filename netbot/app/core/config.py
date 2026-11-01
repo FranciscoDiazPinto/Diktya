@@ -66,6 +66,27 @@ class Settings(BaseSettings):
     monitoring_site_id: str | None = None
     network_status_max_age_seconds: float = Field(60.0, gt=0)
 
+    # --- Tickets y notificaciones (Épica 005) ---
+    ticket_agent_enabled: bool = True
+    ticket_agent_interval_seconds: float = Field(15.0, ge=1)
+    # JSON {"tipo_de_incidente": "baja|media|alta|critica"} que sustituye reglas por defecto.
+    ticket_criticality_rules_json: Optional[str] = None
+    # Dispositivos afectados a la vez desde los que se sube un nivel de criticidad.
+    ticket_mass_incident_devices: int = Field(3, ge=2)
+    # JSON {"critica": 15, ...}: minutos máximos sin atención por criticidad.
+    ticket_attention_minutes_json: Optional[str] = None
+    notification_email_max_attempts: int = Field(5, ge=1, le=20)
+    notification_email_retry_seconds: float = Field(60.0, ge=1)
+    public_app_url: str = "http://localhost:5173"
+    # Correo: sin SMTP_HOST solo se notifica dentro de la aplicación.
+    smtp_host: Optional[str] = None
+    smtp_port: int = Field(587, ge=1, le=65535)
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[SecretStr] = None
+    smtp_from: Optional[str] = None
+    smtp_starttls: bool = True
+    smtp_timeout_seconds: float = Field(10.0, gt=0)
+
     csv_max_bytes: int = Field(1_048_576, ge=1024, le=10_485_760)
     csv_max_rows: int = Field(500, ge=1, le=1000)
     csv_preview_ttl_seconds: int = Field(900, ge=30, le=86400)
@@ -108,6 +129,12 @@ class Settings(BaseSettings):
         "unifi_api_key",
         "unifi_site",
         "unifi_ca_bundle",
+        "ticket_criticality_rules_json",
+        "ticket_attention_minutes_json",
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
+        "smtp_from",
         "openrouter_api_key",
         "openrouter_model",
         "wifi_access_credentials_json",
