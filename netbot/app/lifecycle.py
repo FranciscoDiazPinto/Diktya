@@ -11,6 +11,8 @@ from app.core.database import SessionLocal
 from app.chat.guest import expire_guest_sessions, sessions
 from app.monitoring.factory import build_monitoring_service, build_unifi_source
 from app.monitoring.inventory import InventoryCollector
+from app.tickets.agent import TicketAgent
+from app.tickets.notifications import build_mailer
 from app.monitoring.service import MonitoringService
 
 logger = logging.getLogger("netbot")
@@ -39,9 +41,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.monitoring_collector_enabled:
         sources = [service.provider, *([unifi] if unifi else [])]
         collector = asyncio.create_task(InventoryCollector(sources, SessionLocal, settings).run_forever())
+    ticket_agent = None
+    if settings.ticket_agent_enabled:
+        ticket_agent = asyncio.create_task(TicketAgent(SessionLocal, settings, build_mailer(settings)).run_forever())
     try:
         yield
     finally:
+        if ticket_agent:
+            ticket_agent.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await ticket_agent
         if collector:
             collector.cancel()
             with contextlib.suppress(asyncio.CancelledError):

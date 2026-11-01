@@ -10,6 +10,7 @@ import { createInventory } from './inventory.mjs';
 import { createReservations } from './reservations.mjs';
 import { createSupport } from './support.mjs';
 import { createTickets } from './tickets.mjs';
+import { createNotifications } from './notifications.mjs';
 import { createCsvImports } from './csv-imports.mjs';
 
 export function createDashboard({document, window, localStorage, fetch, Option, crypto, FormData}) {
@@ -34,7 +35,8 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
   const monitoring = createMonitoring({document, window, sessionState: state, api, format, ...dom,
     signOut: (message) => session.signOut(message)});
   const inventory = createInventory({document, window, Option, state, api, ...dom});
-  const features = [monitoring, inventory, reservations, support, tickets, chat, csvImports, wifiRecipients];
+  const notifications = createNotifications({document, window, state, api, ...dom});
+  const features = [monitoring, inventory, notifications, reservations, support, tickets, chat, csvImports, wifiRecipients];
   session = createSession({document, state, api, FormData, ...dom,
     onAuthenticated(user) { guest.stop(); for (const feature of features) feature.reset(); for (const feature of features) feature.configureUser(user); },
     onSignedOut() { for (const feature of features) feature.reset(); guest.start(); }});
@@ -43,6 +45,6 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
     document.querySelector('.nav-item.active')?.classList.remove('active'); item.classList.add('active'); sidebar.classList.remove('open');
   }));
   document.querySelector('.mobile-menu').addEventListener('click', () => sidebar.classList.toggle('open'));
-  return {guest, wifiRecipients, session, api, chat, support, tickets, reservations, monitoring, inventory, csvImports,
+  return {guest, wifiRecipients, session, api, chat, support, tickets, reservations, monitoring, inventory, notifications, csvImports,
     start() { guest.start(); return session.validateSession(); }};
 }

@@ -153,3 +153,9 @@ button { cursor: pointer; }
 .plan-side button.selected { outline: 2px solid var(--navy); }
 .plan-side #plan-unplaced { margin-bottom: 16px; }
 @media (max-width: 900px) { .inventory-kpis { grid-template-columns: repeat(2, 1fr); }.plan-layout { grid-template-columns: 1fr; } }
+
+/* Tickets y notificaciones */
+.reservation-card.is-urgent { border-left: 4px solid #d3503c; }
+.notification-item.is-unread { background: #f8ecd4; }
+.notification-item button { justify-self: start; }
+.ticket-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

@@ -99,13 +99,18 @@
         <header class="topbar">
           <button class="mobile-menu" aria-label="Abrir navegacion">☰</button>
           <div class="breadcrumbs"><span>Workspace</span><i>/</i><strong>Resumen</strong></div>
-          <div class="topbar-actions"><span class="last-sync">Ultima sincronizacion <strong id="last-sync">–</strong></span><button class="refresh-button" id="refresh-button"><span>↻</span> Actualizar</button></div>
+          <div class="topbar-actions"><span class="last-sync">Ultima sincronizacion <strong id="last-sync">–</strong></span><button class="refresh-button" id="notifications-button" type="button" hidden aria-expanded="false" aria-controls="notifications-panel">Notificaciones <b class="alert-count" id="notifications-count">0</b></button><button class="refresh-button" id="refresh-button"><span>↻</span> Actualizar</button></div>
         </header>
 
         <div class="content-wrap">
           <section class="page-heading">
             <div><p class="eyebrow" id="today-label"></p><h1 id="greeting">Hola <span>↗</span></h1><p class="heading-copy">Este es el estado de tu infraestructura en este momento.</p></div>
             <div class="period-picker" aria-label="Ventana del grafico"><button class="period active" data-window="300">5 min</button><button class="period" data-window="900">15 min</button><button class="period" data-window="3600">1 h</button></div>
+          </section>
+
+          <section class="panel support-panel" id="notifications-panel" hidden aria-labelledby="notifications-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">EQUIPO TÉCNICO</p><h2 id="notifications-heading">Notificaciones</h2></div></div>
+            <div id="notifications-list" class="reservation-list"></div>
           </section>
 
           <section class="issues-banner is-hidden" id="issues-banner" role="alert"></section>
@@ -178,7 +183,15 @@
           </section>
 
           <section class="panel support-panel" id="tickets-panel" hidden aria-labelledby="tickets-heading">
-            <div class="panel-heading"><div><p class="panel-kicker">SEGUIMIENTO</p><h2 id="tickets-heading">Tickets autorizados</h2></div><button id="tickets-refresh" type="button">Actualizar</button></div>
+            <div class="panel-heading"><div><p class="panel-kicker">SEGUIMIENTO</p><h2 id="tickets-heading">Tickets autorizados</h2></div><div class="panel-tools"><label class="toggle-option" for="tickets-status">Estado</label><select id="tickets-status"><option value="">Todos</option><option value="open">Abierto</option><option value="in_progress">En progreso</option><option value="resolved">Resuelto</option><option value="closed">Cerrado</option></select><label class="toggle-option" for="tickets-criticality">Criticidad</label><select id="tickets-criticality"><option value="">Todas</option><option value="critica">Crítica</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select><label class="toggle-option"><input type="checkbox" id="tickets-mine" /> Asignados a mí</label><button id="tickets-refresh" type="button">Actualizar</button></div></div>
+            <form id="ticket-manual-form" class="support-form" hidden>
+              <h3>Crear ticket técnico</h3>
+              <label for="manual-summary">Resumen</label><input id="manual-summary" minlength="3" maxlength="160" required />
+              <label for="manual-description">Descripción</label><textarea id="manual-description" maxlength="2000" required rows="2"></textarea>
+              <label for="manual-criticality">Criticidad</label><select id="manual-criticality"><option value="baja">Baja</option><option value="media" selected>Media</option><option value="alta">Alta</option><option value="critica">Crítica</option></select>
+              <button id="manual-submit" type="submit">Crear ticket técnico</button>
+              <p id="manual-feedback" role="status"></p>
+            </form>
             <div id="tickets-list" class="reservation-list"></div>
           </section>
 
