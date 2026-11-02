@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import urlsplit
 from typing import Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -15,19 +16,20 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
         populate_by_name=True,
     )
 
     app_name: str = "Netbot"
-    environment: str = "development"
+    environment: Literal["development", "test", "production"] = "development"
     database_url: str = "sqlite:///./netbot.db"
     jwt_secret_key: str = "change-me-in-production"
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     admin_email: Optional[str] = None
     admin_password: Optional[str] = None
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,null"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Monitoreo (Épica 002) ---
     # Fuente real por defecto. "mock" solo se usa si se pide de forma explícita.
@@ -172,6 +174,24 @@ class Settings(BaseSettings):
         for name, url in (("OPNSENSE_BASE_URL", self.opnsense_base_url), ("UNIFI_BASE_URL", self.unifi_base_url)):
             if url is not None and not url.lower().startswith(("http://", "https://")):
                 raise ValueError(f"{name} debe empezar con http:// o https://")
+        return self
+
+    # SQLite compartido por workers en este equipo, separado de datos de negocio.
+    security_rate_limit_path: str = "netbot-rate-limits.db"
+
+    @model_validator(mode="after")
+    def _production_security(self) -> "Settings":
+        if self.environment.lower() in {"production", "prod"}:
+            if len(self.jwt_secret_key) < 64 or self.jwt_secret_key == "change-me-in-production":
+                raise ValueError("JWT_SECRET_KEY requiere al menos 64 caracteres aleatorios")
+            if not self.unifi_verify_tls or not self.opnsense_verify_tls:
+                raise ValueError("Producción requiere verificación TLS")
+            for url in (self.unifi_base_url, self.opnsense_base_url, self.unifi_api_base_url):
+                if url and urlsplit(url).scheme.lower() != "https":
+                    raise ValueError("Producción requiere HTTPS para las integraciones")
+            for origin in self.cors_origins.split(","):
+                if origin.strip() in {"null", "*"}:
+                    raise ValueError("CORS requiere orígenes explícitos en producción")
         return self
 
     @property

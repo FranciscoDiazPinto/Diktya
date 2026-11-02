@@ -134,6 +134,8 @@ async def create_manual_ticket(db: Session, user: User, payload: TicketManualCre
     if payload.network_id is not None:
         authorize(db, user, Permission.TICKETS_CREATE_OWN, payload.network_id)
         snapshot = (await network_status(db, user, payload.network_id, monitoring, settings)).model_dump(mode="json")
+    if payload.device_id is not None:
+        require_user_permission(db, user, Permission.MONITORING_READ)
     device = device_brief(db, payload.device_id) if payload.device_id else None
     if payload.device_id and device is None:
         raise InvalidInput("El dispositivo indicado no existe en el inventario.")

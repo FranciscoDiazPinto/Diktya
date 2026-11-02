@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
+import sqlite3
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -10,6 +12,16 @@ from .config import settings
 
 class Base(DeclarativeBase):
     pass
+
+
+@event.listens_for(Engine, "connect")
+def enable_sqlite_foreign_keys(connection, record):
+    if isinstance(connection, sqlite3.Connection):
+        cursor = connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+        finally:
+            cursor.close()
 
 
 connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}

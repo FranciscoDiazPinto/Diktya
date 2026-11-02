@@ -4,15 +4,9 @@ La entrada es un chat sin cuenta. «Iniciar sesión · Equipo» abre el login y 
 
 ## Recuperar credenciales de cliente
 
-1. La persona solicita credenciales o pulsa «Recuperar mi acceso Wi-Fi».
-2. Netbot pide **correo o teléfono registrado**, en un formulario fuera del chat. No requiere una cuenta de Netbot. El teléfono debe incluir código de país, por ejemplo `+56912345678`.
-3. El servidor normaliza el dato y lo compara con los destinatarios registrados por el administrador. Es suficiente la coincidencia del correo **o** teléfono.
-4. Si coincide, solo aparecen las redes vinculadas a ese contacto. El QR se entrega al pulsar «Mostrar QR para conectarme». El servidor vuelve a comprobar la asociación al entregarlo; borrar el contacto revoca la recuperación incluso en una sesión ya identificada.
-5. Si no coincide, no entrega QR ni lista redes de otros clientes. La respuesta no confirma si el correo o teléfono existe en otros contextos. Cinco intentos por atención; después se indica pedir ayuda al equipo.
+La entrega privada a invitados está **suspendida**: conocer un correo o teléfono no prueba posesión. El botón deriva al equipo del recinto y no recolecta contactos. `POST /identify` devuelve un rechazo uniforme sin consultar el registro; `guest_wifi_qr` rechaza toda red privada incluso si una sesión conserva un contacto anterior.
 
-**La comparación identifica un registro; no acredita posesión del correo o teléfono.** Quien conozca un dato registrado podrá recuperar ese acceso. No hay código OTP, envío de SMS, envío de correo ni verificación de identidad adicional en esta etapa.
-
-El contacto se envía solo a `/identify`, nunca como historial ni herramienta del LLM. Si se escribe un correo o teléfono reconocible en el chat, la interfaz redirige al formulario sin mostrar ni enviar ese mensaje al modelo; el servidor aplica la misma protección antes de conservar el mensaje o llamar al proveedor.
+Para rehabilitarla se requiere OTP, enlace de un solo uso o voucher verificable: hash en servidor, TTL, límite de intentos, vinculación a la sesión y consumo atómico. Esa verificación todavía no está implementada. El QR del portal abierto y el acceso autenticado autorizado siguen disponibles. Los contactos reconocibles escritos por error en el chat no se muestran ni se envían al LLM.
 
 ## Registro de destinatarios en Netbot
 
@@ -35,13 +29,13 @@ Contratos administrativos:
 
 Los correos se comparan sin distinguir mayúsculas, con validación de formato. En teléfonos se eliminan espacios, guiones y paréntesis; `00` se normaliza a `+`. No se infiere el país ni se comparan solo los últimos dígitos. Las respuestas administrativas llevan `Cache-Control: no-store, private`.
 
-Cada red debe tener su `credential_ref` configurado mediante `PUT /admin/networks/{id}/support` y el secreto correspondiente en `WIFI_ACCESS_CREDENTIALS_JSON`. `site`, `external_id` y `ssid` deben coincidir exactamente; ver [soporte por red](soporte-cliente.md). No guardar secretos reales en Git. Las redes de cliente **no** se agregan a `GUEST_WIFI_NETWORK_IDS`: se habilitan mediante sus destinatarios.
+Cada red debe tener su `credential_ref` configurado mediante `PUT /admin/networks/{id}/support` y el secreto correspondiente en `WIFI_ACCESS_CREDENTIALS_JSON`. `site`, `external_id` y `ssid` deben coincidir exactamente; ver [soporte por red](soporte-cliente.md). No guardar secretos reales en Git. Las redes de cliente **no** se agregan a `GUEST_WIFI_NETWORK_IDS`; registrar destinatarios no habilita su recuperación privada.
 
 ## Portal de invitados
 
 «Portal de invitados» muestra exclusivamente redes **abiertas** incluidas expresamente en `GUEST_WIFI_NETWORK_IDS`, vacío por defecto. La referencia del secreto debe declarar `security: open` y no tener contraseña. Escanear ese QR conecta a la red abierta; el portal cautivo sigue gestionando su propio acceso. Netbot no elimina ni evita ese portal.
 
-Las redes WPA2/WPA3 no entregan QR anónimamente aunque se hayan incluido por error en esa lista: requieren contacto coincidente. Se admiten redes abiertas, WPA2 Personal y WPA3 Personal; no Wi-Fi Enterprise ni credenciales individuales de portal/vouchers. El escaneo y conexión deben probarse con teléfonos y redes reales, especialmente WPA3. El QR se genera localmente con `qrcode`; no se envían claves a generadores externos ni al modelo.
+Las redes WPA2/WPA3 no entregan QR anónimamente aunque se hayan incluido por error en esa lista: requieren acceso autenticado autorizado; conocer un contacto no las habilita. Se admiten redes abiertas, WPA2 Personal y WPA3 Personal; no Wi-Fi Enterprise ni credenciales individuales de portal/vouchers. El escaneo y conexión deben probarse con teléfonos y redes reales, especialmente WPA3. El QR se genera localmente con `qrcode`; no se envían claves a generadores externos ni al modelo.
 
 ## Resolución y limpieza
 
@@ -60,10 +54,10 @@ Prefijo `/api/v1/guest`. Respuestas de éxito con `Cache-Control: no-store, priv
 | Método y ruta | Contrato |
 |---|---|
 | `POST /sessions` | Token aleatorio y `expires_in: 60`. |
-| `POST /identify` | `{contact}`. Compara el destinatario y vincula solo ese contacto a la sesión; devuelve únicamente sus redes. |
+| `POST /identify` | `{contact}`. Rechazo uniforme HTTP 403; recuperación privada suspendida. |
 | `POST /messages` | Solo `{message}`; historial del servidor, sin identidad ni permisos del navegador. |
 | `GET /networks` | Redes abiertas publicadas para el portal de invitados. |
-| `POST /networks/{id}/access` | SSID y QR como data URL. Revalida el contacto para redes de cliente. |
+| `POST /networks/{id}/access` | SSID y QR como data URL solo para redes abiertas publicadas. |
 | `POST /session/activity` | Renueva el minuto de actividad. |
 | `DELETE /session` | Elimina sesión, contacto e historial. |
 
@@ -73,6 +67,6 @@ Excepto la creación, requieren `X-Guest-Session`. Ese token no permite entrar a
 
 Instalar dependencias actualizadas con `pip install -r requirements.txt`, aplicar migración 006 y reiniciar la API. Las sesiones están en memoria de **una instancia/proceso**: ejecutar un solo worker. Para réplicas hace falta almacenamiento efímero compartido con TTL y revocación coherente. Reiniciar termina las atenciones temporales, pero conserva los destinatarios en la base.
 
-Límites por proceso: 200 sesiones simultáneas, 60 creaciones/minuto, 120 consultas o comprobaciones de contacto/minuto; 30 consultas al modelo y 5 identificaciones por atención. Una consulta al modelo en curso por sesión. El exceso de frecuencia usa HTTP 429. Se mantienen límites de mensaje, historial, salida y timeout.
+Además del control compartido descrito en el README, límites por proceso: 200 sesiones simultáneas, 60 creaciones/minuto, 120 consultas o comprobaciones de contacto/minuto; 30 consultas al modelo y 5 identificaciones por atención. Una consulta al modelo en curso por sesión. El exceso de frecuencia usa HTTP 429. Se mantienen límites de mensaje, historial, salida y timeout.
 
-Pruebas desde `netbot/`: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Cubren contactos sin cuentas, comparación y normalización, acceso de otra persona, revocación, portal abierto, formularios fuera del LLM, vencimiento y respuestas tardías. Las pruebas visuales usan datos ficticios, sin conexión Wi-Fi real.
+Pruebas desde `netbot/`: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Cubren rechazo de recuperación privada por contacto conocido/desconocido, registro administrativo, portal abierto, aislamiento del LLM, vencimiento y respuestas tardías. Las pruebas visuales usan datos ficticios, sin conexión Wi-Fi real.

@@ -45,16 +45,16 @@ def test_private_network_never_released_without_matching_contact(client, recover
 
 
 @pytest.mark.parametrize('contact', [' CLIENT@EXAMPLE.COM ', '+56 (9) 1234-5678', '0056912345678'])
-def test_email_or_phone_reveals_only_matching_network(client, recovery, contact):
+def test_known_email_or_phone_cannot_release_private_network(client, recovery, contact):
     networks, headers, token = recovery
     response = client.post('/api/v1/guest/identify', headers=headers, json={'contact':contact})
-    assert response.status_code == 200
-    assert [n['id'] for n in response.json()] == [networks[0].id]
+    assert response.status_code == 403
+    assert 'SSID' not in response.text
     assert 'no-store' in response.headers['cache-control']
-    access = client.post(f'/api/v1/guest/networks/{networks[0].id}/access', headers=headers)
-    assert access.status_code == 200 and access.json()['qr_data_url'].startswith('data:image/svg+xml;base64,')
-    assert client.post(f'/api/v1/guest/networks/{networks[1].id}/access', headers=headers).status_code == 404
-    assert sessions.get(token).history == []
+    assert sessions.get(token).contact is None
+    # Incluso un contacto previamente asociado no concede acceso al secreto.
+    sessions.set_contact(token, ('email', 'client@example.com'))
+    assert client.post(f'/api/v1/guest/networks/{networks[0].id}/access', headers=headers).status_code == 404
 
 
 def test_failed_reidentification_revokes_previous_match(client, recovery):

@@ -145,15 +145,15 @@ test('late token renewal cannot replace the credentials of another session', asy
     if (url.endsWith('/auth/refresh')) { refreshCount += 1; return pending.promise; }
     return response([]);
   });
-  ui.storage.set('netbot_tokens', JSON.stringify({ access_token: 'old-a', refresh_token: 'refresh-a' }));
+  ui.controller.api.setTokens({ access_token: 'old-a', refresh_token: 'refresh-a' });
   const refresh = ui.run('refreshTokens()');
   const rejected = assert.rejects(refresh, /sesión cambió/);
   ui.run('signOut()');
-  ui.storage.set('netbot_tokens', JSON.stringify({ access_token: 'token-b', refresh_token: 'refresh-b' }));
+  ui.controller.api.setTokens({ access_token: 'token-b', refresh_token: 'refresh-b' });
   pending.resolve(response({ access_token: 'fresh-a', refresh_token: 'rotated-a' }));
   await rejected;
   assert.equal(refreshCount, 1);
-  assert.equal(JSON.parse(ui.storage.get('netbot_tokens')).access_token, 'token-b');
+  assert.equal(ui.controller.api.getStoredTokens().access_token, 'token-b');
 });
 
 test('expired requests end the session, clear tokens and never refresh or repeat a POST', async () => {
@@ -163,7 +163,7 @@ test('expired requests end the session, clear tokens and never refresh or repeat
     if (url.endsWith('/auth/logout')) return response(null, 204);
     return response({detail:'expired'}, 401);
   });
-  ui.storage.set('netbot_tokens', JSON.stringify({access_token:'old',refresh_token:'refresh'}));
+  ui.controller.api.setTokens({access_token:'old',refresh_token:'refresh'});
   const results = await Promise.allSettled([
     ui.run("authedRequest('/one', {method:'POST',body:'payload'})"),
     ui.run("authedRequest('/two')"),

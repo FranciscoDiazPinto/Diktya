@@ -4,8 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
-from app.networks.guest_access import GuestNetwork, GuestWifiQr, list_guest_networks, guest_wifi_qr, client_networks
-from app.networks.recipients import normalize_contact
+from app.networks.guest_access import GuestNetwork, GuestWifiQr, list_guest_networks, guest_wifi_qr
 from .guest import sessions, TTL
 from .provider import OpenRouterProvider, ChatProviderError, ChatProviderNotConfigured
 from .schemas import ChatInputError
@@ -91,11 +90,6 @@ class GuestIdentification(BaseModel):
 
 @router.post('/identify', response_model=list[GuestNetwork])
 def identify(payload: GuestIdentification, token: str = Depends(guest_token), db: Session = Depends(get_db)):
-    sessions.begin_identification(token)
-    contact = normalize_contact(payload.contact)
-    result = client_networks(db, contact)
-    if not result:
-        # No confirma existencia del cliente ni expone redes de otra persona.
-        raise HTTPException(403, 'No se pudo habilitar el acceso con esos datos. Revisa lo ingresado o solicita ayuda al equipo.', headers={'Cache-Control': 'no-store, private'})
-    sessions.set_contact(token, contact)
-    return result
+    # Respuesta uniforme, sin consultar ni enumerar contactos registrados.
+    raise HTTPException(403, 'La recuperación privada requiere verificación de identidad. Solicita ayuda al equipo.',
+                        headers={'Cache-Control': 'no-store, private'})

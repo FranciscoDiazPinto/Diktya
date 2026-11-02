@@ -41,7 +41,8 @@ def client_networks(db: Session, contact: tuple[str, str]) -> list[GuestNetwork]
 
 
 def guest_wifi_qr(db: Session, settings: Settings, network_id: int, contact: tuple[str, str] | None = None) -> GuestWifiQr:
-    authorized = contact is not None and any(n.id == network_id for n in matching_networks(db, contact))
+    # Conocer un contacto no demuestra posesión. No habilita redes privadas.
+    authorized = False
     network = db.get(Network, network_id)
     if network is None or (not authorized and network_id not in settings.guest_wifi_network_ids):
         raise NotFound('No se pudo habilitar ese acceso. Revisa tus datos o solicita ayuda al equipo.')

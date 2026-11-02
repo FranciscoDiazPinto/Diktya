@@ -4,14 +4,16 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-netbot}
-      POSTGRES_USER: ${POSTGRES_USER:-netbot}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_USER: ${POSTGRES_USER:?Configure POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure a random POSTGRES_PASSWORD}
+      NETBOT_APP_PASSWORD: ${NETBOT_APP_PASSWORD:?Configure a different random application password}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/10-app-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-netbot} -d ${POSTGRES_DB:-netbot}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?Configure POSTGRES_USER} -d ${POSTGRES_DB:-netbot}"]
       interval: 5s
       timeout: 5s
       retries: 5
