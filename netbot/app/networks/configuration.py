@@ -32,6 +32,8 @@ def configure_support(network_id: int, payload: SupportConfigWrite, user: User, 
         db.add(config)
     config.credential_ref = payload.credential_ref
     config.monitoring_interface_id = payload.monitoring_interface_id
+    config.unifi_site_id = payload.unifi_site_id
+    config.unifi_ap_ids = sorted(payload.unifi_ap_ids)
     db.add(SupportAudit(actor_id=user.id, network_id=network_id, action="network_support.updated"))
     db.commit()
     return SupportConfigWrite.model_validate(config)

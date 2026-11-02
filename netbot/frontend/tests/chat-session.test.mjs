@@ -335,3 +335,36 @@ test('late recipient list from another network never replaces the selected netwo
   pending.resolve(response([{email:'first@example.com', phone:null}])); await first;
   assert.equal(ui.nodes.get('#wifi-recipients-contacts').value, 'second@example.com;');
 });
+
+
+test('stale monitoring values never retain healthy current KPI labels',async()=>{
+  const stamp='2026-10-30T12:00:00Z';
+  const ui=dashboard(async url=>{
+    const path=new URL(url).pathname;
+    if(!path.includes('/monitoring/'))return response([]);
+    const data=path.endsWith('/interfaces')?[{interface_id:'wan',name:'igc0',status:'up',ip_addresses:[],traffic:{bytes_in:100,bytes_out:100}}]
+      :path.endsWith('/system')?null:path.endsWith('/stats')?{packets_blocked:1}:[];
+    return response({data,source:'mock',status:'degraded',stale:true,issues:[],collected_at:stamp,last_attempt_at:stamp});
+  });
+  ui.login('internal',['monitoring:read']);await tick();
+  assert.match(ui.nodes.get('#stat-interfaces-meta').innerHTML,/Datos anteriores/);
+  assert.doesNotMatch(ui.nodes.get('#stat-interfaces-meta').innerHTML,/Todas operativas/);
+  assert.match(ui.nodes.get('#stat-traffic-meta').innerHTML,/Datos anteriores/);
+  assert.match(ui.nodes.get('#interfaces-list').innerHTML,/Datos anteriores/);
+  assert.match(ui.nodes.get('#live-badge').innerHTML,/Datos anteriores/);
+});
+
+
+test('leaving My network clears credentials and discards a pending reveal',async()=>{
+  const pending=deferred();
+  const ui=dashboard(async url=>url.endsWith('/access')?pending.promise:response([]));
+  ui.login('a',['chat:use','networks:read:own','wifi:access:read:own']);await tick();
+  ui.controller.navigation.navigate('support-panel');
+  const loading=ui.run('showWifiAccess(1)');
+  ui.controller.navigation.navigate('chat');
+  pending.resolve(response({network_id:1,ssid:'Private',security:'wpa2-personal',passphrase:'demo-secret-never-display'}));
+  await loading;
+  assert.equal(ui.nodes.get('#wifi-access-panel').hidden,true);
+  assert.equal(ui.nodes.get('#wifi-access-panel').children.length,0);
+  assert.equal(ui.controller.navigation.currentView,'overview');
+});

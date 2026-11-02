@@ -66,3 +66,12 @@ Las pruebas (`node --test frontend/tests/*.test.mjs`) importan los mismos módul
 ### Carga CSV
 
 Admin puede validar la [plantilla y contrato CSV](../docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
+
+
+## Navegación por vistas
+
+El menú muestra una vista a la vez: Resumen y chat, Puntos de acceso, Interfaces, Clientes, Firewall, Mi red, Tickets y Aprovisionamiento, según permisos. `modules/navigation.mjs` controla únicamente wrappers y navegación por hash, con enlaces directos, recarga y Atrás/Adelante sin reinstanciar controladores ni perder conversaciones. Los módulos conservan sus controles de autorización y estado privado; el backend sigue autorizando cada solicitud.
+
+Resumen reúne el chat con indicadores/gráficos para roles globales y accesos a funciones permitidas para otros usuarios. En escritorio se muestran monitoreo y chat en columnas; en pantallas estrechas se apilan. El enlace antiguo `#chat` abre esta vista combinada. CSV, planes SSID y reservas se agrupan en Aprovisionamiento. Acceso Wi-Fi y destinatarios se ubican en Mi red; salir de esa vista oculta credenciales y descarta respuestas pendientes. Los botones de propuestas del chat abren la vista correspondiente. Una respuesta tardía de preparación SSID no cambia de página si el usuario ya salió del chat.
+
+Para desarrollo, servir `frontend` normalmente: las rutas `#chat`, `#clients`, etc. no requieren reescrituras del servidor. Tras actualizar módulos estáticos en una demo ya abierta, recargar sin caché si el navegador conserva la versión anterior.

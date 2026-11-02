@@ -39,7 +39,7 @@ class VlanReservationService:
 
     async def available_vlans(self) -> list[AvailableVlan]:
         inventory = await self.monitoring.get_vlan_inventory()
-        if inventory.status == MonitoringStatus.UNAVAILABLE or inventory.data is None:
+        if inventory.status != MonitoringStatus.OK or inventory.stale or inventory.data is None:
             raise InventoryUnavailable
         reserved = self._active_keys()
         return [AvailableVlan(**item.model_dump()) for item in inventory.data
@@ -49,7 +49,7 @@ class VlanReservationService:
         require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
         inventory = await self.monitoring.get_vlan_inventory()
         require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
-        if inventory.data is None or inventory.status == MonitoringStatus.UNAVAILABLE:
+        if inventory.data is None or inventory.status != MonitoringStatus.OK or inventory.stale:
             raise InventoryUnavailable
         item = next((v for v in inventory.data if
                      (v.parent_interface, v.tag) == (data.parent_interface, data.tag)), None)

@@ -119,7 +119,7 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     const button=textNode('button','Preparar revisión en el panel');button.type='button';
     button.addEventListener('click',async()=>{
       if(!isChatCurrent(context)||button.disabled) return;button.disabled=true;
-      try {const plan=await request('/ssid-plans',{method:'POST',body:JSON.stringify(proposal)});if(!isChatCurrent(context)) return;showPlan(plan);panel.scrollIntoView?.({behavior:'smooth',block:'start'});}
+      try {const plan=await request('/ssid-plans',{method:'POST',body:JSON.stringify(proposal)});if(!isChatCurrent(context)) return;showPlan(plan);onOpenPlans();}
       catch(error) {if(isChatCurrent(context)) {card.append(textNode('p',error.message));button.disabled=false;}}
     });card.append(button);chatMessages.append(card);
   }

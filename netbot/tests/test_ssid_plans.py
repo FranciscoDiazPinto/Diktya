@@ -146,7 +146,7 @@ def execution_service(db_session, x, writer):
     settings=Settings(_env_file=None,unifi_inventory_mode='api',unifi_write_enabled=True,unifi_api_contract='10.6.106',
         monitoring_provider='opnsense',opnsense_base_url='https://firewall.example.test',opnsense_api_key='test',opnsense_api_secret='test',
         monitoring_site_id='lab',ssid_security_profiles_json=json.dumps({'perfil-clientes':{'type':'WPA2_PERSONAL','passphrase':'test-only-password','bands':[2.4,5]}}))
-    response=SimpleNamespace(status=SimpleNamespace(value='ok'),source='opnsense',collected_at=utc_now(),
+    response=SimpleNamespace(stale=False,status=SimpleNamespace(value='ok'),source='opnsense',collected_at=utc_now(),
         data=[SimpleNamespace(parent_interface='igc1',tag=20)])
     monitoring=SimpleNamespace(get_vlan_inventory=AsyncMock(return_value=response))
     inventory=SimpleNamespace(read=AsyncMock(return_value={'source':'unifi','simulated':False,'application_version':'10.6.106',

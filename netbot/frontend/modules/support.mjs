@@ -1,5 +1,5 @@
 
-export function createSupport({ document, window, Option, state, api, chatMessages, textNode, clockTime, captureChat, isChatCurrent }) {
+export function createSupport({ document, window, Option, state, api, chatMessages, textNode, clockTime, captureChat, isChatCurrent, onOpenSupport = () => true }) {
   const $ = (selector) => document.querySelector(selector);
   const { authedRequest } = api;
   const supportPanel = $('#support-panel'), supportNetworkSelect = $('#support-network');
@@ -85,8 +85,8 @@ export function createSupport({ document, window, Option, state, api, chatMessag
     button.type = 'button';
     button.addEventListener('click', () => {
       if (!isChatCurrent(context)) return;
+      if(!onOpenSupport())return;
       showWifiAccess(action.network_id);
-      supportPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     card.append(button);
     chatMessages.append(card);

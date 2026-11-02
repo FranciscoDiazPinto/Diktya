@@ -70,7 +70,7 @@ class CsvImportService:
     async def _inventory(self):
         response = await self.monitoring.get_vlan_inventory()
         age = (utc_now() - as_utc(response.collected_at)).total_seconds()
-        if (response.status != MonitoringStatus.OK or response.data is None
+        if (response.status != MonitoringStatus.OK or response.stale or response.data is None
                 or response.source != self.settings.monitoring_provider
                 or age < -5 or age > self.settings.csv_inventory_max_age_seconds):
             raise ServiceUnavailable("Inventario VLAN no disponible, incompleto o fuera de vigencia. Vuelve a intentar.")

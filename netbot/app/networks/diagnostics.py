@@ -34,7 +34,7 @@ async def network_status(db: Session, user: User, network_id: int,
     base.update(source=response.source, simulated=response.source == "mock", observed_at=observed)
     if response.source != settings.monitoring_provider or age < -5 or age > settings.network_status_max_age_seconds:
         return NetworkStatus(**base, summary="La telemetría no es vigente o no corresponde a la fuente configurada.")
-    if response.status != MonitoringStatus.OK or response.data is None:
+    if response.status != MonitoringStatus.OK or response.stale or response.data is None:
         return NetworkStatus(**base, summary="El monitoreo no está disponible o es incompleto; esto no demuestra que tu red esté caída.")
     matches = [interface for interface in response.data if interface.interface_id == interface_id]
     if len(matches) != 1:

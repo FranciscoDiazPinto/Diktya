@@ -14,6 +14,7 @@ from .providers.opnsense import (
     OPNsenseMonitoringProvider,
 )
 from .service import MonitoringService
+from .providers.unifi import UniFiAccessPointProvider
 
 logger = logging.getLogger("netbot.monitoring.factory")
 
@@ -61,4 +62,6 @@ def build_monitoring_service(settings: Settings) -> MonitoringService:
         cache_ttl_seconds=settings.monitoring_cache_ttl_seconds,
         firewall_log_fetch_limit=settings.firewall_log_fetch_limit,
         history_seconds=settings.monitoring_history_seconds,
+        stale_retention_seconds=settings.monitoring_stale_retention_seconds,
+        access_points_provider=UniFiAccessPointProvider(settings),
     )

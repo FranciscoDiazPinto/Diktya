@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     # --- Monitoreo (Épica 002) ---
     # "mock" es el valor por defecto: el entorno local no tiene hardware de red.
     monitoring_provider: Literal["mock", "opnsense"] = "mock"
-    monitoring_cache_ttl_seconds: float = Field(5.0, ge=0)
+    monitoring_cache_ttl_seconds: float = Field(5.0, ge=0, le=60)
+    monitoring_stale_retention_seconds: float = Field(300.0, ge=0, le=86400)
     monitoring_mock_scenario: Literal["healthy", "degraded", "outage"] = "healthy"
     firewall_log_fetch_limit: int = Field(500, ge=1, le=5000)
     # Muestreo de tráfico en segundo plano para el gráfico del dashboard.
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
     guest_wifi_network_ids: list[int] = Field(default_factory=list)
 
     # Inventario oficial UniFi: URL completa hasta /integration/v1, sin secretos en MD.
+    unifi_monitoring_mode: Literal["disabled", "mock", "api"] = "disabled"
+    unifi_monitoring_site_id: str | None = None
+    unifi_monitoring_max_aps: int = Field(100, ge=1, le=500)
+    unifi_monitoring_statistics_budget_seconds: float = Field(5.0, gt=0, le=30)
     unifi_inventory_mode: Literal["disabled", "mock", "api"] = "disabled"
     unifi_api_base_url: str | None = None
     unifi_api_key: SecretStr | None = None

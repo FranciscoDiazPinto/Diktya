@@ -132,3 +132,23 @@ button { cursor: pointer; }
 #guest-qr { display: grid; justify-items: center; gap: 12px; text-align: center; }
 .wifi-qr { display: block; width: min(260px, 100%); height: auto; aspect-ratio: 1; background: white; }
 @media (max-width: 800px) { .guest-layout { grid-template-columns: 1fr; margin-top: 35px; gap: 20px; } .guest-welcome h1 { font-size: 36px; } .guest-chat { padding: 18px; } .guest-header button { font-size: 12px; } }
+
+/* Vistas de aplicación: los wrappers separan navegación y visibilidad por permiso. */
+.app-view > .support-panel:first-child, .app-view > .chat-panel:first-child { margin-top: 0; }
+#view-overview .activity-panel { grid-column: 1 / -1; }
+.overview-shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 14px; }
+.overview-shortcut { display: flex; flex-direction: column; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--ink); text-decoration: none; }
+.overview-shortcut strong { font-size: 16px; }
+.overview-shortcut span { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.overview-shortcut:hover { border-color: var(--ink); }
+#view-overview .chat-messages { min-height: 240px; max-height: 55vh; }
+#view-title:focus { outline: none; }
+
+.overview-with-chat { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr); gap: 16px; align-items: start; }
+.overview-monitoring { min-width: 0; }
+.overview-monitoring .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.overview-monitoring .dashboard-grid { grid-template-columns: 1fr; }
+.overview-with-chat > .chat-panel { margin-top: 0; position: sticky; top: 20px; }
+.overview-with-chat.personal { grid-template-columns: 1fr; }
+@media (max-width: 1200px) { .overview-with-chat { grid-template-columns: 1fr; } .overview-with-chat > .chat-panel { position: static; } }
+@media (max-width: 700px) { .overview-monitoring .stats-grid { grid-template-columns: 1fr; } }

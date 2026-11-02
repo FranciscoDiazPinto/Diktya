@@ -1,13 +1,26 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+
+
+from app.monitoring.schemas import AccessPointMetrics, InterfaceMetrics, MonitoringResponse
 
 
 class SupportConfigWrite(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, from_attributes=True)
     credential_ref: str | None = Field(default=None, min_length=1, max_length=160)
     monitoring_interface_id: str | None = Field(default=None, min_length=1, max_length=160)
+    unifi_site_id: str | None = Field(default=None, min_length=1, max_length=160)
+    unifi_ap_ids: list[str] = Field(default_factory=list, max_length=500)
+
+    @model_validator(mode='after')
+    def validate_ap_binding(self):
+        if self.unifi_ap_ids and not self.unifi_site_id:
+            raise ValueError('Indica el sitio UniFi para vincular AP.')
+        if len(set(self.unifi_ap_ids))!=len(self.unifi_ap_ids) or any(not a or len(a)>160 for a in self.unifi_ap_ids):
+            raise ValueError('Los identificadores de AP deben ser únicos y no vacíos.')
+        return self
 
 
 class NetworkStatus(BaseModel):
@@ -53,3 +66,9 @@ class SupportAuditRead(BaseModel):
     network_id: int
     action: str
     created_at: datetime
+
+
+class NetworkTelemetry(BaseModel):
+    network_id: int
+    access_points: MonitoringResponse[list[AccessPointMetrics]]
+    interfaces: MonitoringResponse[list[InterfaceMetrics]]

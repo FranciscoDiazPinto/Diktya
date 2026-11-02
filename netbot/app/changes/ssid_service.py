@@ -76,7 +76,7 @@ class SsidPlanService:
         scope = self.scope(actor, scope_id)  # revocación durante esperas
         if scope.resources != resources or scope.site_id != site_id:
             raise Conflict('Cambió el ámbito. Vuelve a consultar.')
-        if (response.data is None or response.status.value != 'ok'
+        if (response.data is None or response.status.value != 'ok' or response.stale
                 or response.source != self.settings.monitoring_provider
                 or not -5 <= (utc_now()-as_utc(response.collected_at)).total_seconds() <= self.settings.csv_inventory_max_age_seconds):
             raise ServiceUnavailable('El inventario VLAN no está disponible o vigente.')

@@ -38,7 +38,7 @@ flowchart TD
 | auth | Usuarios/roles/tokens y auditoría de identidad append-only (008). `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
 | networks | Inventario y asignaciones (`service.py`); autorización por recurso (`access.py`); configuración (`configuration.py`); claves (`credentials.py`); diagnóstico (`diagnostics.py`); registro de auditoría (`audit.py`). |
 | tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
-| monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
+| monitoring | Contratos de monitoreo, adaptadores mock/OPNsense/UniFi, normalización, caché con retención explícita de lecturas anteriores e historial de tráfico. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
 | changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). Incluye planes SSID privados, ámbitos/concesiones, inventario UniFi y ejecutor CLI separado, deshabilitado por defecto. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
@@ -134,3 +134,7 @@ Los modelos WifiScope, WifiScopeGrant, SsidPlan y WifiWriteLease pertenecen a ch
 La épica 001 incorpora auditoría de identidad, sesiones JWT vinculadas a refresh revocable, protección concurrente del último admin y expiración sin renovación automática del navegador. `auth.audit` posee el registro y middleware ASGI de denegaciones; los casos de uso conservan sus transacciones. Ver [contrato y evidencia de cierre](epica-001-autenticacion-roles.md).
 
 El despliegue objetivo es un equipo local en el rack, con acceso a UniFi/OPNsense por la red de administración y endpoints configurables. Un backend local puede seguir utilizando un proveedor LLM externo. Ver [configuración y límites de aprovisionamiento](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot); la validación física de Netbot sigue pendiente.
+
+Monitoreo AP: `monitoring.providers.unifi` expone DTO mínimos, paginación y telemetría opcional. `networks.telemetry` posee la vinculación por red (009), filtra AP/interfaz y reautoriza tras consultar monitoreo. `frontend/modules/access-points.mjs` maneja la vista global y técnica; no comparte estado con el dashboard de firewall. La caché antigua nunca habilita reservas o ejecución SSID. Ver [contratos y límites](epica-002-monitoreo.md#avance-hu004hu005--30-10-2026).
+
+`frontend/modules/navigation.mjs` posee la selección de vista por hash y los wrappers exteriores. El compositor conecta acciones de soporte/SSID a navegación mediante callbacks. Los controladores de funcionalidad conservan sus paneles, datos, permisos y tareas; navegación no hace solicitudes API ni reemplaza autorización del servidor. Salir de Mi red limpia credenciales mediante la API pública de soporte.

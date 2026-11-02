@@ -34,6 +34,7 @@ class IssueKind(StrEnum):
     SERVER_ERROR = "server_error"
     INVALID_RESPONSE = "invalid_response"
     UNKNOWN = "unknown"
+    RATE_LIMITED = "rate_limited"
 
 
 class MonitoringStatus(StrEnum):
@@ -55,6 +56,8 @@ class MonitoringResponse(NetbotModel, Generic[T]):
     status: MonitoringStatus
     source: str = Field(description="Proveedor que originó los datos: 'opnsense' o 'mock'.")
     collected_at: datetime
+    stale: bool = False
+    last_attempt_at: datetime | None = None
     data: T | None = None
     issues: list[CollectionIssue] = Field(default_factory=list)
 
@@ -204,3 +207,32 @@ class FirewallStatistics(NetbotModel):
     )
     packets_passed: int | None = Field(None, ge=0)
     packets_blocked: int | None = Field(None, ge=0)
+
+
+class AccessPointState(StrEnum):
+    ONLINE = "online"
+    OFFLINE = "offline"
+    TRANSITIONING = "transitioning"
+    UNKNOWN = "unknown"
+
+
+class AccessPointMetrics(NetbotModel):
+    id: str = Field(min_length=1, max_length=160)
+    site_id: str = Field(min_length=1, max_length=160)
+    name: str = Field(min_length=1, max_length=256)
+    model: str | None = None
+    state: AccessPointState = AccessPointState.UNKNOWN
+    controller_state: str = Field(max_length=64)
+    firmware_version: str | None = None
+    last_heartbeat_at: datetime | None = None
+    uptime_seconds: int | None = Field(default=None, ge=0)
+    cpu_percent: float | None = Field(default=None, ge=0, le=100)
+    memory_percent: float | None = Field(default=None, ge=0, le=100)
+    telemetry_available: bool = False
+
+
+class AccessPointPage(NetbotModel):
+    items: list[AccessPointMetrics]
+    total_count: int = Field(ge=0)
+    offset: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)

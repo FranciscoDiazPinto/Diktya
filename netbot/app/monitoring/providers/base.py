@@ -2,10 +2,11 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import ClassVar, Generic, TypeVar
+from typing import ClassVar, Generic, TypeVar, Protocol
 
 from ..schemas import (
     CollectionIssue,
+    AccessPointMetrics,
     DhcpLease,
     FirewallEvent,
     FirewallStatistics,
@@ -63,3 +64,9 @@ class NetworkMonitoringProvider(ABC):
     async def aclose(self) -> None:
         """Libera recursos (conexiones HTTP, etc.)."""
         return None
+
+
+class AccessPointMonitoringProvider(Protocol):
+    source: str
+    async def collect(self) -> CollectionResult[list[AccessPointMetrics]]: ...
+    async def aclose(self) -> None: ...

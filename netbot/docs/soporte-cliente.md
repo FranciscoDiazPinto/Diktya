@@ -114,3 +114,5 @@ Validación: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.tes
 ## Mantenimiento modular
 
 Ver [arquitectura vigente](arquitectura-modular.md) antes de extender este flujo. Autorización en auth/access y networks/access; diagnóstico en networks/diagnostics; claves en networks/credentials; consultas de tickets en tickets/service. El chat usa esos contratos, no sus tablas. Los errores públicos se traducen a HTTP en una frontera común. No se modificó el esquema SQL ni el contrato público por esta reorganización.
+
+La migración 009 amplía la configuración de soporte con `unifi_site_id` y `unifi_ap_ids`, ambos administrables solo por admin. La vista técnica `/api/v1/networks/{id}/telemetry` exige `networks:read:details`, asignación vigente y vinculación explícita; clientes e invitados no pueden consultar AP. Se conservan estados antiguos marcados y no se usan para afirmar disponibilidad actual. Ver [monitoreo por red](epica-002-monitoreo.md#api-y-autorización).

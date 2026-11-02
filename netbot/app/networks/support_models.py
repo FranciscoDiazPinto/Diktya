@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -12,6 +12,8 @@ class NetworkSupportConfig(Base):
     network_id: Mapped[int] = mapped_column(ForeignKey("networks.id", ondelete="CASCADE"), primary_key=True)
     credential_ref: Mapped[str | None] = mapped_column(String(160))
     monitoring_interface_id: Mapped[str | None] = mapped_column(String(160))
+    unifi_site_id: Mapped[str | None] = mapped_column(String(160))
+    unifi_ap_ids: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
 
 
 class SupportAudit(Base):

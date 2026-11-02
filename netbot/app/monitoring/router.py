@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from .dependencies import MonitoringServiceDep, require_monitoring_read
 from .schemas import (
     DhcpLease,
+    AccessPointPage,
     FirewallAction,
     FirewallEvent,
     FirewallStatistics,
@@ -32,6 +33,7 @@ router = APIRouter(
 
 
 def _finalize(response: Response, result: MonitoringResponse) -> MonitoringResponse:
+    response.headers["Cache-Control"] = "no-store, private"
     if result.status == MonitoringStatus.UNAVAILABLE:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return result
@@ -96,3 +98,9 @@ async def get_firewall_events(
     ] = None,
 ):
     return _finalize(response, await service.get_firewall_events(limit=limit, action=action))
+
+
+@router.get("/access-points", response_model=MonitoringResponse[AccessPointPage], responses=_UNAVAILABLE)
+async def get_access_points(response: Response, service: MonitoringServiceDep,
+                            limit: int = Query(default=50,ge=1,le=100), offset: int = Query(default=0,ge=0)):
+    return _finalize(response, await service.get_access_point_page(limit,offset))
