@@ -22,7 +22,7 @@ HAPPY_ROUTES = {
     paths.PATH_INTERFACES_INFO: fx.INTERFACES_INFO,
     paths.PATH_INTERFACE_STATISTICS: fx.INTERFACE_STATISTICS,
     paths.PATH_TRAFFIC_INTERFACE: fx.TRAFFIC_INTERFACE,
-    paths.PATH_FIREWALL_STATS: fx.FIREWALL_STATS,
+    paths.PATH_PF_INTERFACES: fx.PF_INTERFACES,
     paths.PATH_PF_STATISTICS: fx.PF_INFO,
     paths.PATH_FIREWALL_LOG: fx.FIREWALL_LOG,
     "/api/dnsmasq/leases/search": fx.DNSMASQ_LEASES,
@@ -156,7 +156,7 @@ async def test_firewall_events_and_limit():
 
 
 async def test_firewall_stats_partial_failure_degrades():
-    result = await build({paths.PATH_FIREWALL_STATS: httpx.Response(404)}).get_firewall_statistics()
+    result = await build({paths.PATH_PF_INTERFACES: httpx.Response(404)}).get_firewall_statistics()
     assert result.data.states.current_entries == 1523
     assert result.data.packets_passed is None
     assert result.issues[0].optional is False

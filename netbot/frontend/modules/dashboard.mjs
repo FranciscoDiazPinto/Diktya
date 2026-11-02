@@ -1,3 +1,5 @@
+import { createInventory } from './inventory.mjs';
+import { createNotifications } from './notifications.mjs';
 import { createNavigation } from './navigation.mjs';
 import { createAccessPoints } from './access-points.mjs';
 import { createSsidPlans } from './ssid-plans.mjs';
@@ -40,10 +42,12 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
   const monitoring = createMonitoring({document, window, sessionState: state, api, format, ...dom,
     signOut: (message) => session.signOut(message)});
   const accessPoints = createAccessPoints({document,window,Option,state,api,...dom,formatDuration:format.formatDuration});
-  const features = [accessPoints, monitoring, reservations, support, tickets, chat, csvImports, wifiRecipients, ssidPlans];
+  const inventory = createInventory({document, window, Option, state, api, ...dom});
+  const notifications = createNotifications({document, window, state, api, ...dom, onOpenTicket:(id)=>{ navigation.navigate('tickets-panel'); document.querySelector('#ticket-'+Number(id))?.scrollIntoView?.(); }});
+  const features = [inventory, notifications, accessPoints, monitoring, reservations, support, tickets, chat, csvImports, wifiRecipients, ssidPlans];
   session = createSession({document, window, state, api, FormData, ...dom,
     onAuthenticated(user) { guest.stop(); navigation.reset(); for (const feature of features) feature.reset(); for (const feature of features) feature.configureUser(user); navigation.configureUser(user); },
     onSignedOut({expired} = {}) { navigation.reset(); for (const feature of features) feature.reset(); if (expired) guest.stop(); else guest.start(); }});
-  return {navigation, accessPoints, ssidPlans, guest, wifiRecipients, session, api, chat, support, tickets, reservations, monitoring, csvImports,
+  return {navigation, inventory, notifications, accessPoints, ssidPlans, guest, wifiRecipients, session, api, chat, support, tickets, reservations, monitoring, csvImports,
     start() { guest.start(); return session.validateSession(); }};
 }

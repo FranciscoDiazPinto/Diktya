@@ -9,7 +9,8 @@ Genera datos sintéticos coherentes entre sí:
 
 Escenarios (MONITORING_MOCK_SCENARIO):
 - healthy:  todo disponible.
-- degraded: sin sensor de temperatura, estadísticas de firewall fallando y una VLAN caída.
+- degraded: sin sensor de temperatura, estadísticas de firewall fallando, una VLAN caída y
+            un AP fuera de línea.
 - outage:   toda la fuente caída (los endpoints responden 503).
 """
 
@@ -31,12 +32,18 @@ from ..exceptions import (
 )
 from ..schemas import (
     CollectionIssue,
+    DeviceState,
+    DeviceType,
     DhcpLease,
     FirewallAction,
     FirewallEvent,
     FirewallStatistics,
     InterfaceMetrics,
     InterfaceTraffic,
+    InventoryDevice,
+    InventorySnapshot,
+    InventorySsid,
+    InventoryVlan,
     LinkStatus,
     MemoryMetrics,
     StateTableStats,
@@ -340,6 +347,34 @@ class MockMonitoringProvider(NetworkMonitoringProvider):
                 },
                 packets_passed=wan_packets - blocked,
                 packets_blocked=blocked,
+            ),
+            issues=[],
+        )
+
+    async def collect_inventory(self) -> CollectionResult[InventorySnapshot]:
+        if self._scenario == "outage":
+            return self._outage("inventory")
+        ap = DeviceType.ACCESS_POINT
+        hall = DeviceState.OFFLINE if self._scenario == "degraded" else DeviceState.ONLINE
+        return CollectionResult(
+            data=InventorySnapshot(
+                version="mock",
+                devices=[
+                    InventoryDevice(external_id="firewall", name="netbot-fw.evento.local",
+                                    device_type=DeviceType.FIREWALL, model="OPNsense", state=DeviceState.ONLINE),
+                    InventoryDevice(external_id="sw-core", name="Switch Core", device_type=DeviceType.SWITCH,
+                                    model="USW-Pro-24", ip_address="192.168.1.2", state=DeviceState.ONLINE),
+                    InventoryDevice(external_id="ap-hall", name="AP Hall", device_type=ap, model="U7-Pro",
+                                    ip_address="192.168.1.10", state=hall),
+                    InventoryDevice(external_id="ap-norte", name="AP Sala Norte", device_type=ap, model="U7-Pro",
+                                    ip_address="192.168.1.11", state=DeviceState.ONLINE),
+                ],
+                vlans=[InventoryVlan(external_id="igc1:20", name="ASISTENTES", tag=20),
+                       InventoryVlan(external_id="igc1:30", name="STAFF", tag=30)],
+                ssids=[InventorySsid(external_id="ssid-asistentes", name="Evento-Asistentes", enabled=True,
+                                     security="OPEN", vlan_tag=20),
+                       InventorySsid(external_id="ssid-staff", name="Evento-Staff", enabled=True,
+                                     security="WPA2_PERSONAL", vlan_tag=30)],
             ),
             issues=[],
         )

@@ -1,6 +1,7 @@
 // Vistas locales por hash: permisos y estado de cada funcionalidad siguen en sus controladores.
 const VIEWS = [
   {key:'overview',nav:'overview-nav',title:'Resumen y chat',description:'Monitorea tu infraestructura y conversa con Netbot desde el mismo lugar.',allow:()=>true},
+  ...[ ['devices','Dispositivos','Inventario de equipos y su estado.'], ['alerts','Alertas','Incidentes activos de infraestructura.'], ['wireless','SSID y VLAN','Redes detectadas por las integraciones.'], ['coverage','Planos','Ubicación de AP en planos del recinto.'] ].map(([key,title,description])=>({key,nav:key+'-nav',title,description,allow:p=>p.has('monitoring:read')})),
   {key:'access-points-panel',nav:'ap-nav',title:'Puntos de acceso',description:'Estado y telemetría de los AP que puedes consultar.',allow:p=>p.has('monitoring:read')||p.has('networks:read:details')},
   {key:'interfaces',nav:'interfaces-nav',title:'Interfaces',description:'Enlaces y tráfico de las interfaces del firewall.',allow:p=>p.has('monitoring:read')},
   {key:'clients',nav:'clients-nav',title:'Clientes',description:'Consulta y filtra las concesiones DHCP.',allow:p=>p.has('monitoring:read')},

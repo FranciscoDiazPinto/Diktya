@@ -26,8 +26,20 @@ def telemetry(client,db_session,admin_user,login):
     db_session.add_all([NetworkAssignment(network_id=a.id,user_id=users[r].id) for r in ['tecnico','cliente']])
     db_session.add(NetworkSupportConfig(network_id=a.id,monitoring_interface_id='opt1',unifi_site_id='demo-site',unifi_ap_ids=['demo-ap-1']))
     db_session.commit()
-    settings=Settings(_env_file=None,unifi_monitoring_mode='mock',monitoring_site_id='firewall-local',monitoring_cache_ttl_seconds=0)
+    settings=Settings(_env_file=None,monitoring_provider='mock',unifi_enabled=False,monitoring_site_id='firewall-local',monitoring_cache_ttl_seconds=0)
     monitoring=build_monitoring_service(settings)
+    from app.monitoring.providers.access_points import AccessPointAdapter
+    from app.monitoring.providers.base import CollectionResult
+    from app.monitoring.schemas import InventorySnapshot, InventoryDevice, DeviceType, DeviceState
+    class DemoSource:
+        async def collect_inventory(self):
+            if settings.monitoring_mock_scenario == 'outage':
+                return CollectionResult(None)
+            return CollectionResult(InventorySnapshot(site_id='demo-site', devices=[
+                InventoryDevice(external_id=f'demo-ap-{n}', name=f'AP {n}',
+                    device_type=DeviceType.ACCESS_POINT, state=DeviceState.ONLINE) for n in range(1,4)]))
+        async def aclose(self): pass
+    monitoring._access_points=AccessPointAdapter(DemoSource())
     app.dependency_overrides[get_settings]=lambda:settings
     app.dependency_overrides[get_monitoring_service]=lambda:monitoring
     users['admin']=admin_user

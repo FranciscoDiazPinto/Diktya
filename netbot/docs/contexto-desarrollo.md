@@ -216,7 +216,7 @@ Confirmación adicional del usuario el 29 de octubre de 2026: se utilizará la A
 | Área | Implementado en Netbot | Trabajo siguiente |
 |---|---|---|
 | Identidad y ámbitos | Roles, usuario activo, asignaciones por red y chat privado con historial del servidor. | Ámbito explícito sitio/evento/AP/VLAN para crear nuevas redes y reautorizar trabajos pendientes. |
-| UniFi | Sin adaptador operativo. | Contrato Python propio de inventario y aprovisionamiento, implementación de laboratorio y matriz de capacidades por versión. |
+| UniFi | Adaptador propio de solo lectura para inventario y alertas; sin validar contra equipos reales. | Contrato de aprovisionamiento, implementación de laboratorio y matriz de capacidades por versión. |
 | OPNsense | Monitoreo e inventario VLAN con proveedor mock/real, errores tipados y datos parciales. | Correspondencia autorizada con Networks UniFi existentes; no crear VLAN ni reemplazar el cliente por el stub de referencia. |
 | CSV | Validación, vistas previas privadas, confirmación y reservas locales, migración 005. | Preparar despliegues sobre filas/reservas elegidas, con seguridad/AP explícitos y resultados por operación. |
 | Plan individual | Diseño en `contexto-desarrollo.md#ssid`. | Propuesta tipada, baseline completo, versión, vencimiento y confirmación vinculada al actor. |
@@ -544,7 +544,7 @@ La instalación local del backend no implica funcionamiento desconectado de Inte
 En `feature/epica-001-auth-login`, desde `dev` d5de65a: HU001/002/003 incorporan auditoría persistente de identidad y denegaciones, protección concurrente del último administrador, revocación efectiva de JWT por sesión y cambios de cuenta, errores por campo y expiración del navegador con retorno a login. Requiere migración 008; tokens previos sin sid deben volver a autenticarse. La API refresh permanece explícita, sin renovación silenciosa en UI. Se validó SQLite/PostgreSQL 16 y el flujo en navegador con datos ficticios. La definición y evidencia están en [épica 001](epica-001-autenticacion-roles.md). Es cierre técnico candidato a revisión: no acredita PR aprobado, integración en dev ni aceptación académica.
 
 
-## Avance monitoreo · 30-10-2026
+## Avance histórico monitoreo · 30-10-2026
 
 Rama `feature/epica-002-monitoreo` actualizada desde `main` 9ac2a2e; se recuperan las guías internas de dev sin modificar main. Se consultaron los símbolos de `integrations/unifiOs/client.ts`, `integrations/unifi/liveClient.ts` y `integrations/opnsense/liveClient.ts` de Atlas para inventario, estadísticas, heartbeat y separación de APIs. Implementación Python independiente contrastada con OpenAPI UniFi 10.6.106 y Diagnostics de OPNsense. No se copiaron código/datos/secretos ni se contactó hardware real.
 
@@ -555,3 +555,18 @@ Validación del bloque de monitoreo: 339 pruebas backend / 43 frontend, migraci�
 Interfaz por vistas (30-10-2026): separación de Resumen, Asistente, AP, Interfaces, Clientes, Firewall, Mi red, Tickets y Aprovisionamiento mediante navigation.mjs y wrappers exteriores. Conserva módulos, sesión e historial; prueba permisos, enlaces, Atrás/Adelante y limpieza Wi-Fi al cambiar de vista. Cambio preparado en la rama de monitoreo, sin commit/push.
 
 Ajuste de interfaz solicitado: chat junto al dashboard en Resumen, no como vista aparte. El resto conserva vistas independientes y el enlace #chat se resuelve a #overview. La preparación desde el chat sigue abriendo Aprovisionamiento; la limpieza de acceso al salir de Mi red se conserva.
+
+
+## Integración con Itamar · 02-11-2026
+
+Rama `integration/itamar-monitoring-tickets`: integra `origin/dev` 8bb505d, que contiene monitoreo 481dbb7 y tickets 5685483. Se priorizan su inventario persistido, estados sin datos, colector con reintentos, alertas, disponibilidad, planos y seguimiento/notificaciones de tickets. No implica validación contra infraestructura real ni cierre académico automático.
+
+Se conservan la autenticación/auditoría y los planes SSID que ya estaban en main, además de la retención acotada de lecturas anteriores, bloqueo de escrituras con inventario vencido, ámbito explícito por red y navegación. El adaptador Python anterior `monitoring/providers/unifi.py` se reemplaza por el paquete `monitoring/providers/unifi/` de Itamar. `providers/access_points.py` transforma su inventario normalizado a DTO mínimos para la vista por red; no crea otro cliente HTTP ni infiere CPU/RAM/heartbeat que no se recolectan. Las estadísticas opcionales del avance histórico del 30-10 ya no se consultan.
+
+Configuración de lectura: `UNIFI_ENABLED`, `UNIFI_TRANSPORT`, `UNIFI_BASE_URL`, `UNIFI_SITE`, API key y TLS/CA según `.env.example`. Se retiran las variables `UNIFI_MONITORING_*` del prototipo. Sin configuración se informa indisponibilidad y no se sustituye por datos simulados. El aprovisionamiento SSID conserva su configuración independiente `UNIFI_INVENTORY_MODE` / `UNIFI_API_BASE_URL` y permanece deshabilitado por defecto.
+
+Las migraciones publicadas conservan sus identificadores y padres. `010_merge_monitoring_tickets` une `009_network_monitoring_scope` y `008_ticket_incidents`; aplicar `alembic upgrade head`. No usar stamp ni borrar tablas para ocultar las dos líneas. Se prueba actualización desde ambos predecesores con datos conservados y arranque desde base vacía.
+
+Resumen mantiene dashboard y chat juntos. Dispositivos, Alertas, SSID y VLAN y Planos tienen vistas separadas con los controles de Itamar. Puntos de acceso conserva la consulta global/por red autorizada; Mi red limpia credenciales al salir. Notificaciones abre Tickets mediante callback de navegación. La prueba de disponibilidad usa el mismo reloj simulado en recolección y lectura para no depender de la fecha del equipo.
+
+Validación de integración: 399 pruebas backend y 68 frontend aprobadas; migraciones SQLite desde ambas historias con registros conservados; revisión visual de Resumen/chat, Dispositivos y Tickets en demo aislada con datos mock. Sin conexión a UniFi/OPNsense reales ni promoción a main.

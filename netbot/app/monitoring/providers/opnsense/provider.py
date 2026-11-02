@@ -7,23 +7,26 @@ se registra el incidente y esa parte queda nula/`unavailable`; el resto sigue.
 
 import asyncio
 import logging
-from collections.abc import Awaitable
-from dataclasses import dataclass
-from typing import Any, ClassVar
+from datetime import tzinfo
+from typing import ClassVar
 
-from ...exceptions import MonitoringError, ProviderInvalidResponseError, ProviderNotSupportedError
+from ...exceptions import ProviderInvalidResponseError
 from ...schemas import (
-    CollectionIssue,
+    DeviceState,
+    DeviceType,
     DhcpLease,
     FirewallEvent,
     FirewallStatistics,
     InterfaceMetrics,
-    IssueKind,
+    InventoryDevice,
+    InventorySnapshot,
+    InventoryVlan,
     SystemMetrics,
     TemperatureMetrics,
     VlanInventoryItem,
 )
 from ..base import CollectionResult, DhcpLeaseProvider, NetworkMonitoringProvider
+from ..base import collect as _collect, issues_of as _issues
 from .client import OPNsenseClient
 from .mappers import (
     build_interfaces,
@@ -48,65 +51,23 @@ PATH_SYSTEM_TEMPERATURE = "/api/diagnostics/system/system_temperature"
 PATH_INTERFACES_INFO = "/api/interfaces/overview/interfaces_info"
 PATH_INTERFACE_STATISTICS = "/api/diagnostics/interface/get_interface_statistics"
 PATH_TRAFFIC_INTERFACE = "/api/diagnostics/traffic/interface"
-PATH_FIREWALL_STATS = "/api/diagnostics/firewall/stats"
-# pf_statistics exige una sección; "info" equivale a `pfctl -si` (estados y contadores).
+# pf_statistics exige una sección; "info" equivale a `pfctl -si` (estados y contadores) e
+# "interfaces" a `pfctl -vvsI`, la única con paquetes pass/block por interfaz.
 PATH_PF_STATISTICS = "/api/diagnostics/firewall/pf_statistics/info"
+PATH_PF_INTERFACES = "/api/diagnostics/firewall/pf_statistics/interfaces"
 PATH_FIREWALL_LOG = "/api/diagnostics/firewall/log"
 PATH_VLAN_SEARCH = "/api/interfaces/vlan_settings/search_item"
-
-
-@dataclass(slots=True)
-class _Outcome:
-    value: Any = None
-    issue: CollectionIssue | None = None
-
-    @property
-    def ok(self) -> bool:
-        return self.issue is None
-
-
-async def _collect(component: str, call: Awaitable[Any], *, optional: bool = False) -> _Outcome:
-    """Ejecuta una llamada y la convierte en valor o incidente; nunca lanza (salvo cancelación)."""
-    try:
-        return _Outcome(value=await call)
-    except ProviderNotSupportedError as exc:
-        # 404 en un recurso opcional es esperable (hardware/versión): no es una alarma.
-        level = logging.INFO if optional else logging.WARNING
-        logger.log(level, "Componente %s no soportado: %s", component, exc.detail)
-        return _Outcome(
-            issue=CollectionIssue(
-                component=component, kind=exc.kind, message=exc.public_message, optional=optional
-            )
-        )
-    except MonitoringError as exc:
-        logger.warning("Fallo al recolectar %s (%s): %s", component, exc.kind.value, exc.detail)
-        return _Outcome(
-            issue=CollectionIssue(
-                component=component, kind=exc.kind, message=exc.public_message, optional=optional
-            )
-        )
-    except Exception:  # un bug de parseo no debe tumbar el dashboard
-        logger.exception("Error inesperado al recolectar %s", component)
-        return _Outcome(
-            issue=CollectionIssue(
-                component=component,
-                kind=IssueKind.UNKNOWN,
-                message="Error interno al procesar la respuesta de OPNsense.",
-                optional=optional,
-            )
-        )
-
-
-def _issues(*outcomes: _Outcome) -> list[CollectionIssue]:
-    return [o.issue for o in outcomes if o.issue is not None]
 
 
 class OPNsenseMonitoringProvider(NetworkMonitoringProvider):
     source: ClassVar[str] = "opnsense"
 
-    def __init__(self, client: OPNsenseClient, dhcp: DhcpLeaseProvider) -> None:
+    def __init__(
+        self, client: OPNsenseClient, dhcp: DhcpLeaseProvider, *, log_timezone: tzinfo | None = None
+    ) -> None:
         self._client = client
         self._dhcp = dhcp
+        self._log_timezone = log_timezone
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -176,7 +137,7 @@ class OPNsenseMonitoringProvider(NetworkMonitoringProvider):
     async def get_firewall_statistics(self) -> CollectionResult[FirewallStatistics]:
         c = self._client
         stats, pf = await asyncio.gather(
-            _collect("firewall.stats", c.get_json(PATH_FIREWALL_STATS)),
+            _collect("firewall.pf_interfaces", c.get_json(PATH_PF_INTERFACES)),
             _collect("firewall.pf_statistics", c.get_json(PATH_PF_STATISTICS)),
         )
         issues = _issues(stats, pf)
@@ -193,4 +154,35 @@ class OPNsenseMonitoringProvider(NetworkMonitoringProvider):
         )
         if not outcome.ok:
             return CollectionResult(data=None, issues=_issues(outcome))
-        return CollectionResult(data=parse_firewall_events(outcome.value, limit), issues=[])
+        events = parse_firewall_events(outcome.value, limit, default_tz=self._log_timezone)
+        return CollectionResult(data=events, issues=[])
+
+    async def collect_inventory(self) -> CollectionResult[InventorySnapshot]:
+        system, vlans = await asyncio.gather(self.get_system_metrics(), self.get_vlan_inventory())
+        issues = [*system.issues, *vlans.issues]
+        if system.data is None and vlans.data is None:
+            return CollectionResult(data=None, issues=issues)
+        return CollectionResult(
+            data=InventorySnapshot(
+                version=system.data.version if system.data else None,
+                devices=None if system.data is None else [
+                    InventoryDevice(
+                        # La instancia es única y el hostname se puede renombrar: no sirve de ID.
+                        external_id="firewall",
+                        name=system.data.hostname or "OPNsense",
+                        device_type=DeviceType.FIREWALL,
+                        model="OPNsense",
+                        state=DeviceState.ONLINE,  # acaba de responder a la API
+                    )
+                ],
+                vlans=None if vlans.data is None else [
+                    InventoryVlan(
+                        external_id=f"{item.parent_interface}:{item.tag}",
+                        name=item.description,
+                        tag=item.tag,
+                    )
+                    for item in vlans.data
+                ],
+            ),
+            issues=issues,
+        )

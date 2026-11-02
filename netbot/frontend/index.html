@@ -77,6 +77,7 @@
         <nav class="main-nav" aria-label="Navegacion principal">
           <p class="nav-label">Workspace</p>
           <a class="nav-item active" id="overview-nav" href="#overview"><span class="nav-icon">⌂</span> Resumen y chat</a>
+          <a class="nav-item" id="devices-nav" href="#devices"><span class="nav-icon">▦</span> Dispositivos</a><a class="nav-item" id="alerts-nav" href="#alerts"><span class="nav-icon">!</span> Alertas <b class="alert-count" id="nav-alerts">–</b></a><a class="nav-item" id="wireless-nav" href="#wireless"><span class="nav-icon">⌁</span> SSID y VLAN</a><a class="nav-item" id="coverage-nav" href="#coverage"><span class="nav-icon">◫</span> Planos</a>
           <a class="nav-item" href="#access-points-panel" id="ap-nav" hidden><span class="nav-icon">◉</span> Puntos de acceso</a>
           <a class="nav-item" id="interfaces-nav" href="#interfaces"><span class="nav-icon">⌁</span> Interfaces <b id="nav-interfaces">–</b></a>
           <a class="nav-item" id="clients-nav" href="#clients"><span class="nav-icon">◌</span> Clientes <b id="nav-clients">–</b></a>
@@ -97,10 +98,14 @@
         <header class="topbar">
           <button class="mobile-menu" aria-label="Abrir navegacion">☰</button>
           <div class="breadcrumbs"><span>Workspace</span><i>/</i><strong id="current-view-label">Resumen</strong></div>
-          <div class="topbar-actions" id="global-monitoring-actions"><span class="last-sync">Última consulta a Netbot <strong id="last-sync">–</strong></span><button class="refresh-button" id="refresh-button"><span>↻</span> Actualizar</button></div>
+          <div class="topbar-actions"><button class="refresh-button" id="notifications-button" type="button" hidden aria-expanded="false" aria-controls="notifications-panel">Notificaciones <b class="alert-count" id="notifications-count">0</b></button><div class="topbar-actions" id="global-monitoring-actions"><span class="last-sync">Última consulta a Netbot <strong id="last-sync">–</strong></span><button class="refresh-button" id="refresh-button"><span>↻</span> Actualizar</button></div></div>
         </header>
 
         <div class="content-wrap">
+<section class="panel support-panel" id="notifications-panel" hidden aria-labelledby="notifications-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">EQUIPO TÉCNICO</p><h2 id="notifications-heading">Notificaciones</h2></div></div>
+            <div id="notifications-list" class="reservation-list"></div>
+          </section>
           <section class="page-heading">
             <div><p class="eyebrow" id="today-label"></p><h1 id="greeting">Hola <span>↗</span></h1><h1 id="view-title" hidden tabindex="-1"></h1><p class="heading-copy" id="view-description">Una vista general del estado de tu infraestructura.</p></div>
             <div id="overview-period-tools"><div class="period-picker" aria-label="Ventana del grafico"><button class="period active" data-window="300">5 min</button><button class="period" data-window="900">15 min</button><button class="period" data-window="3600">1 h</button></div></div>
@@ -112,6 +117,7 @@
           <div id="personal-overview" class="overview-shortcuts" hidden></div>
           <div class="overview-with-chat" id="dashboard-chat-layout">
             <div class="overview-monitoring" id="overview-monitoring">
+<article class="panel wide-panel" id="inventory"><div class="panel-heading"><div><p class="panel-kicker">INVENTARIO</p><h2>Estado de la red</h2></div><span class="last-sync">Actualizado <strong id="inventory-updated">–</strong></span></div><p class="inventory-stale" id="inventory-stale" role="status" hidden></p><div class="fw-summary inventory-kpis" id="inventory-kpis"></div><div class="inventory-sources" id="inventory-sources" aria-label="Estado de las integraciones"></div></article>
           <section class="stats-grid" aria-label="Indicadores principales">
             <article class="stat-card accent-lime"><div class="stat-top"><span class="stat-label">INTERFACES ACTIVAS</span><span class="stat-symbol">⌁</span></div><div class="stat-value" id="stat-interfaces">–</div><div class="stat-meta" id="stat-interfaces-meta">Cargando…</div><div class="sparkline lime" id="spark-interfaces"></div></article>
             <article class="stat-card accent-orange"><div class="stat-top"><span class="stat-label">TRAFICO WAN</span><span class="stat-symbol">↗</span></div><div class="stat-value" id="stat-traffic">–</div><div class="stat-meta" id="stat-traffic-meta">Cargando…</div><div class="sparkline orange" id="spark-traffic"></div></article>
@@ -172,6 +178,10 @@
             <div id="ap-pagination" class="chat-controls" hidden><button id="ap-previous" type="button">Anterior</button><span id="ap-page"></span><button id="ap-next" type="button">Siguiente</button></div>
           </section>
           </section>
+          <section id="view-alerts" class="app-view" hidden aria-label="alerts"><article class="panel wide-panel" id="alerts"><div class="panel-heading"><div><p class="panel-kicker">INCIDENTES</p><h2>Alertas activas</h2></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Severidad</th><th>Dispositivo</th><th>Mensaje</th><th>Detectada</th></tr></thead><tbody id="alerts-body"><tr><td colspan="4" class="empty-state">Cargando alertas…</td></tr></tbody></table></div></article></section>
+          <section id="view-devices" class="app-view" hidden aria-label="devices"><article class="panel wide-panel" id="devices"><div class="panel-heading"><div><p class="panel-kicker">INFRAESTRUCTURA</p><h2>Dispositivos</h2></div><div class="panel-tools"><label class="toggle-option" for="devices-state">Estado</label><select id="devices-state"><option value="">Todos</option><option value="online">En línea</option><option value="degraded">Degradado</option><option value="offline">Fuera de línea</option><option value="maintenance">Mantención</option><option value="unknown">Desconocido</option></select><label class="toggle-option" for="devices-type">Tipo</label><select id="devices-type"><option value="">Todos</option><option value="ap">AP</option><option value="switch">Switch</option><option value="gateway">Gateway</option><option value="firewall">Firewall</option><option value="unknown">Desconocido</option></select></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>IP</th><th>Estado</th><th>Última vez visto</th></tr></thead><tbody id="devices-body"><tr><td colspan="5" class="empty-state">Cargando dispositivos…</td></tr></tbody></table></div><div class="inventory-pager"><button id="devices-prev" type="button">Anterior</button><span id="devices-page"></span><button id="devices-next" type="button">Siguiente</button></div></article></section>
+          <section id="view-wireless" class="app-view" hidden aria-label="wireless"><article class="panel wide-panel" id="wireless"><div class="panel-heading"><div><p class="panel-kicker">REDES</p><h2>SSID y VLAN</h2></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>SSID</th><th>Estado</th><th>Seguridad</th><th>VLAN</th></tr></thead><tbody id="ssids-body"></tbody></table></div><div class="table-wrap"><table class="data-table"><thead><tr><th>VLAN</th><th>Nombre</th><th>Fuente</th></tr></thead><tbody id="vlans-body"></tbody></table></div></article></section>
+          <section id="view-coverage" class="app-view" hidden aria-label="coverage"><article class="panel wide-panel" id="coverage"><div class="panel-heading"><div><p class="panel-kicker">RECINTO</p><h2>Planos de cobertura</h2></div><div class="panel-tools"><label class="toggle-option" for="plan-select">Plano</label><select id="plan-select"><option value="">Selecciona un plano</option></select><button id="plan-delete" type="button" hidden>Eliminar plano</button></div></div><form id="plan-form" class="chat-controls" hidden><label for="plan-name">Nombre</label><input id="plan-name" maxlength="120" required /><label for="plan-file">Imagen PNG o JPEG</label><input id="plan-file" type="file" accept="image/png,image/jpeg" required /><button id="plan-upload" type="submit">Cargar plano</button></form><p id="plan-status" role="status"></p><div class="plan-layout"><div class="plan-stage" id="plan-stage" hidden><img id="plan-image" alt="Plano del recinto" /><div id="plan-markers"></div></div><aside class="plan-side"><h3>Sin ubicar</h3><div id="plan-unplaced"></div><h3>AP seleccionado</h3><div id="plan-detail"><p class="empty-state">Selecciona un AP.</p></div></aside></div></article></section>
           <section id="view-interfaces" class="app-view" hidden aria-label="Interfaces">
 <article class="panel interfaces-panel" id="interfaces"><div class="panel-heading"><div><p class="panel-kicker">CONECTIVIDAD</p><h2>Interfaces</h2></div></div><div class="interfaces-list" id="interfaces-list"><p class="empty-state">Cargando interfaces…</p></div></article>
           </section>
@@ -214,7 +224,15 @@
           </section>
           <section id="view-tickets-panel" class="app-view" hidden aria-label="Tickets">
 <section class="panel support-panel" id="tickets-panel" hidden aria-labelledby="tickets-heading">
-            <div class="panel-heading"><div><p class="panel-kicker">SEGUIMIENTO</p><h2 id="tickets-heading">Tickets autorizados</h2></div><button id="tickets-refresh" type="button">Actualizar</button></div>
+            <div class="panel-heading"><div><p class="panel-kicker">SEGUIMIENTO</p><h2 id="tickets-heading">Tickets autorizados</h2></div><div class="panel-tools"><label class="toggle-option" for="tickets-status">Estado</label><select id="tickets-status"><option value="">Todos</option><option value="open">Abierto</option><option value="in_progress">En progreso</option><option value="resolved">Resuelto</option><option value="closed">Cerrado</option></select><label class="toggle-option" for="tickets-criticality">Criticidad</label><select id="tickets-criticality"><option value="">Todas</option><option value="critica">Crítica</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select><label class="toggle-option"><input type="checkbox" id="tickets-mine" /> Asignados a mí</label><button id="tickets-refresh" type="button">Actualizar</button></div></div>
+            <form id="ticket-manual-form" class="support-form" hidden>
+              <h3>Crear ticket técnico</h3>
+              <label for="manual-summary">Resumen</label><input id="manual-summary" minlength="3" maxlength="160" required />
+              <label for="manual-description">Descripción</label><textarea id="manual-description" maxlength="2000" required rows="2"></textarea>
+              <label for="manual-criticality">Criticidad</label><select id="manual-criticality"><option value="baja">Baja</option><option value="media" selected>Media</option><option value="alta">Alta</option><option value="critica">Crítica</option></select>
+              <button id="manual-submit" type="submit">Crear ticket técnico</button>
+              <p id="manual-feedback" role="status"></p>
+            </form>
             <div id="tickets-list" class="reservation-list"></div>
           </section>
           </section>

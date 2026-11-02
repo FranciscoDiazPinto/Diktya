@@ -232,3 +232,13 @@ def execution_actor(db: Session, user_id: int) -> User:
 def list_audit(db: Session, actor: User, *, limit=50, offset=0) -> list[AuthAuditEvent]:
     require_user_permission(db, actor, Permission.AUTH_AUDIT_READ)
     return list(db.scalars(select(AuthAuditEvent).order_by(AuthAuditEvent.id.desc()).limit(limit).offset(offset)))
+
+def active_staff(db: Session) -> list[dict]:
+    """Contactos del equipo técnico: contrato para notificar sin exponer el modelo User."""
+    users = db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all()
+    staff = []
+    for user in users:
+        roles = {role.name for role in user.roles}
+        if roles & {"admin", "tecnico", "operador"}:
+            staff.append({"id": user.id, "email": user.email, "admin": "admin" in roles})
+    return staff

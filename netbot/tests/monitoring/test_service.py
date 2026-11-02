@@ -46,6 +46,9 @@ class StubProvider(NetworkMonitoringProvider):
     async def get_firewall_statistics(self):
         raise NotImplementedError
 
+    async def collect_inventory(self):
+        raise NotImplementedError
+
     async def get_firewall_events(self, limit):
         self.calls += 1
         base = datetime(2026, 10, 4, tzinfo=timezone.utc)

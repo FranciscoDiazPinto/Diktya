@@ -93,3 +93,15 @@ test('chat belongs to the dashboard and old chat links open the combined overvie
   ui.navigation.configureUser({permissions:['monitoring:read']});
   assert.equal(ui.$('chat').hidden,true);
 });
+
+
+test('integrated inventory modules each open a separate view and reject unprivileged deep links',()=>{
+  for(const key of ['devices','alerts','wireless','coverage']) {
+    const ui=setup('#'+key);ui.navigation.configureUser(admin);
+    assert.deepEqual(ui.visible(),['#view-'+key]);
+    ui.navigation.configureUser({permissions:['chat:use','tickets:read:own']});
+    assert.deepEqual(ui.visible(),['#view-overview']);
+    assert.equal(ui.$(key+'-nav').hidden,true);
+    assert.equal(ui.navigation.navigate(key),false);
+  }
+});

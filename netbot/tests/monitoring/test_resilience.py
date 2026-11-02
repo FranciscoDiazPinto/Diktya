@@ -65,14 +65,20 @@ async def test_known_vlan_inventory_is_not_usable_for_changes_during_outage(db_s
 
 
 async def test_access_point_page_preserves_stale_metadata_and_has_exact_total():
-    from app.core.config import Settings
-    from app.monitoring.providers.unifi import UniFiAccessPointProvider
-    settings=Settings(_env_file=None,unifi_monitoring_mode='mock')
-    provider=UniFiAccessPointProvider(settings)
-    service=MonitoringService(MockMonitoringProvider(),cache_ttl_seconds=0,access_points_provider=provider)
+    from app.monitoring.providers.access_points import AccessPointAdapter
+    from app.monitoring.schemas import InventorySnapshot, InventoryDevice, DeviceType
+    class Source:
+        fail = False
+        async def collect_inventory(self):
+            if self.fail: return CollectionResult(None)
+            return CollectionResult(InventorySnapshot(site_id='demo-site', devices=[
+                InventoryDevice(external_id=f'demo-ap-{n}',name=f'AP {n}',device_type=DeviceType.ACCESS_POINT)
+                for n in range(1,4)]))
+    provider=Source()
+    service=MonitoringService(MockMonitoringProvider(),cache_ttl_seconds=0,access_points_provider=AccessPointAdapter(provider))
     page=await service.get_access_point_page(limit=1,offset=1)
     assert page.data.total_count==3 and page.data.items[0].id=='demo-ap-2'
-    settings.monitoring_mock_scenario='outage'
+    provider.fail=True
     old=await service.get_access_point_page(limit=1,offset=2)
     assert old.stale and old.data.total_count==3 and old.data.items[0].id=='demo-ap-3'
 
