@@ -3,7 +3,7 @@
 La entrada es el chat temporal de invitados. `modules/guest.mjs` controla el QR, la confirmación y la limpieza a los 60 segundos, sin almacenamiento del navegador. El compositor cambia entre invitados, login y dashboard. Ver [configuración de autoatención](../docs/atencion-invitados.md).
 
 Prototipo del centro de monitoreo de Netbot. Esta primera versión no requiere
-dependencias ni build: abre `index.html` directamente en el navegador.
+dependencias ni build: servir con HTTP local, o con HTTPS en producción.
 
 ## Estructura
 
@@ -15,15 +15,9 @@ dependencias ni build: abre `index.html` directamente en el navegador.
 
 El formulario usa `POST /auth/login`, valida la sesion con `GET /auth/me` y cierra
 sesion con `POST /auth/logout`. Por defecto busca la API en `http://localhost:8000`.
-Para cambiarla desde la consola del navegador:
+En producción usa la API del mismo origen mediante proxy HTTPS. La URL no se lee de localStorage. Los tokens viven únicamente en memoria; recargar o cerrar la página exige iniciar sesión de nuevo. El arranque borra tokens y URL base persistidos por versiones anteriores. El refresh explícito conserva rotación y aislamiento de sesión; no hay renovación automática ni cookies de autenticación.
 
-```js
-localStorage.setItem('netbot_api_url', 'http://localhost:8000')
-```
-
-El backend permite por defecto los origenes de desarrollo `localhost:5173`,
-`127.0.0.1:5173` y archivos locales (`null`). En otros entornos se puede definir
-`CORS_ORIGINS` como una lista separada por comas.
+CORS admite por defecto `localhost:5173` y `127.0.0.1:5173`, sin `null`. En producción usar `CORS_ORIGINS` explícitos.
 
 ## Chat con Netbot
 

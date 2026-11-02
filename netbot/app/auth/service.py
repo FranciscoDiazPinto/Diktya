@@ -43,8 +43,17 @@ def _fingerprint(email: str) -> str:
 
 def login(data: LoginRequest, db: Session) -> TokenResponse:
     bind_request(db)
+    # El hash costoso no debe mantener el bloqueo global de administración.
+    initial = db.scalar(select(User).where(User.email == data.email.lower()))
+    initial_id = initial.id if initial else None
+    password_hash = initial.hashed_password if initial else _DUMMY_PASSWORD_HASH
+    db.rollback()  # liberar la transacción de lectura antes de Argon2
+    valid_password = verify_password(data.password, password_hash)
     _lock_administration(db)
     user = db.scalar(select(User).where(User.email == data.email.lower()))
+    # Una modificación concurrente de cuenta/contraseña invalida el resultado previo.
+    valid_password = bool(valid_password and user and user.id == initial_id
+                          and user.hashed_password == password_hash)
     now = _login_now()
     locked_until = user.login_locked_until if user else None
     if locked_until is not None and locked_until.tzinfo is None:
@@ -53,8 +62,6 @@ def login(data: LoginRequest, db: Session) -> TokenResponse:
     if user and locked_until is not None and not locked:
         user.failed_login_attempts = 0
         user.login_locked_until = None
-    # Comprobar el hash también durante el bloqueo y para correos desconocidos.
-    valid_password = verify_password(data.password, user.hashed_password if user else _DUMMY_PASSWORD_HASH)
     if not user or not user.is_active or not valid_password or locked:
         if user and user.is_active and not locked:
             user.failed_login_attempts += 1

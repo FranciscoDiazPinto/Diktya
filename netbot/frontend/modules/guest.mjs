@@ -29,7 +29,7 @@ export function createGuest({document, window, api, Option, now = () => Date.now
   function checkExpiry() {
     if (deadline && now() >= deadline) reset('La atención anterior se limpió. Hola, ¿en qué puedo ayudarte?');
   }
-  function reset(welcome = '¡Hola! Puedo ayudarte a recuperar el acceso Wi-Fi enviado a tu correo. ¿Qué necesitas?') {
+  function reset(welcome = '¡Hola! Puedo orientarte con la conexión Wi-Fi. ¿Qué necesitas?') {
     const old = token; generation += 1; token = null; creating = null;
     aborter.abort(); aborter = new AbortController(); cancelTimer(); stage = ''; lastActivity = 0;
     setBusy(false); input.value = ''; messages.replaceChildren(); $('#guest-qr').replaceChildren();
@@ -98,29 +98,14 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     checkExpiry(); if (busy) return;
     $('#guest-wifi').hidden = true; $('#guest-qr').replaceChildren(); $('#guest-network').replaceChildren();
     $('#guest-contact').value = ''; $('#guest-identify-error').textContent = '';
-    $('#guest-identify-form').hidden = false; stage = ''; $('#guest-resolution').hidden = true;
-    say('Para recuperar tus credenciales, ingresa el correo o teléfono registrado en el formulario protegido. Solo mostraremos la red que corresponda a ese dato.');
-    arm(); touch(); $('#guest-contact').focus();
+    $('#guest-identify-form').hidden = true; stage = ''; $('#guest-resolution').hidden = true;
+    say('La recuperación privada requiere verificación de identidad. Solicita ayuda al equipo del recinto. No ingreses contactos ni contraseñas en el chat.');
+    arm(); touch();
   }
-  $('#guest-identify-form').addEventListener('submit', async (event) => {
-    event.preventDefault(); checkExpiry(); if (busy) return;
-    const contact = $('#guest-contact').value.trim(); if (!contact) return;
-    $('#guest-contact').value = ''; $('#guest-identify-error').textContent = '';
-    $('#guest-qr').replaceChildren(); $('#guest-network').replaceChildren(); $('#guest-wifi').hidden = true;
-    const g = generation; setBusy(true); arm();
-    try {
-      await ensureSession();
-      const networks = await request('/identify', {method: 'POST', body: JSON.stringify({contact})});
-      if (!current(g)) return;
-      $('#guest-network').replaceChildren(...networks.map(n => new Option(`${n.name} · ${n.ssid}`, n.id)));
-      $('#guest-wifi').hidden = networks.length === 0; $('#guest-identify-form').hidden = true;
-      say('Encontramos tu acceso. Selecciona tu red y pulsa «Mostrar QR para conectarme».'); arm();
-    } catch (error) {
-      if (!current(g)) return;
-      if (error.status === 404) { failure(error, g); return; }
-      $('#guest-identify-error').textContent = error.message || 'No se pudo comprobar el acceso. Solicita ayuda al equipo.';
-      arm();
-    } finally { if (current(g)) setBusy(false); }
+  $('#guest-identify-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    $('#guest-contact').value = '';
+    askIdentity();
   });
   async function showQr() {
     checkExpiry(); if (busy || !$('#guest-network').value) return;
@@ -140,7 +125,7 @@ export function createGuest({document, window, api, Option, now = () => Date.now
   $('#guest-form').addEventListener('submit', async (event) => {
     event.preventDefault(); checkExpiry(); if (busy) return;
     const message = input.value.trim(); if (!message) return; input.value = '';
-    // El dato de recuperación va únicamente a /identify, nunca al log ni al LLM.
+    // No recolectar ni reenviar contactos al modelo; la recuperación privada está suspendida.
     if (/[^\s@]+@[^\s@]+|(?:\+|00)?[0-9][0-9 ()-]{7,}[0-9]/.test(message)) { askIdentity(); return; }
     say(message, 'user');
     const choice = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[.!¡¿?]/g, '').trim();

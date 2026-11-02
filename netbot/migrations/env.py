@@ -28,9 +28,30 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=Base.metadata)
-        with context.begin_transaction():
-            context.run_migrations()
+        sqlite = connection.dialect.name == "sqlite"
+        if sqlite:
+            # Solo mantenimiento offline: batch recrea tablas y con CASCADE activo
+            # borraría filas hijas. Validar antes, migrar atómicamente y validar después.
+            if connection.exec_driver_sql("PRAGMA foreign_key_check").fetchone():
+                raise RuntimeError("SQLite tiene referencias huérfanas; corregir antes de migrar")
+            connection.rollback()
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            connection.commit()
+        context.configure(connection=connection, target_metadata=Base.metadata,
+                          **({"transactional_ddl": True} if sqlite else {}))
+        try:
+            with context.begin_transaction():
+                if sqlite:
+                    # sqlite3 en modo legacy no inicia transacción para DDL por sí solo.
+                    connection.exec_driver_sql("BEGIN IMMEDIATE")
+                context.run_migrations()
+                if sqlite and connection.exec_driver_sql("PRAGMA foreign_key_check").fetchone():
+                    raise RuntimeError("La migración produjo referencias inválidas; rollback")
+        finally:
+            if sqlite:
+                connection.rollback()
+                connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+                connection.commit()
 
 
 if context.is_offline_mode():

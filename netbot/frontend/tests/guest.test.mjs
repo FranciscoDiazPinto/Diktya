@@ -52,7 +52,7 @@ test('entry is anonymous; closing requires confirmation and clears within exactl
 test('QR stays outside history and is removed together with all guest state on confirmation', async () => {
   const ui = setup(async path => (path.endsWith('/networks') || path.endsWith('/identify')) ? [{id: 1, name: 'Invitados', ssid: 'Public'}] : {ssid:'Public', qr_data_url:'data:image/svg+xml;base64,TEST'});
   await ui.submit('Dame el Wi-Fi');
-  await ui.identify('client@example.com');
+  await ui.$('#guest-portal-button').events.click();
   ui.$('#guest-network').value = '1';
   await ui.$('#guest-show-qr').events.click();
   assert.equal(ui.$('#guest-qr').children[1].src, 'data:image/svg+xml;base64,TEST');
@@ -125,28 +125,23 @@ test('a QR arriving after cleanup cannot appear in the next attention', async ()
   assert.equal(ui.$('#guest-wifi').hidden, true);
 });
 
-test('recovery requests contact before showing networks and sends it outside chat only', async () => {
-  const ui = setup(async path => path.endsWith('/identify') ? [{id: 7, name: 'Cliente', ssid: 'Client'}] : {answer:'General'});
+test('private recovery requests staff verification without collecting contacts', async () => {
+  const ui = setup();
   await ui.submit('Necesito mis credenciales');
-  assert.equal(ui.$('#guest-identify-form').hidden, false);
-  assert.equal(ui.$('#guest-wifi').hidden, true);
-  assert.ok(!ui.calls.some(c => c.path.endsWith('/access')));
-  await ui.identify('client@example.com');
-  assert.equal(ui.$('#guest-wifi').hidden, false);
-  assert.equal(ui.$('#guest-contact').value, '');
   assert.equal(ui.$('#guest-identify-form').hidden, true);
+  assert.equal(ui.$('#guest-wifi').hidden, true);
+  await ui.identify('client@example.com');
+  assert.equal(ui.$('#guest-contact').value, '');
   assert.doesNotMatch(ui.content(), /client@example.com/);
-  assert.equal(ui.calls.find(c => c.path.endsWith('/identify')).options.body, JSON.stringify({contact:'client@example.com'}));
-  assert.ok(!ui.calls.some(c => c.path.endsWith('/messages')));
-  ui.guest.reset();
-  assert.equal(ui.$('#guest-network').children.length, 0);
+  assert.match(ui.content(), /verificación de identidad/);
+  assert.ok(!ui.calls.some(c => /identify|messages|access/.test(c.path)));
 });
 
 test('contact accidentally entered in chat is neither echoed nor sent to the model', async () => {
   const ui = setup();
   await ui.submit('Mi correo es private@example.com');
   assert.doesNotMatch(ui.content(), /private@example.com/);
-  assert.equal(ui.$('#guest-identify-form').hidden, false);
+  assert.equal(ui.$('#guest-identify-form').hidden, true);
   assert.equal(ui.calls.length, 0);
   ui.$('#guest-contact').value = '+56912345678';
   ui.advance(60000);
@@ -160,6 +155,7 @@ test('failed identification never displays a network selector or QR', async () =
   await ui.identify('no-match@example.com');
   assert.equal(ui.$('#guest-wifi').hidden, true);
   assert.equal(ui.$('#guest-qr').children.length, 0);
-  assert.match(ui.$('#guest-identify-error').textContent, /No se pudo/);
+  assert.match(ui.content(), /verificación de identidad/);
+  assert.ok(!ui.calls.some(c => c.path.endsWith('/identify')));
   assert.doesNotMatch(ui.content(), /no-match@example.com/);
 });

@@ -1,4 +1,6 @@
 import os
+import tempfile
+import sqlite3
 
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["ENVIRONMENT"] = "test"
@@ -6,7 +8,8 @@ os.environ["MONITORING_PROVIDER"] = "mock"
 os.environ["MONITORING_COLLECTOR_ENABLED"] = "false"
 os.environ["UNIFI_ENABLED"] = "false"
 os.environ["TICKET_AGENT_ENABLED"] = "false"
-os.environ["JWT_SECRET_KEY"] = "a-test-secret-key-that-is-long-enough"
+os.environ["JWT_SECRET_KEY"] = "test-only-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+os.environ["SECURITY_RATE_LIMIT_PATH"] = os.path.join(tempfile.mkdtemp(prefix="netbot-rates-"), "rates.db")
 os.environ["ADMIN_EMAIL"] = ""
 os.environ["ADMIN_PASSWORD"] = ""
 
@@ -79,3 +82,11 @@ def login(client):
         return response, {"Authorization": f"Bearer {response.json()['access_token']}"}
 
     return do_login
+
+
+@pytest.fixture(autouse=True)
+def isolate_request_limits():
+    path = os.environ["SECURITY_RATE_LIMIT_PATH"]
+    if os.path.exists(path):
+        with sqlite3.connect(path) as db:
+            db.execute("DELETE FROM request_limits")
