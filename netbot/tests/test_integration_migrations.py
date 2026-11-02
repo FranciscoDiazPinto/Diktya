@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, inspect, text
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize('previous', ['009_network_monitoring_scope', '008_ticket_incidents'])
+@pytest.mark.parametrize('previous', ['009_network_monitoring_scope', '008_ticket_incidents', '010_merge_monitoring_tickets'])
 def test_upgrade_each_history_preserves_records_and_converges(previous, tmp_path):
     url = f'sqlite:///{tmp_path / "integration.db"}'
     env = dict(os.environ, DATABASE_URL=url, ENVIRONMENT='test', MONITORING_PROVIDER='mock',
@@ -23,15 +23,17 @@ def test_upgrade_each_history_preserves_records_and_converges(previous, tmp_path
     engine = create_engine(url)
     with engine.begin() as db:
         db.execute(text("INSERT INTO users (id,email,hashed_password,is_active) VALUES (17,'preserved@example.com','test-hash',1)"))
-        if previous == '009_network_monitoring_scope':
+        if previous != '008_ticket_incidents':
             db.execute(text("INSERT INTO auth_audit_events (actor_id,action,outcome,source,details) VALUES (17,'test','success','test','{}')"))
         else:
             db.execute(text("INSERT INTO monitoring_sources (source,status,consecutive_failures) VALUES ('mock','ok',0)"))
     migrate('head')
     with engine.connect() as db:
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '010_merge_monitoring_tickets'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '011_login_lockout'
         assert db.scalar(text('SELECT email FROM users WHERE id=17')) == 'preserved@example.com'
-        if previous == '009_network_monitoring_scope':
+        assert db.scalar(text('SELECT failed_login_attempts FROM users WHERE id=17')) == 0
+        assert db.scalar(text('SELECT login_locked_until FROM users WHERE id=17')) is None
+        if previous != '008_ticket_incidents':
             assert db.scalar(text('SELECT actor_id FROM auth_audit_events')) == 17
         else:
             assert db.scalar(text('SELECT status FROM monitoring_sources')) == 'ok'
