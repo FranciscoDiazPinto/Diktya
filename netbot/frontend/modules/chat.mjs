@@ -9,6 +9,13 @@ export function createChat({ document, Option, state, api, onConversationChanged
   const chatEmpty = document.querySelector('#chat-empty');
   const chatStatus = document.querySelector('#chat-status');
   const chatSend = document.querySelector('#chat-send');
+  chatInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    if (!event.repeat && !chatInput.disabled && !chatSend.disabled && chatInput.value.trim()) {
+      chatForm.requestSubmit(chatSend);
+    }
+  });
   let conversationId = null;
   let conversationVersion = 0;
   let chatSelection = 0;

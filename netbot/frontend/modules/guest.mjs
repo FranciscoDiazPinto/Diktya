@@ -2,6 +2,14 @@
 export function createGuest({document, window, api, Option, now = () => Date.now()}) {
   const $ = (s) => document.querySelector(s);
   const screen = $('#guest-screen'), messages = $('#guest-messages'), input = $('#guest-message');
+  input.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    const button = $('#guest-send');
+    if (!event.repeat && !input.disabled && !button.disabled && input.value.trim()) {
+      $('#guest-form').requestSubmit(button);
+    }
+  });
   let generation = 0, token = null, creating = null, timer = null, deadline = 0;
   let visible = false, busy = false, stage = '', lastActivity = 0;
   let aborter = new AbortController();
