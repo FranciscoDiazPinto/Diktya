@@ -49,6 +49,15 @@ Tras iniciar sesion, el dashboard consulta cada 5 s los recursos de
 vence, limpia la sesión y muestra el login; no renueva automáticamente ni repite escrituras. Las fallas parciales (`degraded`/`unavailable`)
 se muestran en un aviso sobre los indicadores, sin ocultar los datos que si llegaron.
 
+El módulo `inventory.mjs` consulta cada 15 s el resumen, los dispositivos con filtros por estado y
+tipo, las alertas y los SSID/VLAN, y avisa si los datos están desactualizados o si se perdió la API.
+También muestra los planos: cada AP con color según su estado y los demás como «sin ubicar».
+Cargar planos y ubicar APs solo aparece con `networks:manage`.
+
+## Tickets y notificaciones
+
+El panel de tickets filtra por estado, criticidad y responsable. Quien gestiona tickets puede asignárselos, comentar, ajustar la criticidad y crear tickets técnicos; `visor` solo consulta los de infraestructura. `notifications.mjs` muestra la bandeja del equipo técnico cada 20 s y destaca Alta y Crítica.
+
 ## Soporte al cliente
 
 El panel Mi acceso y mi red permite comprobar una red autorizada y revelar su acceso Wi-Fi fuera del chat durante un minuto. El chat puede ofrecer ese botón y propuestas de ticket con confirmación explícita. Los tickets persisten en el backend; técnicos asignados y administradores pueden actualizar su estado con notas visibles para el cliente.
@@ -57,7 +66,7 @@ Los datos mock se rotulan como demostración; interfaz activa no significa Wi-Fi
 
 ## Organización del código
 
-El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
+El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, inventory, notifications, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
 
 Cada controlador mantiene estado privado; identidad y época de sesión son el único estado compartido. No añadir lógica de funcionalidad a app.js/dashboard ni importar el compositor desde otro módulo. Usar el cliente API común y preservar los controles que descartan respuestas tardías de otra cuenta/selección.
 
@@ -66,3 +75,14 @@ Las pruebas (`node --test frontend/tests/*.test.mjs`) importan los mismos módul
 ### Carga CSV
 
 Admin puede validar la [plantilla y contrato CSV](../docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
+
+
+## Navegación por vistas
+
+El menú muestra una vista a la vez: Resumen y chat, Dispositivos, Alertas, SSID y VLAN, Planos, Puntos de acceso, Interfaces, Clientes, Firewall, Mi red, Tickets y Aprovisionamiento, según permisos. `modules/navigation.mjs` controla únicamente wrappers y navegación por hash, con enlaces directos, recarga y Atrás/Adelante sin reinstanciar controladores ni perder conversaciones. Los módulos conservan sus controles de autorización y estado privado; el backend sigue autorizando cada solicitud.
+
+Resumen reúne el chat con indicadores/gráficos para roles globales y accesos a funciones permitidas para otros usuarios. En escritorio se muestran monitoreo y chat en columnas; en pantallas estrechas se apilan. El enlace antiguo `#chat` abre esta vista combinada. CSV, planes SSID y reservas se agrupan en Aprovisionamiento. Acceso Wi-Fi y destinatarios se ubican en Mi red; salir de esa vista oculta credenciales y descarta respuestas pendientes. Los botones de propuestas del chat abren la vista correspondiente. Una respuesta tardía de preparación SSID no cambia de página si el usuario ya salió del chat.
+
+Para desarrollo, servir `frontend` normalmente: las rutas `#chat`, `#clients`, etc. no requieren reescrituras del servidor. Tras actualizar módulos estáticos en una demo ya abierta, recargar sin caché si el navegador conserva la versión anterior.
+
+Las notificaciones del equipo permanecen accesibles desde la barra superior en cualquier vista; sus enlaces abren Tickets. Los módulos inventory y notifications provienen del desarrollo de monitoreo/tickets integrado y conservan sus contratos de API.

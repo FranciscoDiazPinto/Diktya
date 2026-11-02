@@ -4,6 +4,7 @@ La entrada pública incluye [autoatención de invitados y QR Wi-Fi](atencion-inv
 
 Esta guía describe el código implementado. Es el punto de entrada técnico junto con [AGENTS.md](../../AGENTS.md). El [documento de referencia](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo, separado del estado real.
 
+El contexto de interoperabilidad externo y las notas internas se mantienen en las ramas de desarrollo; no son dependencias del producto académico.
 
 ## Organización
 
@@ -23,7 +24,8 @@ flowchart TD
     CHAT --> LLM[Contrato ChatProvider / OpenRouter]
     NET --> MON
     TICK --> NET
-    MON --> ADAPT[Adaptadores mock / OPNsense]
+    MON --> ADAPT[Adaptadores mock / OPNsense / UniFi]
+    MON --> DB
     AUTH --> DB[(SQL: tablas propias de cada módulo)]
     CHAT --> DB
     NET --> DB
@@ -35,12 +37,12 @@ flowchart TD
 
 | Módulo | Propiedad y contratos |
 |---|---|
-| auth | Usuarios/roles/tokens y auditoría de identidad append-only (008). `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
+| auth | Usuarios/roles/tokens. `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
 | networks | Inventario y asignaciones (`service.py`); autorización por recurso (`access.py`); configuración (`configuration.py`); claves (`credentials.py`); diagnóstico (`diagnostics.py`); registro de auditoría (`audit.py`). |
-| tickets | Tablas Ticket/Event y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización. |
-| monitoring | Contrato `NetworkMonitoringProvider`, normalización, servicio/cache/historial y fábrica de adaptadores mock/OPNsense. |
+| tickets | Tablas Ticket/Event/Notification y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización; `criticality.py` las reglas; `notifications.py` las entregas; `agent.py` el agente en memoria de incidentes, escalamiento y correo. |
+| monitoring | Contratos `InfrastructureSource` y `NetworkMonitoringProvider`, normalización, servicio/cache/historial, fábrica de adaptadores mock/OPNsense/UniFi, inventario persistido y colector (`inventory.py`), alertas (`alerts.py`) y planos (`plans.py`). Tablas `monitoring_*`, migración 007. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
-| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). Incluye planes SSID privados, ámbitos/concesiones, inventario UniFi y ejecutor CLI separado, deshabilitado por defecto. |
+| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). No ejecuta configuración de infraestructura. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
 | core | Configuración, conexión SQL y errores de aplicación. No coordina dominios. |
 
@@ -53,7 +55,7 @@ El chat consulta `tickets.service.list_ticket_summaries()`; no importa Ticket ni
 - auth → core.
 - monitoring → core y autenticación de sus endpoints.
 - networks → auth/core/monitoring.
-- tickets → auth/core y APIs públicas de networks.
+- tickets → auth/core y APIs públicas de networks y monitoring.
 - changes → auth/core/monitoring.
 - chat → contratos y servicios públicos de auth/networks/tickets/changes/monitoring.
 - Composición → todos los módulos. Ningún dominio depende del punto de entrada HTTP.
@@ -78,7 +80,7 @@ Los schemas de respuesta conservan los contratos públicos. La refactorización 
 
 - `main.create_app()` construye HTTP y registra adaptadores; no consulta la base ni crea tablas al importar.
 - `routes.py` registra routers; `http_errors.py` registra la traducción de errores.
-- `lifecycle.py` inicia/cierra monitoreo y su tarea de muestreo en memoria.
+- `lifecycle.py` inicia/cierra monitoreo y sus tareas en memoria de muestreo y recolección de inventario, y el agente de tickets.
 - `bootstrap.initialize_database()` registra metadata y prepara roles/admin; la CLI lo usa sin cargar FastAPI.
 - `model_registry.register_models()` registra modelos para bootstrap y Alembic.
 
@@ -92,12 +94,14 @@ Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las
 
 | Archivo en modules/ | Responsabilidad |
 |---|---|
-| api.mjs | HTTP, tokens, renovación solo explícita, cierre ante 401 y rechazo de respuestas de otra época de sesión. |
+| api.mjs | HTTP, tokens, una renovación compartida y rechazo de respuestas de otra época de sesión. |
 | session.mjs | Login/logout/perfil; notifica autenticación y salida al compositor. |
 | chat.mjs | Conversación, versión, selección, historial y mensajes. |
 | monitoring.mjs | Estado privado de métricas, polling y representación del dashboard. |
+| inventory.mjs | Resumen, dispositivos, alertas, SSID/VLAN y planos de cobertura. |
 | support.mjs | Diagnóstico personal y panel temporal de acceso Wi-Fi. |
-| tickets.mjs | Formulario, confirmación, listado y seguimiento de tickets. |
+| tickets.mjs | Formulario, confirmación, filtros, listado y seguimiento de tickets. |
+| notifications.mjs | Bandeja de notificaciones del equipo técnico. |
 | reservations.mjs | Propuestas, confirmación y liberación de reservas locales. |
 | csv-imports.mjs | Archivo, vista previa, selección, recuperación y confirmación explícita de reservas por CSV. |
 | dom.mjs / format.mjs | Utilidades de vista y formato, sin reglas de permisos. |
@@ -116,7 +120,7 @@ Las decisiones visuales no sustituyen autorización del backend. Los resultados 
 6. Agregar ruta/herramienta/vista como adaptadores. Una herramienta nueva debe declarar permiso y validar argumentos.
 7. Ejecutar pruebas pertinentes, actualizar estas guías y los contratos funcionales afectados.
 
-UniFi debería tener un adaptador propio. Las operaciones AP/SSID/VLAN deben pasar por plan confirmado, trabajo durable, autorización al ejecutar, verificación y auditoría. Un proceso de muestreo en memoria no cumple ese contrato. Los roles delimitan capacidades; no es necesario crear un proceso/worker por cada rol.
+La lectura de UniFi ya tiene adaptador propio en `monitoring/providers/unifi`. Las operaciones de escritura AP/SSID/VLAN deben pasar por plan confirmado, trabajo durable, autorización al ejecutar, verificación y auditoría. Un proceso de muestreo en memoria no cumple ese contrato. Los roles delimitan capacidades; no es necesario crear un proceso/worker por cada rol.
 
 ## Verificación y alcance real
 
@@ -126,11 +130,13 @@ Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.t
 
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
-Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/mock, acceso Wi-Fi protegido y tickets internos. Pendiente: UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, aprovisionamiento CSV en UniFi y notificaciones externas. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
-
-Los modelos WifiScope, WifiScopeGrant, SsidPlan y WifiWriteLease pertenecen a changes (migración 007). `ssid_service` coordina autorización/SQL; `wifi_inventory` consulta UniFi y `ssid_executor` aplica el contrato 10.6.106. `changes.cli` usa bootstrap sin importar la app HTTP. Véase [operación y límites](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot).
+Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/UniFi/mock de solo lectura con inventario, alertas y planos, acceso Wi-Fi protegido, tickets internos, tickets automáticos por incidente y notificaciones. Falta validar el monitoreo contra equipos reales. Pendiente: escrituras UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, y aprovisionamiento CSV en UniFi. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
 
 
-La épica 001 incorpora auditoría de identidad, sesiones JWT vinculadas a refresh revocable, protección concurrente del último admin y expiración sin renovación automática del navegador. `auth.audit` posee el registro y middleware ASGI de denegaciones; los casos de uso conservan sus transacciones. Ver [contrato y evidencia de cierre](epica-001-autenticacion-roles.md).
+## Integración vigente de monitoreo y tickets (02-11-2026)
 
-El despliegue objetivo es un equipo local en el rack, con acceso a UniFi/OPNsense por la red de administración y endpoints configurables. Un backend local puede seguir utilizando un proveedor LLM externo. Ver [configuración y límites de aprovisionamiento](carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot); la validación física de Netbot sigue pendiente.
+El inventario, alertas, disponibilidad y planos se implementan en `monitoring.inventory`, `alerts`, `plans`, `models` y el paquete `providers.unifi`. Los incidentes y notificaciones se coordinan en `tickets.agent` y `tickets.notifications`. Se conservan planes SSID y auditoría de autenticación; migración 010 une las dos historias sin cambiar migraciones anteriores. Las decisiones de trabajo se conservan en las ramas de desarrollo.
+
+`providers.access_points.AccessPointAdapter` reutiliza el inventario normalizado UniFi para DTO mínimos por red, con sitio resuelto y estado explícito. No recolecta estadísticas ni presume heartbeat. `networks.telemetry` filtra por vinculación sitio/AP de la migración 009 y reautoriza tras las esperas. `MonitoringResponse.stale` identifica lecturas anteriores en la retención acotada; cambios y diagnósticos rechazan datos vencidos.
+
+`frontend/modules/navigation.mjs` controla wrappers y hash; cada controlador mantiene su estado privado. Resumen contiene dashboard y chat; inventario, alertas, redes, planos y demás módulos tienen vistas independientes. `inventory.mjs` y `notifications.mjs` conservan sus contratos y reciben coordinación mediante callbacks del compositor.

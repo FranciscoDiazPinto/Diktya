@@ -1,7 +1,7 @@
 """Casos de uso de autenticación y administración de usuarios."""
 import hashlib
 import hmac
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +17,12 @@ from .schemas import LoginRequest, RefreshRequest, RoleCreate, TokenResponse, Us
 from .security import create_access_token, create_refresh_token, hash_password, verify_password
 
 _DUMMY_PASSWORD_HASH = hash_password("netbot-login-timing-placeholder")
+_LOGIN_FAILURE_LIMIT = 5
+_LOGIN_LOCK_DURATION = timedelta(minutes=15)
+
+
+def _login_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 def user_read(user: User) -> UserRead:
     return UserRead(
@@ -39,11 +45,27 @@ def login(data: LoginRequest, db: Session) -> TokenResponse:
     bind_request(db)
     _lock_administration(db)
     user = db.scalar(select(User).where(User.email == data.email.lower()))
+    now = _login_now()
+    locked_until = user.login_locked_until if user else None
+    if locked_until is not None and locked_until.tzinfo is None:
+        locked_until = locked_until.replace(tzinfo=timezone.utc)
+    locked = locked_until is not None and now < locked_until
+    if user and locked_until is not None and not locked:
+        user.failed_login_attempts = 0
+        user.login_locked_until = None
+    # Comprobar el hash también durante el bloqueo y para correos desconocidos.
     valid_password = verify_password(data.password, user.hashed_password if user else _DUMMY_PASSWORD_HASH)
-    if not user or not user.is_active or not valid_password:
+    if not user or not user.is_active or not valid_password or locked:
+        if user and user.is_active and not locked:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= _LOGIN_FAILURE_LIMIT:
+                user.login_locked_until = now + _LOGIN_LOCK_DURATION
+                record_event(db, "auth.login.locked", target_id=user.id, outcome="denied")
         record_event(db, "auth.login.failed", outcome="failure", details={"subject_fingerprint": _fingerprint(data.email)})
         db.commit()
         raise Unauthenticated("Invalid credentials")
+    user.failed_login_attempts = 0
+    user.login_locked_until = None
     tokens = _tokens(user, db)
     record_event(db, "auth.login.succeeded", actor_id=user.id)
     db.commit()
@@ -232,3 +254,13 @@ def execution_actor(db: Session, user_id: int) -> User:
 def list_audit(db: Session, actor: User, *, limit=50, offset=0) -> list[AuthAuditEvent]:
     require_user_permission(db, actor, Permission.AUTH_AUDIT_READ)
     return list(db.scalars(select(AuthAuditEvent).order_by(AuthAuditEvent.id.desc()).limit(limit).offset(offset)))
+
+def active_staff(db: Session) -> list[dict]:
+    """Contactos del equipo técnico: contrato para notificar sin exponer el modelo User."""
+    users = db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).all()
+    staff = []
+    for user in users:
+        roles = {role.name for role in user.roles}
+        if roles & {"admin", "tecnico", "operador"}:
+            staff.append({"id": user.id, "email": user.email, "admin": "admin" in roles})
+    return staff

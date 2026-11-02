@@ -6,10 +6,11 @@ export function createMonitoring({ document, window, sessionState, api, format, 
   const refreshButton = $('#refresh-button');
   const syncLabel = $('#last-sync');
   const POLL_MS = 5000;
+  let pollId = 0;
   const metrics = { timer: null, lastSync: null, chartWindow: 300, fwAction: '', data: {}, rates: {},
                     history: { interfaces: [], traffic: [], clients: [], blocked: [] } };
   function reset() {
-    stopPolling();
+    stopPolling();pollId+=1;
     metrics.data = {}; metrics.lastSync = null; metrics.rates = {};
     metrics.history = { interfaces: [], traffic: [], clients: [], blocked: [] };
   }
@@ -37,7 +38,7 @@ export function createMonitoring({ document, window, sessionState, api, format, 
   }
 
   async function poll() {
-    const session = sessionState.session;
+    const session = sessionState.session, id = ++pollId;
     try {
       const [system, interfaces, traffic, clients, stats, events] = await Promise.all([
         monitoringRequest('/system'),
@@ -47,13 +48,13 @@ export function createMonitoring({ document, window, sessionState, api, format, 
         monitoringRequest('/firewall/stats'),
         monitoringRequest('/firewall/events?limit=200'),
       ]);
-      if (session !== sessionState.session) return;
+      if (session !== sessionState.session || id !== pollId) return;
       metrics.data = { system, interfaces, traffic, clients, stats, events };
       metrics.lastSync = new Date();
       recordSamples();
       render();
     } catch (error) {
-      if (session !== sessionState.session) return;
+      if (session !== sessionState.session || id !== pollId) return;
       if (error.status === 401) { signOut('Tu sesion expiro, ingresa nuevamente'); return; }
       if (error.status === 403) { renderFatal('Tu usuario no tiene permiso para ver el monitoreo (monitoring:read).'); return; }
       renderFatal('No se pudo conectar con la API de Netbot.');
@@ -76,10 +77,10 @@ export function createMonitoring({ document, window, sessionState, api, format, 
       if (last) metrics.rates[series.interface_id] = { in: last.bytes_in_per_second, out: last.bytes_out_per_second };
     }
     const wanRate = metrics.rates.wan;
-    if (wanRate) pushHistory('traffic', wanRate.in + wanRate.out);
-    if (interfaces.data) pushHistory('interfaces', interfaces.data.filter((i) => i.status === 'up').length);
-    if (clients.data) pushHistory('clients', clients.data.filter((c) => c.active).length);
-    if (stats.data) pushHistory('blocked', stats.data.packets_blocked);
+    if (wanRate && !traffic.stale) pushHistory('traffic', wanRate.in + wanRate.out);
+    if (interfaces.data && !interfaces.stale) pushHistory('interfaces', interfaces.data.filter((i) => i.status === 'up').length);
+    if (clients.data && !clients.stale) pushHistory('clients', clients.data.filter((c) => c.active).length);
+    if (stats.data && !stats.stale) pushHistory('blocked', stats.data.packets_blocked);
   }
 
   // --------------------------------------------------------------------------- //
@@ -113,18 +114,20 @@ export function createMonitoring({ document, window, sessionState, api, format, 
   function renderStatus() {
     const entries = Object.entries(metrics.data);
     const statuses = entries.map(([, r]) => r.status);
+    const stale = entries.filter(([,r])=>r.stale);
     const worst = statuses.includes('unavailable') ? 'unavailable' : statuses.includes('degraded') ? 'degraded' : 'ok';
     const source = metrics.data.system?.source || entries[0]?.[1].source;
     const sourceName = source === 'mock' ? 'Simulador' : source === 'opnsense' ? 'OPNsense' : 'Sin fuente';
 
     $('#source-name').textContent = sourceName;
-    $('#source-detail').textContent = worst === 'ok' ? `Operativo · ${clockTime(metrics.lastSync)}` : worst === 'degraded' ? 'Datos parciales' : 'Fuente con fallas';
+    $('#source-detail').textContent = stale.length ? `Datos anteriores · ${clockTime(stale[0][1].collected_at)}` : worst === 'ok' ? `Operativo · ${clockTime(metrics.lastSync)}` : worst === 'degraded' ? 'Datos parciales' : 'Fuente con fallas';
     $('#source-dot').className = `status-dot ${worst}`;
     $('#live-badge').className = `live-badge ${worst}`;
-    $('#live-badge').innerHTML = `<i></i> ${worst === 'ok' ? 'En vivo' : worst === 'degraded' ? 'Parcial' : 'Sin datos'}`;
-    $('#footer-status').innerHTML = `${worst === 'ok' ? 'Todos los sistemas operativos' : worst === 'degraded' ? 'Algunos componentes con fallas' : 'Fuente de monitoreo no disponible'} <i class="status-dot ${worst}"></i>${source === 'mock' ? ' · datos simulados' : ''}`;
+    $('#live-badge').innerHTML = `<i></i> ${stale.length ? 'Datos anteriores' : worst === 'ok' ? 'En vivo' : worst === 'degraded' ? 'Parcial' : 'Sin datos'}`;
+    $('#footer-status').innerHTML = `${stale.length ? 'Mostrando datos anteriores; estado actual no confirmado' : worst === 'ok' ? 'Todos los sistemas operativos' : worst === 'degraded' ? 'Algunos componentes con fallas' : 'Fuente de monitoreo no disponible'} <i class="status-dot ${worst}"></i>${source === 'mock' ? ' · datos simulados' : ''}`;
 
-    const problems = entries.flatMap(([key, r]) => r.issues.filter((issue) => !issue.optional).map((issue) => ({ key, ...issue })));
+    const staleProblems = stale.map(([key,r])=>({key,component:'antigüedad',message:`Datos anteriores de ${clockTime(r.collected_at)}; último intento ${clockTime(r.last_attempt_at)}.`}));
+    const problems = [...staleProblems, ...entries.flatMap(([key, r]) => r.issues.filter((issue) => !issue.optional).map((issue) => ({ key, ...issue })))];
     const banner = $('#issues-banner');
     banner.classList.toggle('is-hidden', !problems.length);
     banner.className = `issues-banner ${problems.length ? '' : 'is-hidden'} ${statuses.includes('unavailable') ? 'critical' : ''}`;
@@ -137,6 +140,9 @@ export function createMonitoring({ document, window, sessionState, api, format, 
     banner.innerHTML = `<strong>${escapeHtml(message)}</strong>`;
     $('#source-dot').className = 'status-dot unavailable';
     $('#source-name').textContent = 'Sin conexion';
+    $('#live-badge').className = 'live-badge unavailable';
+    $('#live-badge').textContent = metrics.lastSync ? 'Datos anteriores' : 'Sin datos';
+    $('#footer-status').textContent = 'No se pudo consultar el estado actual. Los valores anteriores no están verificados.';
     $('#source-detail').textContent = 'Reintentando…';
   }
 
@@ -207,6 +213,10 @@ export function createMonitoring({ document, window, sessionState, api, format, 
       setMeta('stat-blocked-meta', blockedEvents != null ? 'Del registro · estadisticas no disponibles' : 'Sin datos', 'negative');
     }
 
+    for (const [id,resource] of [['stat-interfaces-meta',interfaces],['stat-traffic-meta',metrics.data.traffic.stale?metrics.data.traffic:interfaces],['stat-clients-meta',clients],['stat-blocked-meta',stats.stale?stats:events]]) {
+      if (resource.stale) setMeta(id, `Datos anteriores · ${clockTime(resource.collected_at)}`, 'neutral');
+    }
+
     renderSparkline('spark-interfaces', metrics.history.interfaces);
     renderSparkline('spark-traffic', metrics.history.traffic);
     renderSparkline('spark-clients', metrics.history.clients);
@@ -237,7 +247,7 @@ export function createMonitoring({ document, window, sessionState, api, format, 
     $('#chart-x').innerHTML = Array.from({ length: ticks }, (_, i) => {
       const t = start + (span * i) / (ticks - 1);
       const format = span < 600000 ? { hour: '2-digit', minute: '2-digit', second: '2-digit' } : { hour: '2-digit', minute: '2-digit' };
-      return `<span>${i === ticks - 1 ? 'Ahora' : new Date(t).toLocaleTimeString('es-CL', format)}</span>`;
+      return `<span>${new Date(t).toLocaleTimeString('es-CL', format)}</span>`;
     }).join('');
   }
 
@@ -252,7 +262,7 @@ export function createMonitoring({ document, window, sessionState, api, format, 
       $('#sys-host').textContent = 'Sin datos del sistema';
       return;
     }
-    $('#sys-host').textContent = system.hostname || 'Equipo sin nombre';
+    $('#sys-host').textContent = `${system.hostname || 'Equipo sin nombre'}${metrics.data.system.stale?' · Datos anteriores':''}`;
     $('#sys-cpu').innerHTML = system.cpu_percent != null ? `${Math.round(system.cpu_percent)}<span>%</span>` : '–';
     setBar('sys-cpu-bar', system.cpu_percent);
     if (system.memory) {
@@ -288,8 +298,8 @@ export function createMonitoring({ document, window, sessionState, api, format, 
     if (!interfaces) { $('#interfaces-list').innerHTML = '<p class="empty-state">Interfaces no disponibles.</p>'; return; }
     $('#interfaces-list').innerHTML = interfaces.map((i) => {
       const rate = metrics.rates[i.interface_id];
-      const statusClass = i.status === 'up' ? '' : i.status === 'down' ? 'down' : 'warning';
-      const traffic = i.status !== 'up' ? 'Sin enlace' : rate ? `↓ ${formatRate(rate.in)} ↑ ${formatRate(rate.out)}` : `Σ ${formatBytes((i.traffic?.bytes_in || 0) + (i.traffic?.bytes_out || 0))}`;
+      const statusClass = metrics.data.interfaces.stale ? 'warning' : i.status === 'up' ? '' : i.status === 'down' ? 'down' : 'warning';
+      const traffic = metrics.data.interfaces.stale ? 'Datos anteriores' : i.status !== 'up' ? 'Sin enlace' : rate ? `↓ ${formatRate(rate.in)} ↑ ${formatRate(rate.out)}` : `Σ ${formatBytes((i.traffic?.bytes_in || 0) + (i.traffic?.bytes_out || 0))}`;
       const errors = (i.traffic?.errors_in || 0) + (i.traffic?.errors_out || 0);
       return `<div class="interface-row"><span class="interface-status ${statusClass}"></span><div><strong>${escapeHtml(i.description || i.interface_id.toUpperCase())}</strong><small>${escapeHtml(i.name)} · ${escapeHtml(i.ip_addresses.join(', ') || 'sin IP')}</small></div><span class="interface-speed">${errors ? `${errors} errores` : escapeHtml(i.interface_id)}</span><span class="interface-traffic ${statusClass}">${traffic}</span></div>`;
     }).join('');

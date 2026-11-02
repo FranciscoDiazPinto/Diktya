@@ -3,7 +3,7 @@ from typing import Optional
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Table, Column, func, JSON, event, DDL
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Table, Column, func, JSON, event, DDL
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -24,6 +24,8 @@ class User(Base):
     full_name: Mapped[Optional[str]] = mapped_column(String(160))
     hashed_password: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    login_locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     roles: Mapped[list["Role"]] = relationship(secondary=user_roles, back_populates="users")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")

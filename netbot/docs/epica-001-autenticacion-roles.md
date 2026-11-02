@@ -133,3 +133,13 @@ El 30-10-2026 se verificó además PostgreSQL 16.15 temporal por socket privado:
 | HU003 · 5 pts | Permisos por API/chat, auditoría de denegaciones y matriz HTTP. | Revisión de pares, trazabilidad de diagramas y aceptación del alcance de roles. |
 
 No acreditar puntos aceptados ni cierre académico únicamente por pruebas automáticas. Publicación, PR aprobado por otro integrante y acta de aceptación deben comprobarse por separado.
+
+## Bloqueo temporal de login HU001
+
+Desde `feature/auth-login-lockout`, cinco contraseñas incorrectas consecutivas para una cuenta activa bloquean nuevos ingresos durante 15 minutos. Incluso una contraseña correcta se rechaza mientras el bloqueo esté vigente. Los intentos durante ese período no prolongan su duración ni generan nuevas sesiones. Al cumplirse el plazo, la siguiente solicitud inicia una secuencia nueva; un login exitoso reinicia el contador. El bloqueo temporal no cambia `is_active` ni habilita una cuenta desactivada y no revoca sesiones válidas anteriores.
+
+La migración `011_login_lockout` agrega contador y vencimiento en `users`: el estado se comparte entre procesos y persiste al reiniciar el servicio. Aplicar `alembic upgrade head` antes del despliegue; `create_all` no actualiza bases existentes. Los intentos se serializan con el bloqueo transaccional de identidad existente para no perder incrementos concurrentes.
+
+Se conserva la respuesta genérica HTTP 401 de credenciales inválidas para cuentas desconocidas, inactivas y temporalmente bloqueadas. No se publican contadores ni fechas de bloqueo en el perfil ni se guardan contraseñas en auditoría. Cada rechazo conserva `auth.login.failed`; la transición al bloqueo registra una sola vez `auth.login.locked` con la cuenta objetivo.
+
+`tests/test_login_lockout.py` cubre el quinto fallo, contraseña correcta durante bloqueo, vencimiento exacto, reinicio de conteo, aislamiento por cuenta, cuentas inactivas, persistencia entre sesiones de base de datos y fallos concurrentes. Las pruebas de migración verifican datos existentes y defaults de las columnas nuevas. Esto completa el comportamiento de bloqueo del backlog; la aceptación de HU001 por el equipo y los demás criterios de entrega se revisan por separado.

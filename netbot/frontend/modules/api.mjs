@@ -13,6 +13,7 @@ export function createApi({ fetch, localStorage, state, onSessionExpired = () =>
   async function apiRequest(path, options = {}, accessToken = '') {
     const response = await fetch(`${API_BASE}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...(options.headers || {}) } });
     if (response.status === 204) return null;
+    if (options.raw && response.ok) return response.blob();
     let body = null;
     try { body = await response.json(); } catch {}
     if (!response.ok) throw new ApiError(body?.detail || 'No fue posible conectar con Netbot.', response.status, body);

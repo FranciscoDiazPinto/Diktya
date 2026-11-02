@@ -6,12 +6,12 @@ Asistente para consultar y gestionar soporte de redes de eventos, con permisos p
 
 - Autenticación y roles cliente, tecnico/operador, visor interno y admin.
 - Conversaciones privadas persistentes; admin no obtiene acceso a chats ajenos.
-- Monitoreo mediante OPNsense o datos mock, con dashboard y diagnóstico parcial por red.
+- Monitoreo de solo lectura mediante OPNsense y UniFi Network o datos mock: inventario persistido, disponibilidad, alertas, planos de cobertura y dashboard. Falta validarlo contra equipos reales.
 - Entrega protegida de acceso Wi-Fi fuera del modelo y del historial.
-- Tickets internos persistentes con confirmación, seguimiento y gestión por técnicos asignados.
+- Tickets internos persistentes, automáticos desde incidentes, con criticidad, notificaciones y escalamiento. El correo requiere SMTP y no se probó contra un servidor real.
 - Reservas VLAN locales con confirmación. No aprovisionan VLANs ni SSIDs en la infraestructura.
 
-Pendientes: integración UniFi, reinicio/adopción de APs, aprovisionamiento SSID/VLAN, trabajos durables, verificación/compensación, administración por chat, aprovisionamiento CSV y notificaciones externas. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
+Pendientes: reinicio/adopción de APs, aprovisionamiento SSID/VLAN, trabajos durables, verificación/compensación, administración por chat, y aprovisionamiento CSV. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
 
 ## Desarrollo y arquitectura
 

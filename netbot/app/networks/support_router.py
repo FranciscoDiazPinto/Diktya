@@ -8,9 +8,10 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.monitoring.dependencies import MonitoringServiceDep
 from .diagnostics import network_status
+from .telemetry import network_telemetry
 from .credentials import reveal_wifi
 from . import configuration
-from .support_schemas import SupportConfigWrite, NetworkStatus, WifiAccessRead, SupportAuditRead
+from .support_schemas import SupportConfigWrite, NetworkStatus, WifiAccessRead, SupportAuditRead, NetworkTelemetry
 
 router = APIRouter(prefix="/networks", tags=["network support"])
 admin_router = APIRouter(prefix="/admin/networks", tags=["network support configuration"])
@@ -47,3 +48,11 @@ def read_wifi_access(network_id: int, response: Response,
     response.headers["Cache-Control"] = "no-store, private"
     response.headers["Pragma"] = "no-cache"
     return reveal_wifi(db, user, network_id, settings)
+
+
+@router.get("/{network_id}/telemetry", response_model=NetworkTelemetry)
+async def read_network_telemetry(network_id: int, response: Response, monitoring: MonitoringServiceDep,
+                                 user: User = Depends(require_permission(Permission.NETWORKS_READ_DETAILS.value)),
+                                 db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
+    response.headers["Cache-Control"] = "no-store, private"
+    return await network_telemetry(db,user,network_id,monitoring,settings)

@@ -1,6 +1,6 @@
 # Soporte al cliente: acceso Wi-Fi, estado y tickets
 
-Esta entrega implementa el bloque de atención al cliente sobre las asignaciones y conversaciones privadas existentes. No aplica cambios a UniFi ni OPNsense. La carga CSV y la ejecución de operaciones de red siguen en las etapas posteriores del plan.
+Esta entrega implementa el bloque de atención al cliente sobre las asignaciones y conversaciones privadas existentes. No aplica cambios a UniFi ni OPNsense. La ejecución de operaciones de red sigue en etapas posteriores del plan.
 
 ## Capacidades por rol
 
@@ -101,7 +101,41 @@ Transiciones: open → in_progress/resolved; in_progress → open/resolved; reso
 
 En el chat, `prepare_support_ticket` devuelve una propuesta. El botón Crear ticket confirma mediante la API y solo entonces muestra el número creado. Cancelar no guarda nada. `list_support_tickets` consulta hasta cinco tickets autorizados dentro del ámbito de la conversación. El panel Tickets muestra los 50 más recientes; el resto está disponible por paginación de API.
 
-Son tickets internos de Netbot. No se han conectado notificaciones automáticas ni una mesa de ayuda externa.
+Son tickets internos de Netbot; no se conecta una mesa de ayuda externa.
+
+## Tickets de incidentes y notificaciones (Épica 005)
+
+`tickets/agent.py` corre en el lifespan cada `TICKET_AGENT_INTERVAL_SECONDS`. Es una tarea en memoria de una instancia, no una cola durable. Convierte alertas activas en tickets, resuelve los que se normalizaron, escala los desatendidos y envía correos. Una alerta genera su ticket en un ciclo; sumado al colector de monitoreo queda dentro de los 2 minutos pedidos.
+
+**Un incidente, un ticket.** Un índice único impide dos tickets sin cerrar con la misma clave. Un nuevo evento se anota en el ticket existente; si estaba resuelto, se reabre. Después de cerrado, una repetición abre otro ticket. `tickets.agent.open_incident()` es la entrada común: la Épica 004 puede usarla para verificación o rollback fallidos, aún sin conectar porque esa épica no existe.
+
+**Criticidad.** Se clasifica por reglas, no con el LLM: son deterministas y comprobables.
+
+| Tipo de incidente | Criticidad |
+|---|---|
+| `source_unavailable`, `rollback_failed` | Crítica |
+| `device_offline`, `verification_failed` | Alta |
+| `device_degraded`, `device_missing`, `source_degraded` | Media |
+
+Un gateway o firewall fuera de línea es Crítica. Con `TICKET_MASS_INCIDENT_DEVICES` (3) o más incidentes del mismo tipo a la vez se sube un nivel. Un tipo sin regla queda en Media con `needs_review`. `TICKET_CRITICALITY_RULES_JSON` sustituye reglas: `{"device_offline":"critica"}`. La cantidad de usuarios afectados no entra en el cálculo: el inventario no la registra.
+
+**Notificaciones.** Cada creación, escalamiento, reapertura o resolución se notifica a técnicos y administradores activos. Los tickets de una red solo llegan a administradores y técnicos asignados a ella, para no revelar datos de un cliente. La entrega interna se guarda junto con el ticket, así que un fallo de correo no la afecta. El correo requiere `SMTP_HOST`; sin él solo se notifica en la aplicación. Se reintenta con espera progresiva hasta `NOTIFICATION_EMAIL_MAX_ATTEMPTS`, se cancela si el usuario fue desactivado, y Alta y Crítica salen primero y se destacan. Cada entrega registra estado, intentos, envío y lectura.
+
+**Seguimiento.** Un ticket abierto y sin responsable que supera su tiempo máximo reenvía la notificación y sube de criticidad. `TICKET_ATTENTION_MINUTES_JSON` lo define por criticidad: Crítica 15, Alta 30, Media 120 y Baja 480 minutos. Si la alerta se normaliza, el ticket pasa a Resuelto y espera el cierre de un técnico. Cerrar exige un motivo de al menos 5 caracteres.
+
+**Acceso.** Los tickets de infraestructura no pertenecen a una red: técnicos y administradores los gestionan, y `visor` (Supervisor de Evento) los consulta en modo lectura mediante `monitoring:read`. Los clientes no los ven. No se agregaron permisos, porque un permiso nuevo cambiaría la huella de autorización y ocultaría conversaciones existentes.
+
+| Endpoint | Función |
+|---|---|
+| `GET /api/v1/tickets?status=&criticality=&assignee_id=&network_id=` | Listado con filtros. |
+| `POST /api/v1/tickets/manual` | Ticket de técnico o administrador; red y dispositivo opcionales. |
+| `POST /api/v1/tickets/{id}/assign` | Autoasignación, con `version`. |
+| `POST /api/v1/tickets/{id}/comments` | Comentario, sin cambiar el estado. |
+| `PATCH /api/v1/tickets/{id}/criticality` | Ajuste con motivo; quita `needs_review`. |
+| `GET /api/v1/notifications` | Bandeja propia y cantidad sin leer. |
+| `POST /api/v1/notifications/{id}/read` | Marca como leída, solo la propia. |
+
+La migración `008_ticket_incidents` agrega columnas a tickets y la tabla `notifications`. Revertirla borra los tickets de infraestructura, que no caben en el esquema anterior. Enviar correo no se ha probado contra un servidor SMTP real.
 
 ## Auditoría y migración
 
@@ -114,3 +148,5 @@ Validación: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.tes
 ## Mantenimiento modular
 
 Ver [arquitectura vigente](arquitectura-modular.md) antes de extender este flujo. Autorización en auth/access y networks/access; diagnóstico en networks/diagnostics; claves en networks/credentials; consultas de tickets en tickets/service. El chat usa esos contratos, no sus tablas. Los errores públicos se traducen a HTTP en una frontera común. No se modificó el esquema SQL ni el contrato público por esta reorganización.
+
+La migración 009 amplía la configuración de soporte con `unifi_site_id` y `unifi_ap_ids`, ambos administrables solo por admin. La vista técnica `/api/v1/networks/{id}/telemetry` exige `networks:read:details`, asignación vigente y vinculación explícita; clientes e invitados no pueden consultar AP. Se conservan estados antiguos marcados y no se usan para afirmar disponibilidad actual. Ver [monitoreo por red](epica-002-monitoreo.md#api-y-autorización).

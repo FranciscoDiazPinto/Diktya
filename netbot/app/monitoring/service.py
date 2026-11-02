@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TypeVar
 
-from .providers.base import CollectionResult, NetworkMonitoringProvider
+from .providers.base import CollectionResult, NetworkMonitoringProvider, AccessPointMonitoringProvider
 from .schemas import (
     CollectionIssue,
     DhcpLease,
@@ -33,6 +33,7 @@ from .schemas import (
     SystemMetrics,
     VlanInventoryItem,
     TrafficRatePoint,
+    AccessPointMetrics, AccessPointPage,
 )
 
 logger = logging.getLogger("netbot.monitoring.service")
@@ -44,6 +45,7 @@ T = TypeVar("T")
 class _TrafficSample:
     collected_at: datetime
     counters: dict[str, tuple[int, int]]  # interface_id -> (bytes_in, bytes_out)
+    acquired_at: float
 
 
 @dataclass(slots=True)
@@ -61,8 +63,13 @@ class MonitoringService:
         firewall_log_fetch_limit: int = 500,
         history_seconds: float = 3600.0,
         clock: Callable[[], float] = time.monotonic,
+        stale_retention_seconds: float = 300.0,
+        access_points_provider: AccessPointMonitoringProvider | None = None,
     ) -> None:
         self._provider = provider
+        self._access_points = access_points_provider
+        self._stale_retention = stale_retention_seconds
+        self._last_known: dict[str, tuple[MonitoringResponse, float]] = {}
         self._ttl = cache_ttl_seconds
         self._fetch_limit = firewall_log_fetch_limit
         self._clock = clock
@@ -71,8 +78,14 @@ class MonitoringService:
         self._history_seconds = history_seconds
         self._samples: deque[_TrafficSample] = deque()
 
+    @property
+    def provider(self) -> NetworkMonitoringProvider:
+        return self._provider
+
     async def aclose(self) -> None:
         await self._provider.aclose()
+        if self._access_points is not None:
+            await self._access_points.aclose()
 
     # ------------------------------------------------------------------ #
 
@@ -104,13 +117,28 @@ class MonitoringService:
         events = [e for e in full.data if action is None or e.action == action]
         return full.model_copy(update={"data": events[:limit]})
 
+    async def get_access_points(self) -> MonitoringResponse[list[AccessPointMetrics]]:
+        if self._access_points is None:
+            return MonitoringResponse(status=MonitoringStatus.UNAVAILABLE,source="unifi",collected_at=datetime.now(timezone.utc),
+                issues=[CollectionIssue(component="unifi",kind=IssueKind.CONFIGURATION,message="Monitoreo UniFi no configurado.")])
+        return await self._cached("unifi.access_points", self._access_points.collect, source=self._access_points.source)
+
+    async def get_access_point_page(self, limit=50, offset=0) -> MonitoringResponse[AccessPointPage]:
+        response = await self.get_access_points()
+        page = None if response.data is None else AccessPointPage(items=response.data[offset:offset+limit],
+            total_count=len(response.data),offset=offset,limit=limit)
+        return response.model_copy(update={"data":page})
+
     # ------------------------------------------------------------------ #
     # Historial de tráfico
 
     async def sample_traffic(self) -> None:
         """Guarda una lectura de los contadores (si es nueva) y descarta las antiguas."""
         response = await self.get_interfaces()
-        if not response.data:
+        self._append_traffic_sample(response)
+
+    def _append_traffic_sample(self, response) -> None:
+        if not response.data or response.stale:
             return
         counters = {
             i.interface_id: (i.traffic.bytes_in, i.traffic.bytes_out)
@@ -119,7 +147,7 @@ class MonitoringService:
         }
         if self._samples and response.collected_at <= self._samples[-1].collected_at:
             return  # lectura servida desde la caché: ya está registrada
-        self._samples.append(_TrafficSample(response.collected_at, counters))
+        self._samples.append(_TrafficSample(response.collected_at, counters, self._clock()))
         cutoff = response.collected_at.timestamp() - self._history_seconds
         while self._samples and self._samples[0].collected_at.timestamp() < cutoff:
             self._samples.popleft()
@@ -127,11 +155,14 @@ class MonitoringService:
     async def get_traffic_history(
         self, window_seconds: float = 300
     ) -> MonitoringResponse[list[InterfaceTrafficHistory]]:
+        interfaces = await self.get_interfaces()
+        self._append_traffic_sample(interfaces)
         if not self._samples:
-            await self.sample_traffic()
-        if not self._samples:
-            interfaces = await self.get_interfaces()
             return interfaces.model_copy(update={"data": None})
+        stale = interfaces.stale or interfaces.data is None
+        age = self._clock() - self._samples[-1].acquired_at
+        if stale and (self._stale_retention <= 0 or age > self._stale_retention):
+            return interfaces.model_copy(update={"data": None, "status":MonitoringStatus.UNAVAILABLE, "stale":False})
 
         cutoff = self._samples[-1].collected_at.timestamp() - window_seconds
         samples = [s for s in self._samples if s.collected_at.timestamp() >= cutoff]
@@ -156,9 +187,11 @@ class MonitoringService:
                     )
                 )
         return MonitoringResponse(
-            status=MonitoringStatus.OK,
+            status=MonitoringStatus.DEGRADED if stale else interfaces.status,
             source=self._provider.source,
             collected_at=self._samples[-1].collected_at,
+            stale=stale, last_attempt_at=interfaces.last_attempt_at,
+            issues=interfaces.issues,
             data=[
                 InterfaceTrafficHistory(interface_id=interface_id, points=points)
                 for interface_id, points in series.items()
@@ -168,7 +201,7 @@ class MonitoringService:
     # ------------------------------------------------------------------ #
 
     async def _cached(
-        self, key: str, loader: Callable[[], Awaitable[CollectionResult[T]]]
+        self, key: str, loader: Callable[[], Awaitable[CollectionResult[T]]], *, source: str | None = None
     ) -> MonitoringResponse[T]:
         if (hit := self._fresh(key)) is not None:
             return hit
@@ -176,7 +209,16 @@ class MonitoringService:
         async with lock:
             if (hit := self._fresh(key)) is not None:  # otro request ya lo renovó
                 return hit
-            response = await self._collect(key, loader)
+            response = await self._collect(key, loader, source=source)
+            if response.data is not None:
+                self._last_known[key] = (response, self._clock())
+            elif (previous := self._last_known.get(key)) is not None:
+                known, saved_at = previous
+                if self._stale_retention > 0 and self._clock() - saved_at <= self._stale_retention:
+                    response = known.model_copy(update={"status":MonitoringStatus.DEGRADED, "stale":True,
+                        "last_attempt_at":response.collected_at, "issues":response.issues})
+                else:
+                    self._last_known.pop(key, None)
             if self._ttl > 0:
                 self._cache[key] = _CacheEntry(response, self._clock() + self._ttl)
             return response
@@ -184,11 +226,16 @@ class MonitoringService:
     def _fresh(self, key: str) -> MonitoringResponse | None:
         entry = self._cache.get(key)
         if entry is not None and entry.expires_at > self._clock():
-            return entry.response
+            if not entry.response.stale:
+                return entry.response
+            previous = self._last_known.get(key)
+            if previous and self._stale_retention > 0 and self._clock()-previous[1] <= self._stale_retention:
+                return entry.response
+            self._cache.pop(key, None)
         return None
 
     async def _collect(
-        self, key: str, loader: Callable[[], Awaitable[CollectionResult[T]]]
+        self, key: str, loader: Callable[[], Awaitable[CollectionResult[T]]], *, source: str | None = None
     ) -> MonitoringResponse[T]:
         collected_at = datetime.now(timezone.utc)
         try:
@@ -207,8 +254,9 @@ class MonitoringService:
             )
         return MonitoringResponse(
             status=self._status(result),
-            source=self._provider.source,
+            source=source or self._provider.source,
             collected_at=collected_at,
+            last_attempt_at=collected_at,
             data=result.data,
             issues=result.issues,
         )
