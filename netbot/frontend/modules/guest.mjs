@@ -106,14 +106,24 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     checkExpiry(); if (busy) return;
     $('#guest-wifi').hidden = true; $('#guest-qr').replaceChildren(); $('#guest-network').replaceChildren();
     $('#guest-contact').value = ''; $('#guest-identify-error').textContent = '';
-    $('#guest-identify-form').hidden = true; stage = ''; $('#guest-resolution').hidden = true;
-    say('La recuperación privada requiere verificación de identidad. Solicita ayuda al equipo del recinto. No ingreses contactos ni contraseñas en el chat.');
+    $('#guest-identify-form').hidden = false; stage = ''; $('#guest-resolution').hidden = true;
+    say('Ingresa tu correo registrado en el formulario. Si tienes acceso de expositor habilitado, recibirás un enlace para confirmar y ver tu QR en tu dispositivo. No ingreses contraseñas. SMS y Telegram aún no están disponibles.');
     arm(); touch();
   }
-  $('#guest-identify-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    $('#guest-contact').value = '';
-    askIdentity();
+  $('#guest-identify-form').addEventListener('submit', async (event) => {
+    event.preventDefault(); checkExpiry(); if (busy) return;
+    const email = $('#guest-contact').value.trim(); if (!email) return;
+    $('#guest-contact').value = ''; $('#guest-identify-error').textContent = '';
+    const g = generation; setBusy(true); arm();
+    try {
+      await ensureSession();
+      const result = await request('/recovery/email', {method:'POST',body:JSON.stringify({email})});
+      if (!current(g)) return;
+      $('#guest-identify-form').hidden = true;
+      say(result.message); askResolved();
+    } catch (error) {
+      if (current(g)) { $('#guest-identify-error').textContent = error.message; arm(); }
+    } finally { if (current(g)) setBusy(false); }
   });
   async function showQr() {
     checkExpiry(); if (busy || !$('#guest-network').value) return;
@@ -142,12 +152,13 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     }
     if (stage && /^(no|no gracias|seguir|continuar)$/.test(choice)) { moreHelp(); return; }
     stage = ''; $('#guest-resolution').hidden = true;
-    if (/wi[ -]?fi|credencial|contrase[nñ]a|codigo qr|código qr|\bqr\b/i.test(message)) { askIdentity(); return; }
     const g = generation; setBusy(true); arm();
     try {
       await ensureSession(); const response = await request('/messages', {method: 'POST', body: JSON.stringify({message})});
       if (!current(g)) return;
-      say(response.answer); askResolved();
+      say(response.answer);
+      if (response.needs_clarification) { stage = ''; $('#guest-resolution').hidden = true; arm(); }
+      else askResolved();
     } catch (error) { failure(error, g); }
     finally { if (current(g)) setBusy(false); }
   });

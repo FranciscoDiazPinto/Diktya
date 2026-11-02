@@ -145,3 +145,32 @@ def test_guest_history_stays_bounded_even_with_large_provider_output():
     provider = SimpleNamespace(complete=AsyncMock(return_value=ProviderCompletion(content='x' * 100)))
     asyncio.run(store.answer(token, 'Consulta', provider, settings))
     assert store.get(token).history == []
+
+
+@pytest.mark.parametrize('kind, expected', [('Wi-Fi', 'equipo del recinto'), ('Netbot', 'administrador del sistema')])
+def test_missing_password_clarifies_kind_without_calling_model(kind, expected):
+    store = GuestSessions()
+    token = store.create()
+    provider = SimpleNamespace(complete=AsyncMock())
+    settings = Settings(_env_file=None)
+    answer = asyncio.run(store.answer(token, 'no tengo mi clave de usuario', provider, settings))
+    assert answer == '¿Te refieres a las credenciales del Wi-Fi o a tu cuenta de Netbot?'
+    answer = asyncio.run(store.answer(token, kind, provider, settings))
+    assert expected in answer
+    assert 'reinicia' not in answer.lower() and 'olvida la red' not in answer.lower()
+    assert not store.get(token).awaiting_credential_kind
+    assert store.get(token).history == []
+    provider.complete.assert_not_awaited()
+
+
+def test_explicit_wifi_recovery_does_not_divert_general_wifi_questions():
+    store = GuestSessions()
+    token = store.create()
+    provider = SimpleNamespace(complete=AsyncMock(return_value=ProviderCompletion(content='DHCP asigna direcciones IP.')))
+    settings = Settings(_env_file=None)
+    answer = asyncio.run(store.answer(token, 'Olvidé mi contraseña del Wi-Fi', provider, settings))
+    assert 'equipo del recinto' in answer and 'Portal de invitados' in answer
+    provider.complete.assert_not_awaited()
+    answer = asyncio.run(store.answer(token, '¿Qué es DHCP en una red Wi-Fi?', provider, settings))
+    assert 'DHCP' in answer
+    provider.complete.assert_awaited_once()

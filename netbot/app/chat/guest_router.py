@@ -25,6 +25,7 @@ class GuestMessage(BaseModel):
 
 class GuestAnswer(BaseModel):
     answer: str
+    needs_clarification: bool = False
     expires_in: int = TTL
 
 
@@ -61,7 +62,8 @@ def activity(token: str = Depends(guest_token)):
 async def send_message(payload: GuestMessage, token: str = Depends(guest_token),
                        settings: Settings = Depends(get_settings), provider=Depends(get_guest_provider)):
     try:
-        return GuestAnswer(answer=await sessions.answer(token, payload.message, provider, settings))
+        answer = await sessions.answer(token, payload.message, provider, settings)
+        return GuestAnswer(answer=answer, needs_clarification=sessions.get(token).awaiting_credential_kind)
     except ChatInputError as exc:
         raise HTTPException(422, str(exc)) from None
     except ChatProviderNotConfigured:
@@ -93,3 +95,53 @@ def identify(payload: GuestIdentification, token: str = Depends(guest_token), db
     # Respuesta uniforme, sin consultar ni enumerar contactos registrados.
     raise HTTPException(403, 'La recuperación privada requiere verificación de identidad. Solicita ayuda al equipo.',
                         headers={'Cache-Control': 'no-store, private'})
+
+
+# Recuperación verificada por correo, independiente del historial y del modelo.
+from fastapi import BackgroundTasks, Request
+from fastapi.responses import HTMLResponse
+from pydantic import EmailStr
+from app.networks.email_recovery import prepare_email, approve_and_reveal, build_recovery_mailer, recovery_origin, GENERIC_MESSAGE
+from .recovery_pages import APPROVAL_HTML, APPROVAL_JS
+
+
+def get_recovery_mailer(settings: Settings = Depends(get_settings)):
+    return build_recovery_mailer(settings)
+
+
+class EmailRecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    email: EmailStr = Field(max_length=320)
+
+
+class EmailApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    token: str = Field(min_length=40, max_length=64)
+
+
+@router.post('/recovery/email', status_code=202)
+def request_email_recovery(payload: EmailRecoveryRequest, background: BackgroundTasks,
+                           token: str = Depends(guest_token), db: Session = Depends(get_db),
+                           settings: Settings = Depends(get_settings), mailer=Depends(get_recovery_mailer)):
+    background.add_task(prepare_email(db, settings, str(payload.email), mailer))
+    return {'message': GENERIC_MESSAGE}
+
+
+@router.get('/recovery/approve', response_class=HTMLResponse)
+def recovery_approval_page():
+    return HTMLResponse(APPROVAL_HTML, headers={
+        'Content-Security-Policy': "default-src 'none'; script-src 'self'; connect-src 'self'; img-src data:; base-uri 'none'; frame-ancestors 'none'",
+        'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cache-Control': 'no-store, private'})
+
+
+@router.get('/recovery/approval.js')
+def recovery_approval_script():
+    return Response(APPROVAL_JS, media_type='application/javascript', headers={'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer'})
+
+
+@router.post('/recovery/approve', response_model=list[GuestWifiQr])
+def approve_email_recovery(payload: EmailApprovalRequest, request: Request,
+                           db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
+    if request.headers.get('origin') != recovery_origin(settings):
+        raise HTTPException(403, 'Origen de confirmación no permitido.')
+    return approve_and_reveal(db, settings, payload.token)

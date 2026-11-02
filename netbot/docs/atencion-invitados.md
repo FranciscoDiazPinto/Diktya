@@ -4,9 +4,17 @@ La entrada es un chat sin cuenta. «Iniciar sesión · Equipo» abre el login y 
 
 ## Recuperar credenciales de cliente
 
-La entrega privada a invitados está **suspendida**: conocer un correo o teléfono no prueba posesión. El botón deriva al equipo del recinto y no recolecta contactos. `POST /identify` devuelve un rechazo uniforme sin consultar el registro; `guest_wifi_qr` rechaza toda red privada incluso si una sesión conserva un contacto anterior.
+El expositor ingresa su **correo registrado** en el formulario, fuera del chat. El servidor responde de forma uniforme exista o no el contacto; envía un enlace solo si hay redes explícitamente habilitadas para expositores. Teléfono, SMS y Telegram quedan pendientes: un número con formato válido no acredita posesión.
 
-Para rehabilitarla se requiere OTP, enlace de un solo uso o voucher verificable: hash en servidor, TTL, límite de intentos, vinculación a la sesión y consumo atómico. Esa verificación todavía no está implementada. El QR del portal abierto y el acceso autenticado autorizado siguen disponibles. Los contactos reconocibles escritos por error en el chat no se muestran ni se envían al LLM.
+El enlace caduca a los cinco minutos. Abrirlo por GET no consume ni revela datos: hay que pulsar **Confirmar y mostrar mi QR**. El QR aparece en el dispositivo que abrió el correo, no en el tótem, y se limpia de la página tras un minuto. El token es aleatorio, su hash es lo único almacenado y el consumo es atómico de un solo uso. El fragmento de URL evita enviar el token en la petición GET o en Referer. El cliente nunca recibe el enlace desde la respuesta de solicitud.
+
+Administración, Marketing y Servicios están excluidas, aunque coincida el contacto o alguien intente publicar esas redes como abiertas. La configuración `guest_recovery_purpose` debe ser `expositor` y el nombre/SSID no puede indicar una categoría interna bloqueada. Por defecto todas las redes tienen `disabled`. El listado y las asignaciones actuales se revalidan al consumir el enlace, dentro de la misma exclusión transaccional que su modificación. Cambiar la categoría o retirar al destinatario invalida enlaces pendientes. Se incluyen solo las redes autorizadas al solicitar y aún autorizadas al confirmar.
+
+Configurar SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_STARTTLS`) y `GUEST_EMAIL_RECOVERY_ENABLED=true`, `GUEST_EMAIL_RECOVERY_PUBLIC_URL=https://dominio-api.example` (origen sin ruta). Producción exige HTTPS y STARTTLS. Sin configuración no se habilita la recuperación. La URL debe ser accesible desde el dispositivo que recibe el correo: localhost solo sirve para pruebas en el mismo equipo.
+
+Aplicar migración **012_wifi_email_recovery**. En el panel de destinatarios el administrador selecciona y guarda la finalidad de la red. La API dedicada es `PATCH /admin/networks/{id}/recovery-policy` con `{purpose: "expositor"}`; también forma parte del DTO de soporte. No se habilitan redes antiguas automáticamente.
+
+Las solicitudes tienen límites por origen/global y como máximo dos envíos pendientes por correo en cinco minutos. Las respuestas no muestran si existe el destinatario. Fallos SMTP se registran sin destinatarios, enlaces ni credenciales; no existe un worker durable de reintentos: solicitar otro enlace o contactar al equipo si no llega. Los registros caducados se eliminan al procesar una nueva solicitud; el acceso caduca aunque no se haya ejecutado esa limpieza.
 
 ## Registro de destinatarios en Netbot
 
@@ -29,13 +37,13 @@ Contratos administrativos:
 
 Los correos se comparan sin distinguir mayúsculas, con validación de formato. En teléfonos se eliminan espacios, guiones y paréntesis; `00` se normaliza a `+`. No se infiere el país ni se comparan solo los últimos dígitos. Las respuestas administrativas llevan `Cache-Control: no-store, private`.
 
-Cada red debe tener su `credential_ref` configurado mediante `PUT /admin/networks/{id}/support` y el secreto correspondiente en `WIFI_ACCESS_CREDENTIALS_JSON`. `site`, `external_id` y `ssid` deben coincidir exactamente; ver [soporte por red](soporte-cliente.md). No guardar secretos reales en Git. Las redes de cliente **no** se agregan a `GUEST_WIFI_NETWORK_IDS`; registrar destinatarios no habilita su recuperación privada.
+Cada red debe tener su `credential_ref` configurado mediante `PUT /admin/networks/{id}/support` y el secreto correspondiente en `WIFI_ACCESS_CREDENTIALS_JSON`. `site`, `external_id` y `ssid` deben coincidir exactamente; ver [soporte por red](soporte-cliente.md). No guardar secretos reales en Git. Las redes de cliente **no** se agregan a `GUEST_WIFI_NETWORK_IDS`; registrar destinatarios por sí solo no habilita recuperación: también se requiere la finalidad expositor y confirmar el enlace.
 
 ## Portal de invitados
 
 «Portal de invitados» muestra exclusivamente redes **abiertas** incluidas expresamente en `GUEST_WIFI_NETWORK_IDS`, vacío por defecto. La referencia del secreto debe declarar `security: open` y no tener contraseña. Escanear ese QR conecta a la red abierta; el portal cautivo sigue gestionando su propio acceso. Netbot no elimina ni evita ese portal.
 
-Las redes WPA2/WPA3 no entregan QR anónimamente aunque se hayan incluido por error en esa lista: requieren acceso autenticado autorizado; conocer un contacto no las habilita. Se admiten redes abiertas, WPA2 Personal y WPA3 Personal; no Wi-Fi Enterprise ni credenciales individuales de portal/vouchers. El escaneo y conexión deben probarse con teléfonos y redes reales, especialmente WPA3. El QR se genera localmente con `qrcode`; no se envían claves a generadores externos ni al modelo.
+Las redes WPA2/WPA3 no entregan QR anónimamente aunque se hayan incluido por error en esa lista: requieren acceso autenticado autorizado o el enlace de correo confirmado de una red de expositor; conocer un contacto no las habilita. Se admiten redes abiertas, WPA2 Personal y WPA3 Personal; no Wi-Fi Enterprise ni credenciales individuales de portal/vouchers. El escaneo y conexión deben probarse con teléfonos y redes reales, especialmente WPA3. El QR se genera localmente con `qrcode`; no se envían claves a generadores externos ni al modelo.
 
 ## Resolución y limpieza
 
@@ -54,6 +62,9 @@ Prefijo `/api/v1/guest`. Respuestas de éxito con `Cache-Control: no-store, priv
 | Método y ruta | Contrato |
 |---|---|
 | `POST /sessions` | Token aleatorio y `expires_in: 60`. |
+| `POST /recovery/email` | `{email}`; requiere sesión temporal, responde 202 uniforme y envía enlace si corresponde. |
+| `GET /recovery/approve` | Página de confirmación; no requiere sesión y no consume tokens. |
+| `POST /recovery/approve` | Token en cuerpo y Origin configurado; devuelve QR solo tras consumo válido. |
 | `POST /identify` | `{contact}`. Rechazo uniforme HTTP 403; recuperación privada suspendida. |
 | `POST /messages` | Solo `{message}`; historial del servidor, sin identidad ni permisos del navegador. |
 | `GET /networks` | Redes abiertas publicadas para el portal de invitados. |

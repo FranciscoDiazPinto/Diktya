@@ -56,3 +56,19 @@ async def read_network_telemetry(network_id: int, response: Response, monitoring
                                  db: Session = Depends(get_db), settings: Settings = Depends(get_settings)):
     response.headers["Cache-Control"] = "no-store, private"
     return await network_telemetry(db,user,network_id,monitoring,settings)
+
+
+from pydantic import BaseModel, ConfigDict
+from typing import Literal
+from .configuration import configure_recovery_purpose
+
+
+class RecoveryPurposeWrite(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    purpose: Literal['disabled', 'expositor', 'administracion', 'marketing', 'servicios']
+
+
+@admin_router.patch('/{network_id}/recovery-policy')
+def update_recovery_policy(network_id: int, payload: RecoveryPurposeWrite, db: Session = Depends(get_db),
+                           user: User = Depends(require_permission('networks:manage'))):
+    return configure_recovery_purpose(network_id, payload.purpose, user, db)

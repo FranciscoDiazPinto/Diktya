@@ -9,6 +9,7 @@ from app.monitoring.schemas import AccessPointMetrics, InterfaceMetrics, Monitor
 
 class SupportConfigWrite(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, from_attributes=True)
+    guest_recovery_purpose: Literal["disabled", "expositor", "administracion", "marketing", "servicios"] = "disabled"
     credential_ref: str | None = Field(default=None, min_length=1, max_length=160)
     monitoring_interface_id: str | None = Field(default=None, min_length=1, max_length=160)
     unifi_site_id: str | None = Field(default=None, min_length=1, max_length=160)

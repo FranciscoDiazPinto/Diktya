@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     unifi_api_contract: str | None = None
     ssid_security_profiles_json: SecretStr | None = None
 
+    guest_email_recovery_enabled: bool = False
+    guest_email_recovery_public_url: str = ""
+
     # --- Chatbot ---
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str | None = None
@@ -189,6 +192,9 @@ class Settings(BaseSettings):
             for url in (self.unifi_base_url, self.opnsense_base_url, self.unifi_api_base_url):
                 if url and urlsplit(url).scheme.lower() != "https":
                     raise ValueError("Producción requiere HTTPS para las integraciones")
+            if self.guest_email_recovery_enabled:
+                if urlsplit(self.guest_email_recovery_public_url).scheme != "https" or not self.smtp_starttls:
+                    raise ValueError("La recuperación por correo requiere HTTPS y SMTP STARTTLS")
             for origin in self.cors_origins.split(","):
                 if origin.strip() in {"null", "*"}:
                     raise ValueError("CORS requiere orígenes explícitos en producción")

@@ -9,6 +9,7 @@ from .models import Network
 from .support_models import NetworkSupportConfig
 from .credentials import credential_for
 from .wifi_qr import wifi_qr_data_url
+from .guest_policy import restricted_network
 
 
 class GuestNetwork(BaseModel):
@@ -27,8 +28,11 @@ def list_guest_networks(db: Session, settings: Settings) -> list[GuestNetwork]:
     rows = db.scalars(select(Network).where(Network.id.in_(settings.guest_wifi_network_ids)).order_by(Network.id))
     public = []
     for network in rows:
+        config = db.get(NetworkSupportConfig, network.id)
+        if restricted_network(network, config):
+            continue
         try:
-            credential = credential_for(network, db.get(NetworkSupportConfig, network.id), settings)
+            credential = credential_for(network, config, settings)
         except ServiceUnavailable:
             continue
         if credential.security == 'open':
@@ -44,7 +48,7 @@ def guest_wifi_qr(db: Session, settings: Settings, network_id: int, contact: tup
     # Conocer un contacto no demuestra posesión. No habilita redes privadas.
     authorized = False
     network = db.get(Network, network_id)
-    if network is None or (not authorized and network_id not in settings.guest_wifi_network_ids):
+    if network is None or restricted_network(network, db.get(NetworkSupportConfig, network_id)) or (not authorized and network_id not in settings.guest_wifi_network_ids):
         raise NotFound('No se pudo habilitar ese acceso. Revisa tus datos o solicita ayuda al equipo.')
     credential = credential_for(network, db.get(NetworkSupportConfig, network_id), settings)
     if not authorized and credential.security != 'open':

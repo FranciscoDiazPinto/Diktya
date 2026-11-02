@@ -94,7 +94,7 @@ def test_only_admin_can_configure_support_and_cannot_upload_plaintext_password(c
     assert client.put(path, json=payload, headers=headers["tech"]).status_code == 403
     assert client.put(path, json=payload, headers=headers["admin"]).status_code == 200
     assert client.put(path, json={**payload, "passphrase": TEST_PASSPHRASE}, headers=headers["admin"]).status_code == 422
-    assert client.get(path, headers=headers["admin"]).json() == {**payload, "unifi_site_id":None,"unifi_ap_ids":[]}
+    assert client.get(path, headers=headers["admin"]).json() == {**payload, "unifi_site_id":None,"unifi_ap_ids":[],"guest_recovery_purpose":"disabled"}
     assert client.get(path, headers=headers["a"]).status_code == 403
 
 

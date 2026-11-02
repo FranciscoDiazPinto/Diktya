@@ -3,11 +3,13 @@ export function createWifiRecipients({document, Option, state, api}) {
   const $ = s => document.querySelector(s);
   const panel = $('#wifi-recipients-panel'), network = $('#wifi-recipients-network');
   const contacts = $('#wifi-recipients-contacts'), save = $('#wifi-recipients-save'), status = $('#wifi-recipients-status');
+  const purpose = $('#wifi-recovery-purpose'), savePurpose = $('#wifi-recovery-save');
   let generation = 0, loaded = false;
   const capture = () => ({session: state.session, generation, id: network.value});
   const current = c => c.session === state.session && c.generation === generation && c.id === network.value;
   function reset() {
     generation += 1; loaded = false; panel.hidden = true; contacts.value = ''; status.textContent = '';
+    purpose.value = 'disabled'; savePurpose.disabled = true;
     network.replaceChildren(new Option('Selecciona una red', '')); network.disabled = false; save.disabled = true; contacts.disabled = true;
   }
   async function configureUser(user) {
@@ -22,12 +24,14 @@ export function createWifiRecipients({document, Option, state, api}) {
   }
   network.addEventListener('change', async () => {
     generation += 1; loaded = false; contacts.value = ''; status.textContent = ''; save.disabled = true; contacts.disabled = true;
+    savePurpose.disabled = true; purpose.value = 'disabled';
     if (!network.value) return;
     const context = capture();
     try {
-      const rows = await api.authedRequest(`/admin/networks/${Number(context.id)}/recipients`);
+      const [rows, config] = await Promise.all([api.authedRequest(`/admin/networks/${Number(context.id)}/recipients`), api.authedRequest(`/admin/networks/${Number(context.id)}/support`)]);
       if (!current(context)) return;
       contacts.value = rows.map(r => `${r.email || ''};${r.phone || ''}`).join('\n');
+      purpose.value = config.guest_recovery_purpose || 'disabled'; savePurpose.disabled = false;
       loaded = true; save.disabled = false; contacts.disabled = false;
     } catch (error) { if (current(context)) status.textContent = error.message; }
   });
@@ -47,6 +51,15 @@ export function createWifiRecipients({document, Option, state, api}) {
       status.textContent = `${rows.length} destinatario(s) guardados para esta red.`;
     } catch (error) { if (current(context)) status.textContent = error.status === 422 ? 'Revisa los correos y teléfonos. Cada cliente necesita al menos uno; incluye código de país.' : error.message; }
     finally { if (current(context)) { save.disabled = false; contacts.disabled = false; network.disabled = false; } }
+  });
+  savePurpose.addEventListener('click', async () => {
+    if (!loaded || !network.value || savePurpose.disabled) return;
+    const context = capture(); savePurpose.disabled = true;
+    try {
+      await api.authedRequest(`/admin/networks/${Number(context.id)}/recovery-policy`, {method:'PATCH',body:JSON.stringify({purpose:purpose.value})});
+      if (current(context)) status.textContent = 'Finalidad guardada. Solo Expositores puede recuperar por correo; las redes internas están excluidas.';
+    } catch (error) { if (current(context)) status.textContent = error.message; }
+    finally { if (current(context)) savePurpose.disabled = false; }
   });
   return {reset, configureUser};
 }

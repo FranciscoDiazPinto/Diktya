@@ -56,7 +56,7 @@ class RequestSecurityMiddleware:
                 policy = ('guest-start', 5, 120)
             elif path.startswith(('/api/v1/chat/', '/api/v1/guest/')) and path.endswith('/messages'):
                 policy = ('chat', 10, 60)
-            elif path == '/api/v1/guest/identify':
+            elif path in {'/api/v1/guest/identify', '/api/v1/guest/recovery/email', '/api/v1/guest/recovery/approve'}:
                 policy = ('recovery', 5, 60)
         if policy:
             # No confiar en X-Forwarded-For aportado por clientes; el servidor ASGI

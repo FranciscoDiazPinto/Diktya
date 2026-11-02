@@ -68,6 +68,8 @@ def replace_recipients(db: Session, actor: User, network_id: int, payload: Recip
     require_user_permission(db, actor, Permission.NETWORKS_MANAGE)
     if db.get(Network, network_id) is None:
         raise NotFound('Red no encontrada.')
+    from .guest_policy import lock_recovery_networks
+    lock_recovery_networks(db, [network_id])
     db.execute(delete(NetworkRecipient).where(NetworkRecipient.network_id == network_id))
     db.add_all([NetworkRecipient(network_id=network_id, **row.model_dump()) for row in payload.recipients])
     record_audit(db, actor.id, network_id, 'wifi_recipients.updated')

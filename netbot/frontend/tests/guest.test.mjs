@@ -125,23 +125,22 @@ test('a QR arriving after cleanup cannot appear in the next attention', async ()
   assert.equal(ui.$('#guest-wifi').hidden, true);
 });
 
-test('private recovery requests staff verification without collecting contacts', async () => {
-  const ui = setup();
-  await ui.submit('Necesito mis credenciales');
+test('password questions reach the server clarification instead of generic private recovery', async () => {
+  const ui = setup(async () => ({answer:'¿Te refieres a las credenciales del Wi-Fi o a tu cuenta de Netbot?',needs_clarification:true}));
+  await ui.submit('no tengo mi clave de usuario');
+  assert.match(ui.content(), /Wi-Fi o a tu cuenta de Netbot/);
+  assert.equal(ui.$('#guest-resolution').hidden, true);
+  assert.doesNotMatch(ui.content(), /¿Se resolvió/);
+  assert.ok(ui.calls.some(c => c.path.endsWith('/messages')));
+  assert.ok(!ui.calls.some(c => /identify|access/.test(c.path)));
   assert.equal(ui.$('#guest-identify-form').hidden, true);
-  assert.equal(ui.$('#guest-wifi').hidden, true);
-  await ui.identify('client@example.com');
-  assert.equal(ui.$('#guest-contact').value, '');
-  assert.doesNotMatch(ui.content(), /client@example.com/);
-  assert.match(ui.content(), /verificación de identidad/);
-  assert.ok(!ui.calls.some(c => /identify|messages|access/.test(c.path)));
 });
 
 test('contact accidentally entered in chat is neither echoed nor sent to the model', async () => {
   const ui = setup();
   await ui.submit('Mi correo es private@example.com');
   assert.doesNotMatch(ui.content(), /private@example.com/);
-  assert.equal(ui.$('#guest-identify-form').hidden, true);
+  assert.equal(ui.$('#guest-identify-form').hidden, false);
   assert.equal(ui.calls.length, 0);
   ui.$('#guest-contact').value = '+56912345678';
   ui.advance(60000);
@@ -155,7 +154,20 @@ test('failed identification never displays a network selector or QR', async () =
   await ui.identify('no-match@example.com');
   assert.equal(ui.$('#guest-wifi').hidden, true);
   assert.equal(ui.$('#guest-qr').children.length, 0);
-  assert.match(ui.content(), /verificación de identidad/);
+  assert.match(ui.$('#guest-identify-error').textContent, /No se pudo/);
   assert.ok(!ui.calls.some(c => c.path.endsWith('/identify')));
   assert.doesNotMatch(ui.content(), /no-match@example.com/);
+});
+
+test('email recovery sends only the form email and keeps contacts outside chat history', async () => {
+  const ui = setup(async () => ({message:'Si corresponde, recibirás un enlace de confirmación.'}));
+  ui.$('#guest-wifi-button').events.click();
+  assert.equal(ui.$('#guest-identify-form').hidden,false);
+  await ui.identify('expositor@example.com');
+  const call=ui.calls.find(c=>c.path.endsWith('/recovery/email'));
+  assert.deepEqual(JSON.parse(call.options.body),{email:'expositor@example.com'});
+  assert.equal(ui.$('#guest-contact').value,'');
+  assert.equal(ui.$('#guest-identify-form').hidden,true);
+  assert.doesNotMatch(ui.content(),/expositor@example.com/);
+  assert.ok(!ui.calls.some(c=>c.path.endsWith('/messages')));
 });
