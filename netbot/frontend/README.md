@@ -15,6 +15,8 @@ dependencias ni build: servir con HTTP local, o con HTTPS en producción.
 
 El formulario usa `POST /auth/login`, valida la sesion con `GET /auth/me` y cierra
 sesion con `POST /auth/logout`. Por defecto busca la API en `http://localhost:8000`.
+Si el backend local usa el puerto 8001, configura la URL de la API como
+`http://localhost:8001` mediante el mecanismo indicado abajo.
 En producción usa la API del mismo origen mediante proxy HTTPS. La URL no se lee de localStorage. Los tokens viven únicamente en memoria; recargar o cerrar la página exige iniciar sesión de nuevo. El arranque borra tokens y URL base persistidos por versiones anteriores. El refresh explícito conserva rotación y aislamiento de sesión; no hay renovación automática ni cookies de autenticación.
 
 CORS admite por defecto `localhost:5173` y `127.0.0.1:5173`, sin `null`. En producción usar `CORS_ORIGINS` explícitos.
