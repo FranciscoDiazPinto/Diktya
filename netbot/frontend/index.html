@@ -86,6 +86,7 @@
           <a class="nav-item" id="tickets-nav" href="#tickets-panel" hidden><span class="nav-icon">□</span> Tickets</a>
           <a class="nav-item" id="support-nav" href="#support-panel" hidden><span class="nav-icon">⌁</span> Mi red</a>
           <a class="nav-item" id="provisioning-nav" href="#provisioning" hidden><span class="nav-icon">⚙</span> Aprovisionamiento</a>
+          <a class="nav-item" id="audit-nav" href="#audit" hidden><span class="nav-icon">≡</span> Auditoría</a>
         </nav>
 
         <div class="sidebar-footer">
@@ -281,6 +282,23 @@
 <article class="panel support-panel" id="reservations-summary" hidden><div class="panel-heading"><h2>Reservas VLAN activas</h2></div><section id="vlan-reservations" class="reservation-list" hidden aria-label="Reservas VLAN activas"></section></article>
           </section>
 
+<section class="panel support-panel" id="view-audit" hidden aria-labelledby="audit-heading">
+  <div class="panel-heading"><div><p class="panel-kicker">TRAZABILIDAD</p><h2 id="audit-heading">Auditoría</h2></div></div>
+  <p>Eventos de identidad, soporte, tickets, reservas y planes. Los estados actuales son instantáneas: su fecha corresponde a la creación del plan, no a su ejecución. No se incluyen conversaciones, contactos ni credenciales.</p>
+  <form id="audit-filters" class="audit-filters">
+    <label>Actor (ID)<input id="audit-actor" type="number" min="1" step="1" /></label>
+    <label>Origen<select id="audit-source"><option value="">Todos</option><option value="auth">Identidad</option><option value="support">Soporte</option><option value="tickets">Tickets</option><option value="reservations">Reservas</option><option value="csv">CSV</option><option value="ssid">Planes SSID</option></select></label>
+    <label>Acción exacta<input id="audit-action" maxlength="80" placeholder="Ej.: auth.login" /></label>
+    <label>Resultado o estado exacto<input id="audit-outcome" maxlength="32" placeholder="Ej.: success" /></label>
+    <label>Desde (hora local)<input id="audit-since" type="datetime-local" /></label>
+    <label>Hasta (hora local)<input id="audit-until" type="datetime-local" /></label>
+    <button type="submit">Aplicar filtros</button><button id="audit-clear" type="button">Limpiar</button>
+  </form>
+  <div class="chat-controls"><button id="audit-export" type="button">Exportar CSV filtrado</button><span>Máximo 5000 registros por exportación.</span></div>
+  <p id="audit-status" role="status" aria-live="polite"></p>
+  <div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Registro unificado de auditoría</caption><thead><tr><th>Fecha local</th><th>Origen</th><th>Actor (ID)</th><th>Acción</th><th>Resultado / estado</th><th>Recurso</th><th>Tipo de registro</th></tr></thead><tbody id="audit-body"></tbody></table></div>
+  <div class="chat-controls"><button id="audit-prev" type="button" disabled>Anterior</button><span id="audit-page"></span><button id="audit-next" type="button" disabled>Siguiente</button></div>
+</section>
           <footer class="page-footer"><span>Netbot v0.1.0</span><span id="footer-status">Conectando con la API…</span></footer>
         </div>
       </main>

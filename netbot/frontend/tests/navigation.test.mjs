@@ -105,3 +105,8 @@ test('integrated inventory modules each open a separate view and reject unprivil
     assert.equal(ui.navigation.navigate(key),false);
   }
 });
+
+ test('audit deep links require audit permission',()=>{
+  const denied=setup('#audit');denied.navigation.configureUser(admin);assert.equal(denied.navigation.currentView,'overview');assert.equal(denied.$('audit-nav').hidden,true);assert.equal(denied.navigation.navigate('audit'),false);
+  const allowed=setup('#audit');allowed.navigation.configureUser({permissions:['audit:read']});assert.equal(allowed.navigation.currentView,'audit');assert.equal(allowed.$('audit-nav').hidden,false);
+});

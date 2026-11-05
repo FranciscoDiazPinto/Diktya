@@ -12,7 +12,7 @@ from app.bootstrap import initialize_database
 from app.core.config import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
-DOMAINS = {"auth", "chat", "networks", "tickets", "changes", "monitoring", "agents"}
+DOMAINS = {"audit", "auth", "chat", "networks", "tickets", "changes", "monitoring", "agents"}
 
 
 def domain_sources():
