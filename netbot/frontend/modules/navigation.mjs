@@ -9,6 +9,7 @@ const VIEWS = [
   {key:'support-panel',nav:'support-nav',title:'Mi red',description:'Comprueba una red autorizada, recupera su acceso o solicita soporte.',allow:p=>p.has('networks:read:own')||p.has('wifi:access:read:own')||p.has('networks:manage')},
   {key:'tickets-panel',nav:'tickets-nav',title:'Tickets',description:'Consulta el seguimiento y gestiona las solicitudes autorizadas.',allow:p=>['tickets:read:own','tickets:read:assigned','tickets:read','tickets:manage'].some(x=>p.has(x))},
   {key:'provisioning',nav:'provisioning-nav',title:'Aprovisionamiento',description:'Revisa planes SSID, cargas CSV y reservas antes de confirmar.',allow:p=>p.has('changes:request')||p.has('vlan:reserve')},
+  {key:'audit',nav:'audit-nav',title:'Auditoría',description:'Trazabilidad de acciones y estados registrados.',allow:p=>p.has('audit:read')},
 ];
 const MONITORING_VIEWS=new Set(['overview','interfaces','clients','firewall']);
 

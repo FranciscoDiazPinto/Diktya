@@ -570,3 +570,9 @@ Las migraciones publicadas conservan sus identificadores y padres. `010_merge_mo
 Resumen mantiene dashboard y chat juntos. Dispositivos, Alertas, SSID y VLAN y Planos tienen vistas separadas con los controles de Itamar. Puntos de acceso conserva la consulta global/por red autorizada; Mi red limpia credenciales al salir. Notificaciones abre Tickets mediante callback de navegación. La prueba de disponibilidad usa el mismo reloj simulado en recolección y lectura para no depender de la fecha del equipo.
 
 Validación de integración: 399 pruebas backend y 68 frontend aprobadas; migraciones SQLite desde ambas historias con registros conservados; revisión visual de Resumen/chat, Dispositivos y Tickets en demo aislada con datos mock. Sin conexión a UniFi/OPNsense reales ni promoción a main.
+
+### HU013 · Consulta de auditoría (05-11-2026)
+
+Rama `feature/hu013-auditoria` desde `dev` 47fd278. Primera entrega: consulta de metadatos de identidad, soporte, tickets, reservas, CSV y planes SSID con filtros, paginación y exportación CSV; vista administrativa y permiso `audit:read`. Proyecciones SQL públicas de cada propietario, sin tablas nuevas ni JSON sensibles. El estado actual de los planes se etiqueta como instantánea, no como evento histórico. Se conserva el alcance pendiente de auditoría durable de ejecución/verificación/rollback. No modifica H010/H011 ni acredita cierre académico. Contrato en arquitectura modular.
+
+Verificación de este bloque: 456 pruebas backend y 77 frontend aprobadas, incluidos permisos sin HTTP, denegación a visor/cliente/técnico/operador, fechas con zona horaria, paginación, metadatos sin secretos, neutralización CSV, límite de exportación, planes inciertos y descarte de respuestas entre sesiones/filtros. Revisión visual pendiente: el navegador conectado falló al abrir pestañas; no se acredita demo visual ni aceptación.

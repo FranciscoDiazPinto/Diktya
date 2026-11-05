@@ -37,6 +37,7 @@ flowchart TD
 
 | Módulo | Propiedad y contratos |
 |---|---|
+| audit | Consulta global de metadatos mediante proyecciones públicas de auth, networks, tickets y changes; filtros, paginación y CSV. Solo `audit:read` (admin). No posee tablas ni consulta modelos de otros dominios. |
 | auth | Usuarios/roles/tokens. `service.py` contiene login y administración; `access.py` autoriza actores; `dependencies.py` adapta identidad/permisos a HTTP. |
 | networks | Inventario y asignaciones (`service.py`); autorización por recurso (`access.py`); configuración (`configuration.py`); claves (`credentials.py`); diagnóstico (`diagnostics.py`); registro de auditoría (`audit.py`). |
 | tickets | Tablas Ticket/Event/Notification y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización; `criticality.py` las reglas; `notifications.py` las entregas; `agent.py` el agente en memoria de incidentes, escalamiento y correo. |
@@ -140,3 +141,13 @@ El inventario, alertas, disponibilidad y planos se implementan en `monitoring.in
 `providers.access_points.AccessPointAdapter` reutiliza el inventario normalizado UniFi para DTO mínimos por red, con sitio resuelto y estado explícito. No recolecta estadísticas ni presume heartbeat. `networks.telemetry` filtra por vinculación sitio/AP de la migración 009 y reautoriza tras las esperas. `MonitoringResponse.stale` identifica lecturas anteriores en la retención acotada; cambios y diagnósticos rechazan datos vencidos.
 
 `frontend/modules/navigation.mjs` controla wrappers y hash; cada controlador mantiene su estado privado. Resumen contiene dashboard y chat; inventario, alertas, redes, planos y demás módulos tienen vistas independientes. `inventory.mjs` y `notifications.mjs` conservan sus contratos y reciben coordinación mediante callbacks del compositor.
+
+## Auditoría unificada · HU013
+
+`GET /api/v1/audit` permite filtrar por `actor_id`, `source` (auth, support, tickets, reservations, csv o ssid), `action` y `outcome` exactos, `since` y `until` inclusivos. Fechas ISO 8601 con zona horaria, normalizadas a UTC; la interfaz convierte desde/hacia hora local. Paginación `limit` entre 1 y 100, `offset` no negativo, orden estable por fecha y desempate por origen/ID/acción. La respuesta incluye `items`, `total`, `limit` y `offset`.
+
+`GET /api/v1/audit/export` aplica los mismos filtros; CSV UTF-8 con BOM, sin paginación y con límite de 5000 filas. Si se supera, rechaza la solicitud para exigir filtros más acotados. Neutraliza fórmulas de hoja de cálculo y responde como descarga con `Cache-Control: no-store, private`. La pantalla usa el cliente autenticado compartido y descarta respuestas de otra sesión o consulta.
+
+Cada módulo ofrece `audit_queries.py` con su proyección de metadatos. Se excluyen deliberadamente JSON de detalles, notas/evidencias de tickets, filas/resultados de CSV, secretos, contactos y conversaciones. `actor_id=null` significa sistema o identidad no determinada; no permite distinguir ambos sin datos históricos adicionales. El permiso `audit:read` pertenece solo a admin y también se comprueba desde el servicio sin HTTP. No requiere migración.
+
+Reservas muestran creación/liberación; planes y cargas muestran creación/confirmación y una fila `snapshot=true` con su estado actual. La fecha de esa instantánea es la creación del plan: **no** acredita cuándo se ejecutó ni quién ejecutó cada paso. No se presenta esta consulta como registro inmutable completo de infraestructura: auditoría append-only transversal, historial de ejecución/verificación/rollback y aceptación de HU013 siguen pendientes. H010 y H011 no cambian.

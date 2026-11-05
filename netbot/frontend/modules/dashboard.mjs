@@ -1,3 +1,4 @@
+import { createAudit } from './audit.mjs';
 import { createInventory } from './inventory.mjs';
 import { createNotifications } from './notifications.mjs';
 import { createNavigation } from './navigation.mjs';
@@ -44,10 +45,11 @@ export function createDashboard({document, window, localStorage, fetch, Option, 
   const accessPoints = createAccessPoints({document,window,Option,state,api,...dom,formatDuration:format.formatDuration});
   const inventory = createInventory({document, window, Option, state, api, ...dom});
   const notifications = createNotifications({document, window, state, api, ...dom, onOpenTicket:(id)=>{ navigation.navigate('tickets-panel'); document.querySelector('#ticket-'+Number(id))?.scrollIntoView?.(); }});
-  const features = [inventory, notifications, accessPoints, monitoring, reservations, support, tickets, chat, csvImports, wifiRecipients, ssidPlans];
+  const audit = createAudit({document, window, state, api});
+  const features = [audit, inventory, notifications, accessPoints, monitoring, reservations, support, tickets, chat, csvImports, wifiRecipients, ssidPlans];
   session = createSession({document, window, state, api, FormData, ...dom,
     onAuthenticated(user) { guest.stop(); navigation.reset(); for (const feature of features) feature.reset(); for (const feature of features) feature.configureUser(user); navigation.configureUser(user); },
     onSignedOut({expired} = {}) { navigation.reset(); for (const feature of features) feature.reset(); if (expired) guest.stop(); else guest.start(); }});
-  return {navigation, inventory, notifications, accessPoints, ssidPlans, guest, wifiRecipients, session, api, chat, support, tickets, reservations, monitoring, csvImports,
+  return {audit, navigation, inventory, notifications, accessPoints, ssidPlans, guest, wifiRecipients, session, api, chat, support, tickets, reservations, monitoring, csvImports,
     start() { guest.start(); return session.validateSession(); }};
 }

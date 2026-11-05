@@ -1,5 +1,6 @@
 """Registro HTTP: los dominios no importan este módulo de composición."""
 from fastapi import FastAPI
+from app.audit.router import router as audit_router
 from app.changes.router import router as changes_router
 from app.auth.routes import admin_router, router
 from app.chat.router import router as chat_router
@@ -10,6 +11,7 @@ from app.tickets.router import notifications_router, router as tickets_router
 from app.monitoring.router import router as monitoring_router
 
 def register_routes(app: FastAPI) -> None:
+    app.include_router(audit_router, prefix="/api/v1")
     app.include_router(monitoring_router, prefix="/api/v1")
     app.include_router(chat_router, prefix="/api/v1")
     app.include_router(guest_router, prefix="/api/v1")

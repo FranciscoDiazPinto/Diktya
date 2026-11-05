@@ -4,6 +4,7 @@ from enum import Enum
 
 
 class Permission(str, Enum):
+    AUDIT_READ = "audit:read"
     AUTH_AUDIT_READ = "auth:audit:read"
     USERS_READ = "users:read"
     USERS_MANAGE = "users:manage"

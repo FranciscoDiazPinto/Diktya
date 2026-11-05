@@ -82,3 +82,7 @@ Resumen reúne el chat con indicadores/gráficos para roles globales y accesos a
 Para desarrollo, servir `frontend` normalmente: las rutas `#chat`, `#clients`, etc. no requieren reescrituras del servidor. Tras actualizar módulos estáticos en una demo ya abierta, recargar sin caché si el navegador conserva la versión anterior.
 
 Las notificaciones del equipo permanecen accesibles desde la barra superior en cualquier vista; sus enlaces abren Tickets. Los módulos inventory y notifications provienen del desarrollo de monitoreo/tickets integrado y conservan sus contratos de API.
+
+## Auditoría
+
+Administradores con `audit:read` disponen de la vista Auditoría: filtros exactos por actor, origen, acción y resultado, rango de fechas en hora local, paginación y descarga CSV con los filtros aplicados (máximo 5000 registros). Los cambios escritos en el formulario se aplican con «Aplicar filtros». Al cerrar sesión se limpian registros y filtros; las respuestas tardías no pueden restaurarlos. Las filas «Estado actual» son instantáneas, con fecha de creación del plan; no son eventos de ejecución. Ver [contrato y límites](../docs/arquitectura-modular.md#auditoría-unificada--hu013).
