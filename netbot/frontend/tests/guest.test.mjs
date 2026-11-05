@@ -10,7 +10,7 @@ class Element {
   replaceChildren(...nodes) { this.children = nodes; }
   focus() {}
 }
-function setup(handler = async () => ({answer: 'Prueba reiniciar la conexión.'})) {
+function setup(handler = async () => ({answer: 'Prueba reiniciar la conexión.', state: 'answered'})) {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(m => [`#${m[1]}`, new Element()]));
   let time = 100000, timerId = 0;
@@ -170,4 +170,27 @@ test('email recovery sends only the form email and keeps contacts outside chat h
   assert.equal(ui.$('#guest-identify-form').hidden,true);
   assert.doesNotMatch(ui.content(),/expositor@example.com/);
   assert.ok(!ui.calls.some(c=>c.path.endsWith('/messages')));
+});
+
+ test('diagnostic questions and unknown states keep the conversation open', async () => {
+  for (const response of [{answer:'¿Ves la red?',state:'needs_information'}, {answer:'Continúa',state:'unexpected'}, {answer:'Texto sin clasificación'}]) {
+    const ui=setup(async()=>response);await ui.submit('No conecta');
+    assert.equal(ui.$('#guest-resolution').hidden,true);assert.doesNotMatch(ui.content(),/¿Se resolvió/);
+  }
+});
+ test('a final answer offers resolution only once until more help is requested',async()=>{
+  const ui=setup();await ui.submit('Qué es DHCP');await ui.submit('Y DNS');
+  assert.equal((ui.content().match(/¿Se resolvió/g)||[]).length,1);
+  assert.equal(ui.$('#guest-resolution').hidden,true);
+  ui.$('#guest-finish').events.click();ui.$('#guest-no').events.click();
+  await ui.submit('Sigo con una duda');assert.equal((ui.content().match(/¿Se resolvió/g)||[]).length,2);
+});
+ test('user-confirmed closure asks before erasing the conversation',async()=>{
+  const ui=setup(async()=>({answer:'Gracias por confirmar.',state:'closed'}));await ui.submit('Ya funciona');
+  assert.match(ui.content(),/¿Confirmas que borremos/);assert.match(ui.content(),/Ya funciona/);
+  ui.$('#guest-yes').events.click();assert.doesNotMatch(ui.content(),/Ya funciona/);
+});
+ test('provider failures never ask whether an answer solved the issue',async()=>{
+  const ui=setup(async()=>{throw new Error('No se pudo responder');});await ui.submit('Hola');
+  assert.match(ui.content(),/No se pudo responder/);assert.doesNotMatch(ui.content(),/¿Se resolvió/);assert.equal(ui.$('#guest-resolution').hidden,true);
 });
