@@ -47,7 +47,11 @@ Las redes WPA2/WPA3 no entregan QR anónimamente aunque se hayan incluido por er
 
 ## Resolución y limpieza
 
-Tras responder o mostrar el QR, Netbot pregunta «¿Se resolvió tu duda?». Si responde que sí, solicita confirmar la limpieza. Confirmar borra inmediatamente mensajes, formulario de contacto, red seleccionada, QR y token. «Seguir consultando» conserva la atención; «Finalizar atención» abre la confirmación.
+El backend devuelve `state`: `needs_information` para preguntas o aclaraciones, `answered` para una explicación o derivación completa y `closed` cuando el usuario expresa que terminó. El modelo solo propone los dos primeros mediante JSON validado; una respuesta que contiene preguntas continúa como aclaración. Texto sin clasificación se trata de forma conservadora como `needs_information`, y JSON inválido se rechaza sin mostrar metadatos. `needs_clarification` se conserva por compatibilidad.
+
+La interfaz ofrece «¿Se resolvió tu duda?» únicamente tras `answered` (o mostrar el QR), una vez por bloque de ayuda. Ignorar esa pregunta y seguir conversando no la repite en cada respuesta. «Necesito más ayuda» vuelve a habilitarla para la siguiente explicación completa. Fallos de conexión o del proveedor no disparan una pregunta de resolución.
+
+Expresiones completas como «ya funciona» o «gracias, ya funciona» señalan intención de terminar; «gracias» solo se interpreta así después de una respuesta completa. «Gracias, pero no funciona» continúa la conversación. La clasificación no certifica conectividad ni resolución real. Si el usuario confirma resolución, solicita confirmar la limpieza. Confirmar borra inmediatamente mensajes, formulario de contacto, red seleccionada, QR y token. «Seguir consultando» conserva la atención; «Finalizar atención» abre la confirmación.
 
 Tras 60 segundos sin actividad se limpia automáticamente, incluso sin responder la confirmación. Al volver a una pestaña suspendida se comprueba el vencimiento. Las respuestas tardías de chat, identificación y QR no pueden aparecer en otra atención.
 

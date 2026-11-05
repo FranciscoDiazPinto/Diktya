@@ -1,4 +1,5 @@
 """Frontera pública de autoatención, separada de la API autenticada."""
+from typing import Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -25,6 +26,7 @@ class GuestMessage(BaseModel):
 
 class GuestAnswer(BaseModel):
     answer: str
+    state: Literal["needs_information", "answered", "closed"] = "needs_information"
     needs_clarification: bool = False
     expires_in: int = TTL
 
@@ -63,7 +65,9 @@ async def send_message(payload: GuestMessage, token: str = Depends(guest_token),
                        settings: Settings = Depends(get_settings), provider=Depends(get_guest_provider)):
     try:
         answer = await sessions.answer(token, payload.message, provider, settings)
-        return GuestAnswer(answer=answer, needs_clarification=sessions.get(token).awaiting_credential_kind)
+        session = sessions.get(token)
+        return GuestAnswer(answer=answer, state=session.dialogue_state,
+                           needs_clarification=session.dialogue_state == "needs_information")
     except ChatInputError as exc:
         raise HTTPException(422, str(exc)) from None
     except ChatProviderNotConfigured:
