@@ -11,7 +11,7 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     }
   });
   let generation = 0, token = null, creating = null, timer = null, deadline = 0;
-  let visible = false, busy = false, stage = '', lastActivity = 0;
+  let visible = false, busy = false, stage = '', lastActivity = 0, resolutionOffered = false;
   let aborter = new AbortController();
   const text = (tag, value) => { const node = document.createElement(tag); node.textContent = value; return node; };
   const current = (g) => visible && g === generation;
@@ -39,7 +39,7 @@ export function createGuest({document, window, api, Option, now = () => Date.now
   }
   function reset(welcome = '¡Hola! Puedo orientarte con la conexión Wi-Fi. ¿Qué necesitas?') {
     const old = token; generation += 1; token = null; creating = null;
-    aborter.abort(); aborter = new AbortController(); cancelTimer(); stage = ''; lastActivity = 0;
+    aborter.abort(); aborter = new AbortController(); cancelTimer(); stage = ''; lastActivity = 0; resolutionOffered = false;
     setBusy(false); input.value = ''; messages.replaceChildren(); $('#guest-qr').replaceChildren();
     $('#guest-wifi').hidden = true; $('#guest-network').replaceChildren(); $('#guest-resolution').hidden = true;
     $('#guest-contact').value = ''; $('#guest-identify-form').hidden = true; $('#guest-identify-error').textContent = '';
@@ -61,6 +61,8 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     try { return await pending; } finally { if (creating === pending) creating = null; }
   }
   function askResolved() {
+    if (resolutionOffered) { stage = ''; $('#guest-resolution').hidden = true; arm(); return; }
+    resolutionOffered = true;
     stage = 'resolved'; $('#guest-resolution').hidden = false;
     $('#guest-question').textContent = '¿Se resolvió tu duda?';
     $('#guest-yes').textContent = 'Sí, se resolvió'; $('#guest-no').textContent = 'Necesito más ayuda';
@@ -74,7 +76,7 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     touch();
   }
   function moreHelp() {
-    stage = ''; $('#guest-resolution').hidden = true; say('Claro. Cuéntame qué falta por resolver.'); arm(); touch(); input.focus();
+    resolutionOffered = false; stage = ''; $('#guest-resolution').hidden = true; say('Claro. Cuéntame qué falta por resolver.'); arm(); touch(); input.focus();
   }
   async function touch() {
     if (!token || !visible) return;
@@ -85,7 +87,8 @@ export function createGuest({document, window, api, Option, now = () => Date.now
   function failure(error, g) {
     if (!current(g)) return;
     if (error.status === 404) { reset('La atención venció y se limpió. Puedes comenzar de nuevo.'); return; }
-    say(error.message || 'No se pudo conectar. Inténtalo nuevamente.'); askResolved();
+    stage = ''; $('#guest-resolution').hidden = true;
+    say(error.message || 'No se pudo conectar. Inténtalo nuevamente.'); arm();
   }
   async function showNetworks() {
     checkExpiry(); if (busy) return;
@@ -157,8 +160,9 @@ export function createGuest({document, window, api, Option, now = () => Date.now
       await ensureSession(); const response = await request('/messages', {method: 'POST', body: JSON.stringify({message})});
       if (!current(g)) return;
       say(response.answer);
-      if (response.needs_clarification) { stage = ''; $('#guest-resolution').hidden = true; arm(); }
-      else askResolved();
+      if (response.state === 'closed') askClear();
+      else if (response.state === 'answered' && !response.needs_clarification) askResolved();
+      else { stage = ''; $('#guest-resolution').hidden = true; arm(); }
     } catch (error) { failure(error, g); }
     finally { if (current(g)) setBusy(false); }
   });

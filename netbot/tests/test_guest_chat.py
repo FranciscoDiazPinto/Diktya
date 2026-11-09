@@ -174,3 +174,68 @@ def test_explicit_wifi_recovery_does_not_divert_general_wifi_questions():
     answer = asyncio.run(store.answer(token, '¿Qué es DHCP en una red Wi-Fi?', provider, settings))
     assert 'DHCP' in answer
     provider.complete.assert_awaited_once()
+
+
+@pytest.mark.parametrize('content, expected', [
+    ('{"answer":"¿Tu equipo detecta la red?","state":"needs_information"}', 'needs_information'),
+    ('{"answer":"DHCP asigna una dirección IP automáticamente.","state":"answered"}', 'answered'),
+    ('{"answer":"¿Tu equipo detecta la red?","state":"answered"}', 'needs_information'),
+    ('Texto de un proveedor sin clasificación.', 'needs_information'),
+])
+def test_guest_validates_model_state_and_preserves_only_answer(content, expected):
+    store = GuestSessions(); token = store.create()
+    provider = SimpleNamespace(complete=AsyncMock(return_value=ProviderCompletion(content=content)))
+    answer = asyncio.run(store.answer(token, 'Ayuda con mi conexión', provider, Settings(_env_file=None)))
+    assert store.get(token).dialogue_state == expected
+    assert store.get(token).history[-1].content == answer
+    assert '"state"' not in answer
+    assert provider.complete.call_count == 1
+    assert provider.complete.call_args.kwargs['tools'] == []
+
+
+@pytest.mark.parametrize('content', [
+    '{"answer":"Todo listo","state":"closed"}',
+    '{"answer":" ","state":"answered"}',
+    '{"answer":"Hola","state":"answered","execute":true}',
+    '{"answer":"Hola","state":123}',
+    '{invalid json}',
+])
+def test_guest_rejects_invalid_state_or_model_requested_closure(content):
+    store = GuestSessions(); token = store.create()
+    provider = SimpleNamespace(complete=AsyncMock(return_value=ProviderCompletion(content=content)))
+    with pytest.raises(ChatProviderError):
+        asyncio.run(store.answer(token, 'Hola', provider, Settings(_env_file=None)))
+    assert store.get(token).history == []
+    assert store.get(token).dialogue_state == 'needs_information'
+
+
+def test_only_user_can_confirm_closure_and_it_does_not_delete_session():
+    store = GuestSessions(); token = store.create()
+    provider = SimpleNamespace(complete=AsyncMock(return_value=ProviderCompletion(content='{"answer":"DHCP asigna una dirección IP.","state":"answered"}')))
+    settings = Settings(_env_file=None)
+    asyncio.run(store.answer(token, 'Qué es DHCP', provider, settings))
+    asyncio.run(store.answer(token, 'gracias, pero no funciona', provider, settings))
+    assert store.get(token).dialogue_state == 'answered'
+    assert provider.complete.call_count == 2
+    asyncio.run(store.answer(token, 'Gracias, ya funciona', provider, settings))
+    assert store.get(token).dialogue_state == 'closed'
+    assert provider.complete.call_count == 2
+    assert store.get(token).history
+    store.delete(token)
+    with pytest.raises(NotFound): store.get(token)
+
+
+def test_guest_api_returns_dialogue_state_and_compatibility_flag(client):
+    provider = SimpleNamespace(complete=AsyncMock(return_value=ProviderCompletion(content='{"answer":"¿La red aparece en tu teléfono?","state":"needs_information"}')))
+    app.dependency_overrides[get_guest_provider] = lambda: provider
+    token = client.post('/api/v1/guest/sessions').json()['token']
+    headers = {'X-Guest-Session': token}
+    response = client.post('/api/v1/guest/messages', headers=headers, json={'message':'No conecta'})
+    assert response.status_code == 200
+    assert response.json()['state'] == 'needs_information'
+    assert response.json()['needs_clarification'] is True
+    assert '"answer"' not in response.json()['answer']
+    response = client.post('/api/v1/guest/messages', headers=headers, json={'message':'Ya funciona'})
+    assert response.json()['state'] == 'closed'
+    assert response.json()['needs_clarification'] is False
+    assert token in sessions.sessions
