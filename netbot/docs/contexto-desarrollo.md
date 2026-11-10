@@ -586,3 +586,14 @@ Promoción a main solicitada por el usuario después de integrar HU013 en dev (4
 En `feature/guest-conversation-state`, desde dev 09bf35b: la respuesta pública incluye `state` (`needs_information`, `answered`, `closed`) y conserva `needs_clarification`. El proveedor devuelve JSON con texto y clasificación; solo el servidor interpreta intención explícita de cierre del usuario. Preguntas y salidas sin clasificación continúan conservadoramente; un estado cerrado emitido por el modelo se rechaza. La interfaz ofrece resolución una vez por bloque, no tras errores, y vuelve a habilitarla al pedir más ayuda. La confirmación de borrado y el minuto de caducidad siguen vigentes.
 
 Verificación: 467 pruebas backend y 81 frontend aprobadas. Prueba local con proveedor real, sin datos personales: saludo → needs_information; explicación de DHCP → answered; «Gracias, ya funciona» → closed. La revisión visual se interrumpió por control del usuario sobre el navegador; no se acredita demo visual. Sin cambios de infraestructura ni de historias HU010/HU011.
+
+
+## Corrección documental del control del 02 de noviembre
+
+Actualización 10-11-2026 en rama `docs/feedback-docente-hu-uml`, base `dev` `3a05bb9`. Se sincronizan backlog, planificación (incluida copia raíz), guía de avance e informe por las 19 HU. Se conserva el DoD sin modificaciones: 0 cierres integrales documentados, 5 en revisión funcional (23 puntos), 12 parciales (85), 2 pendientes (13). No son puntos aceptados. Revisión local: 467 pruebas backend y 81 frontend aprobadas; no se conectaron equipos ni SMTP.
+
+El diseño reemplaza las imágenes históricas por vistas UML y una secuencia por HU; fuentes SVG y generador en `Arquitectura/uml`. HU010/HU011 documentan el límite actual, sin inventar ejecución. Los textos del equipo en Observaciones al avance y Control de Acuerdos del acta 02/11 se preservan en anexo identificado; campos docentes quedan vacíos. Se conserva la fecha original del control, asistencia y firmas. La retroalimentación comunicada por el usuario no se transcribe como si el docente hubiera editado el acta.
+
+Pendiente para cierre: evidencias de pares y aceptación, resolver la diferencia React frente a ES en HU005, validación de laboratorio y demás brechas individuales. Se conserva baseline de 18 semanas sin inventar fechas nuevas. El estado de conversación de invitados integrado en dev es avance transversal, sin sumar puntos al backlog.
+
+Se crea acta independiente para el control del 09/11/2026, preparada el 10/11, con demo presencial y fecha, hora y sala por coordinar. Mantiene asistencia sin marcar y campos docentes vacíos; no reemplaza el acta del 02/11.
