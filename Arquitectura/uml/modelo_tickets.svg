@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900">
+<rect width="1000" height="900" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<text x="30" y="40" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">class modelo_tickets</text>
+<rect x="50" y="95" width="280" height="132" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="190.0" y="126" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">MonitoringAlert</text>
+<path d="M50,143 L330,143" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="62" y="174" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="62" y="206" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">device_id: int [0..1]</text>
+<rect x="655" y="95" width="280" height="196" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="795.0" y="126" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">Ticket</text>
+<path d="M655,143 L935,143" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="667" y="174" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="667" y="206" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">alert_id: int [0..1]</text>
+<text x="667" y="238" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">status: str</text>
+<text x="667" y="270" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">criticality: str</text>
+<rect x="50" y="440" width="280" height="164" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="190.0" y="471" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">TicketEvent</text>
+<path d="M50,488 L330,488" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="62" y="519" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="62" y="551" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">ticket_id: int</text>
+<text x="62" y="583" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">note: str</text>
+<rect x="655" y="440" width="280" height="196" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="795.0" y="471" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">Notification</text>
+<path d="M655,488 L935,488" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="667" y="519" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="667" y="551" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">ticket_id: int</text>
+<text x="667" y="583" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">user_id: int</text>
+<text x="667" y="615" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">status: str</text>
+<path d="M330,155 L655,155" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="360" y="143" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..1</text>
+<text x="625" y="143" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+<path d="M725.0,291 L260.0,440" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="750.0" y="316" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">1</text>
+<text x="285.0" y="428" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+<path d="M795.0,291 L795.0,440" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="820.0" y="316" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">1</text>
+<text x="820.0" y="428" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+</svg>

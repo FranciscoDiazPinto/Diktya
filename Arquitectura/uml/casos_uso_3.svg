@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1050" viewBox="0 0 1000 1050">
+<rect width="1000" height="1050" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<rect x="300" y="35" width="675" height="970" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="635" y="73" font-family="DejaVu Sans,Arial,sans-serif" font-size="27" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">NetBot</text>
+<circle cx="115" cy="450" r="13" stroke="#17283b" stroke-width="2" fill="white"/>
+<path d="M115,463 L115,503" fill="none" stroke="#17283b" stroke-width="2"/>
+<path d="M90,480 L140,480" fill="none" stroke="#17283b" stroke-width="2"/>
+<path d="M115,503 L92,528" fill="none" stroke="#17283b" stroke-width="2"/>
+<path d="M115,503 L138,528" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="115" y="557" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Usuario autorizado</text>
+<ellipse cx="635" cy="145" rx="300" ry="48" stroke="#17283b" stroke-width="2" fill="#eaf0f5"/>
+<text x="635" y="137" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HU014 Generación automática de tickets</text>
+<text x="635" y="166" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">con criticidad</text>
+<path d="M145,490 L335,145" fill="none" stroke="#17283b" stroke-width="2"/>
+<ellipse cx="635" cy="265" rx="300" ry="48" stroke="#17283b" stroke-width="2" fill="#eaf0f5"/>
+<text x="635" y="257" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HU015 Notificación al equipo técnico</text>
+<path d="M145,490 L335,265" fill="none" stroke="#17283b" stroke-width="2"/>
+<ellipse cx="635" cy="385" rx="300" ry="48" stroke="#17283b" stroke-width="2" fill="#eaf0f5"/>
+<text x="635" y="377" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HU016 Seguimiento de tickets hasta su</text>
+<text x="635" y="406" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">resolución</text>
+<path d="M145,490 L335,385" fill="none" stroke="#17283b" stroke-width="2"/>
+<ellipse cx="635" cy="505" rx="300" ry="48" stroke="#17283b" stroke-width="2" fill="#eaf0f5"/>
+<text x="635" y="497" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HU017 Agente de monitoreo continuo en</text>
+<text x="635" y="526" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">background</text>
+<path d="M145,490 L335,505" fill="none" stroke="#17283b" stroke-width="2"/>
+<ellipse cx="635" cy="625" rx="300" ry="48" stroke="#17283b" stroke-width="2" fill="#eaf0f5"/>
+<text x="635" y="617" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HU018 Orquestación multi-agente</text>
+<path d="M145,490 L335,625" fill="none" stroke="#17283b" stroke-width="2"/>
+<ellipse cx="635" cy="745" rx="300" ry="48" stroke="#17283b" stroke-width="2" fill="#eaf0f5"/>
+<text x="635" y="737" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HU019 Configuración del proveedor LLM</text>
+<path d="M145,490 L335,745" fill="none" stroke="#17283b" stroke-width="2"/>
+</svg>

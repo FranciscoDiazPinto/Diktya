@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800">
+<rect width="1000" height="800" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<rect x="8" y="8" width="984" height="784" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="8" y="8" width="205" height="43" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="25" y="37" font-family="DejaVu Sans,Arial,sans-serif" font-size="24" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">sd HU011</text>
+<rect x="4" y="76" width="222" height="91" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="115" y="105" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">Usuario autorizado</text>
+<path d="M115,167 L115,755" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="254" y="76" width="222" height="91" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="365" y="105" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">chat.application</text>
+<path d="M365,167 L365,755" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="504" y="76" width="222" height="91" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="615" y="105" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">ChatService</text>
+<path d="M615,167 L615,755" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6"/>
+<rect x="754" y="76" width="222" height="91" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="865" y="105" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">chat.support</text>
+<path d="M865,167 L865,755" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6"/>
+<path d="M115,235 L365,235" fill="none" stroke="#17283b" stroke-width="2" marker-end="url(#call)"/>
+<text x="240.0" y="199" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Solicitar reinicio de</text>
+<text x="240.0" y="228" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">dispositivo</text>
+<path d="M365,325 L615,325" fill="none" stroke="#17283b" stroke-width="2" marker-end="url(#call)"/>
+<text x="490.0" y="289" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Interpretar solicitud</text>
+<text x="490.0" y="318" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">autorizada</text>
+<path d="M615,415 L865,415" fill="none" stroke="#17283b" stroke-width="2" marker-end="url(#call)"/>
+<text x="740.0" y="379" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Consultar herramientas</text>
+<text x="740.0" y="408" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">disponibles</text>
+<path d="M865,505 L615,505" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<text x="740.0" y="469" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Sin herramienta de</text>
+<text x="740.0" y="498" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">reinicio</text>
+<path d="M615,595 L365,595" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<text x="490.0" y="559" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Informar capacidad no</text>
+<text x="490.0" y="588" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">disponible</text>
+<path d="M365,685 L115,685" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<text x="240.0" y="649" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Dispositivo sin cambios</text>
+</svg>
