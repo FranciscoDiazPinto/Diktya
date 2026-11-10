@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="990" viewBox="0 0 1000 990">
+<rect width="1000" height="990" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<text x="25" y="40" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">cmp Componentes del monolito modular</text>
+<rect x="365" y="70" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="500" y="129" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">frontend/modules</text>
+<rect x="603" y="82" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="86" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="100" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="40" y="280" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="175" y="339" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">auth</text>
+<rect x="278" y="292" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="271" y="296" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="271" y="310" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="365" y="280" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="500" y="339" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">chat</text>
+<rect x="603" y="292" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="296" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="310" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="690" y="280" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="825" y="339" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">networks</text>
+<rect x="928" y="292" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="921" y="296" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="921" y="310" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="40" y="550" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="175" y="609" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">changes</text>
+<rect x="278" y="562" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="271" y="566" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="271" y="580" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="365" y="550" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="500" y="609" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">monitoring</text>
+<rect x="603" y="562" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="566" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="580" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="690" y="550" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="825" y="609" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">tickets</text>
+<rect x="928" y="562" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="921" y="566" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="921" y="580" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="365" y="800" width="270" height="100" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<text x="500" y="859" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">audit</text>
+<rect x="603" y="812" width="20" height="29" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="816" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<rect x="596" y="830" width="13" height="7" fill="white" stroke="#17283b" stroke-width="2"/>
+<path d="M500,170 L175,280" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<path d="M500,170 L500,280" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<path d="M500,170 L825,280" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<path d="M500,380 L175,550" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<path d="M500,380 L500,550" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<path d="M500,380 L825,550" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#reply)"/>
+<text x="500" y="765" font-family="DejaVu Sans,Arial,sans-serif" font-size="19" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">audit consulta proyecciones públicas de auth, networks, changes y tickets</text>
+</svg>

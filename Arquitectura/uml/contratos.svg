@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900">
+<rect width="1000" height="900" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<text x="35" y="40" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">class Contratos de integración</text>
+<rect x="50" y="90" width="280" height="160" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="190" y="120" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">«interface»</text>
+<text x="190" y="152" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">ChatProvider</text>
+<path d="M50,170 L330,170" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="190" y="208" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">+ complete()</text>
+<rect x="650" y="90" width="280" height="160" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="790" y="120" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">«interface»</text>
+<text x="790" y="152" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">InfrastructureSource</text>
+<path d="M650,170 L930,170" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="790" y="208" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">+ collect_inventory()</text>
+<rect x="50" y="400" width="280" height="100" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="190.0" y="431" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">OpenRouterProvider</text>
+<path d="M50,448 L330,448" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="62" y="479" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">+ complete()</text>
+<rect x="650" y="400" width="280" height="100" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="790.0" y="431" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">UnifiMonitoringProvider</text>
+<path d="M650,448 L930,448" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="662" y="479" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">+ collect_inventory()</text>
+<path d="M190,400 L190,250" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#general)"/>
+<path d="M790,400 L790,250" fill="none" stroke="#17283b" stroke-width="2" stroke-dasharray="8 6" marker-end="url(#general)"/>
+<text x="500" y="730" font-family="DejaVu Sans,Arial,sans-serif" font-size="23" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Realización de interfaces del proyecto</text>
+</svg>

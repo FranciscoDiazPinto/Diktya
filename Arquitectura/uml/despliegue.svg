@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="920" viewBox="0 0 1000 920">
+<rect width="1000" height="920" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<text x="30" y="40" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">deployment Entorno de desarrollo</text>
+<rect x="45" y="100" width="360" height="235" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<path d="M45,100 l18,-16 h360 v235 l-18,16 M405,100 l18,-16" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="225.0" y="135" font-family="DejaVu Sans,Arial,sans-serif" font-size="23" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">«device» Equipo usuario</text>
+<rect x="63" y="167" width="324" height="150" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="225.0" y="199" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">«artifact»</text>
+<text x="225.0" y="228" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">frontend estático ES</text>
+<rect x="595" y="100" width="360" height="235" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<path d="M595,100 l18,-16 h360 v235 l-18,16 M955,100 l18,-16" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="775.0" y="135" font-family="DejaVu Sans,Arial,sans-serif" font-size="23" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">«device» Equipo servidor</text>
+<rect x="613" y="167" width="324" height="150" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="775.0" y="199" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">«artifact»</text>
+<text x="775.0" y="228" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">netbot/app</text>
+<rect x="595" y="485" width="360" height="235" fill="#eaf0f5" stroke="#17283b" stroke-width="2"/>
+<path d="M595,485 l18,-16 h360 v235 l-18,16 M955,485 l18,-16" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="775.0" y="520" font-family="DejaVu Sans,Arial,sans-serif" font-size="23" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">«executionEnvironment»</text>
+<rect x="613" y="552" width="324" height="150" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="775.0" y="584" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">«artifact»</text>
+<text x="775.0" y="613" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">SQLite de desarrollo</text>
+<path d="M405,215 L595,215" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="500" y="196" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">HTTP local</text>
+<path d="M775,335 L775,485" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="795" y="410" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">SQL</text>
+<text x="500" y="815" font-family="DejaVu Sans,Arial,sans-serif" font-size="23" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">Topología local observada, no despliegue productivo validado</text>
+</svg>
