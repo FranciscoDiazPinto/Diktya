@@ -62,8 +62,10 @@ def cancel_csv(import_id: UUID, actor: User = Depends(require_permission(Permiss
                 service: CsvImportService = Depends(get_csv_service)):
     return service.cancel(str(import_id), actor)
 
+
 def _service(monitoring: MonitoringServiceDep, db: Session) -> VlanReservationService:
     return VlanReservationService(monitoring, db)
+
 
 @router.get("/vlan-options", response_model=list[AvailableVlan])
 async def vlan_options(monitoring: MonitoringServiceDep,
@@ -74,11 +76,13 @@ async def vlan_options(monitoring: MonitoringServiceDep,
     except InventoryUnavailable:
         raise HTTPException(status_code=503, detail="Inventario VLAN no disponible.") from None
 
+
 @router.get("/vlan-reservations", response_model=list[VlanReservationRead])
 def list_reservations(monitoring: MonitoringServiceDep,
                       _user: User = Depends(require_permission(Permission.VLAN_RESERVE.value)),
                       db: Session = Depends(get_db)):
     return _service(monitoring, db).list_active()
+
 
 @router.post("/vlan-reservations", response_model=VlanReservationRead, status_code=201)
 async def create_reservation(payload: VlanReservationCreate, monitoring: MonitoringServiceDep,
@@ -90,6 +94,7 @@ async def create_reservation(payload: VlanReservationCreate, monitoring: Monitor
         raise HTTPException(status_code=503, detail="Inventario VLAN no disponible.") from None
     except VlanConflict:
         raise HTTPException(status_code=409, detail="La VLAN ya no está disponible.") from None
+
 
 @router.post("/vlan-reservations/{reservation_id}/release", response_model=VlanReservationRead)
 def release_reservation(reservation_id: int, monitoring: MonitoringServiceDep,
@@ -105,7 +110,15 @@ def release_reservation(reservation_id: int, monitoring: MonitoringServiceDep,
 
 from .dependencies import get_ssid_service
 from .ssid_service import SsidPlanService
-from .ssid_schemas import ScopeWrite, SsidProposal, SsidCsv, SsidConfirm, SsidPlanRead
+from .ssid_schemas import (
+    ScopeWrite,
+    SsidProposal,
+    SsidCsv,
+    SsidConfirm,
+    SsidPlanRead,
+    SsidVlanChangeProposal,
+    SsidVlanChangeConfirm,
+)
 
 
 @router.get('/wifi-scopes')
@@ -157,3 +170,24 @@ async def confirm_ssid_plan(plan_id: UUID, payload: SsidConfirm, actor: User = D
 @router.post('/ssid-plans/{plan_id}/cancel', response_model=SsidPlanRead)
 def cancel_ssid_plan(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
     return service.cancel(actor,str(plan_id))
+
+
+@router.post('/ssid-vlan-change-plans', status_code=201)
+async def prepare_ssid_vlan_change(
+    payload: SsidVlanChangeProposal,
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    """H10: prepara y guarda una propuesta; no modifica UniFi."""
+    return await service.propose_vlan_change(actor, payload)
+
+
+@router.post('/ssid-vlan-change-plans/{plan_id}/confirm')
+async def confirm_ssid_vlan_change(
+    plan_id: UUID,
+    payload: SsidVlanChangeConfirm,
+    actor: User = Depends(require_permission(Permission.CHANGES_APPROVE.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    """H10: confirma el plan tras revalidar inventario; no modifica UniFi."""
+    return await service.confirm_vlan_change(actor, str(plan_id), payload)

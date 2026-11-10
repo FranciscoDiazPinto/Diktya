@@ -57,3 +57,81 @@ class WifiInventory:
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
             # No propagar headers, URL ni cuerpos del controlador.
             raise ServiceUnavailable('No se pudo obtener un inventario UniFi completo. Revisa versión, permisos, ruta y TLS.') from None
+
+
+
+    async def read_broadcast(self, site_id: str, broadcast_id: str) -> dict:
+        """Consulta la configuración de un SSID existente sin modificarla."""
+        s = self.settings
+
+        if s.unifi_inventory_mode != 'api':
+            raise ServiceUnavailable(
+                'La consulta detallada de SSID requiere el inventario UniFi en modo API.'
+            )
+
+        if not s.unifi_api_base_url or not s.unifi_api_key:
+            raise ServiceUnavailable('La conexión UniFi no está configurada.')
+
+        url = urlsplit(s.unifi_api_base_url)
+        if (
+            url.scheme != 'https'
+            or url.username
+            or url.password
+            or url.query
+            or url.fragment
+        ):
+            raise ServiceUnavailable('La URL base UniFi no es válida.')
+
+        if not site_id or not broadcast_id:
+            raise ServiceUnavailable('El sitio y el SSID son obligatorios.')
+
+        path = (
+            f'sites/{quote(site_id, safe="")}/wifi/broadcasts/'
+            f'{quote(broadcast_id, safe="")}'
+        )
+
+        try:
+            async with httpx.AsyncClient(
+                base_url=s.unifi_api_base_url.rstrip('/') + '/',
+                headers={'X-API-Key': s.unifi_api_key.get_secret_value()},
+                verify=s.unifi_ca_bundle or True,
+                timeout=s.unifi_timeout_seconds,
+                follow_redirects=False,
+                transport=self.transport,
+            ) as client:
+                response = await client.get(path)
+                response.raise_for_status()
+                data = response.json()
+
+                if not isinstance(data, dict):
+                    raise ValueError('Respuesta inválida.')
+
+                if data.get('id') != broadcast_id:
+                    raise ValueError('El identificador del SSID no coincide.')
+
+                network = data.get('network')
+
+                if not isinstance(network, dict):
+                    raise ValueError('El SSID no tiene información de red válida.')
+
+                if network.get('type') != 'SPECIFIC':
+                    raise ValueError('El SSID no utiliza una red específica.')
+
+                network_id = network.get('networkId')
+
+                if not isinstance(network_id, str) or not network_id:
+                    raise ValueError('La red actual no tiene identificador válido.')
+
+                return {
+                    'id': broadcast_id,
+                    'ssid': data.get('name'),
+                    'network_id': network_id,
+                    'network_type': network['type'],
+                    'source': 'unifi',
+                    'simulated': False,
+                }
+
+        except (httpx.HTTPError, ValueError, TypeError, KeyError):
+            raise ServiceUnavailable(
+                'No se pudo consultar la configuración del SSID en UniFi.'
+            ) from None

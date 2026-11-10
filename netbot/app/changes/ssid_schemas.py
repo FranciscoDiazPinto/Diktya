@@ -1,3 +1,4 @@
+
 from typing import Literal
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -90,3 +91,22 @@ class SsidPlanRead(Strict):
     expires_at: datetime
     execution_status: str
     execution_results: list[dict] = Field(default_factory=list)
+
+
+class SsidVlanChangeProposal(Strict):
+    """Solicitud para cambiar la VLAN de un SSID existente."""
+
+    scope_id: int = Field(gt=0)
+    broadcast_id: str = Field(min_length=1, max_length=160)
+    network_id: str = Field(min_length=1, max_length=160)
+    purpose: str = Field(min_length=1, max_length=500)
+
+
+class SsidVlanChangeConfirm(Strict):
+    """Confirmación explícita de un cambio de VLAN existente."""
+
+    revision: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+    )
