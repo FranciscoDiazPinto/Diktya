@@ -8,7 +8,11 @@ El sistema implementado es un monolito modular FastAPI con PostgreSQL/SQLite y f
 
 El punto de entrada HTTP, el ciclo de vida, la preparación de la base y el registro de modelos están separados. Producción exige migraciones aplicadas antes del arranque; solo development/test admiten create_all. El frontend separa sesión/API, chat, monitoreo, soporte, tickets y reservas.
 
-El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. UniFi, React, WebSocket, ejecución durable, verificación/compensación y aprovisionamiento CSV son objetivos, no capacidades ya disponibles.
+El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. La lectura UniFi y los planes de creación SSID tienen implementación; su operación física continúa pendiente de validación. React, WebSocket y el flujo integral de ejecución durable, compensación y modificación en lote no están implementados.
+
+## Diagramas UML vigentes
+
+El Documento de Diseño se corrigió el 10-11-2026 con 19 secuencias, una por HU, y vistas UML de casos de uso, datos, contratos, componentes y despliegue. Las fuentes editables están en [uml](uml): `historias.json` contiene estados, participantes y mensajes; `generar_uml.py` regenera los SVG sin servicios externos con `python Arquitectura/uml/generar_uml.py` desde la raíz. Los SVG pueden exportarse a PNG para incorporarlos a Word, conservando la relación de aspecto y texto legible. Los archivos `image3.png` a `image10.png` de esta carpeta son antecedentes históricos, no los diagramas de la revisión actual.
 
 ## Diseño de referencia histórico
 

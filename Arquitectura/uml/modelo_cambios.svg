@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900">
+<rect width="1000" height="900" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<text x="30" y="40" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">class modelo_cambios</text>
+<rect x="50" y="95" width="280" height="164" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="190.0" y="126" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">VlanReservation</text>
+<path d="M50,143 L330,143" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="62" y="174" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="62" y="206" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">tag: int</text>
+<text x="62" y="238" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">status: str</text>
+<rect x="655" y="95" width="280" height="132" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="795.0" y="126" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">CsvImport</text>
+<path d="M655,143 L935,143" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="667" y="174" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: str</text>
+<text x="667" y="206" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">status: str</text>
+<rect x="50" y="390" width="280" height="132" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="190.0" y="421" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">WifiScope</text>
+<path d="M50,438 L330,438" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="62" y="469" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="62" y="501" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">site_id: str</text>
+<rect x="655" y="390" width="280" height="164" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="795.0" y="421" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">SsidPlan</text>
+<path d="M655,438 L935,438" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="667" y="469" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: str</text>
+<text x="667" y="501" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">scope_id: int</text>
+<text x="667" y="533" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">status: str</text>
+<path d="M330,450 L655,450" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="360" y="438" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">1</text>
+<text x="625" y="438" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+</svg>

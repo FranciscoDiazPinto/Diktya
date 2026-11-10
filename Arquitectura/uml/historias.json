@@ -1,0 +1,1076 @@
+[
+  {
+    "id": "HU001",
+    "title": "Inicio de sesión",
+    "points": 3,
+    "sprint": 1,
+    "state": "En revisión funcional",
+    "owner": "Francisco Díaz",
+    "gap": "Validar DoD, demostración y revisión de pares documentada.",
+    "participants": [
+      "Usuario autorizado",
+      "auth.routes",
+      "auth.service",
+      "auth.audit"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Ingresar correo y contraseña"
+      ],
+      [
+        1,
+        2,
+        "login()"
+      ],
+      [
+        2,
+        2,
+        "Validar cuenta, hash y bloqueo"
+      ],
+      [
+        2,
+        3,
+        "Registrar resultado de autenticación"
+      ],
+      [
+        3,
+        2,
+        "Evento agregado",
+        true
+      ],
+      [
+        2,
+        1,
+        "Identidad o rechazo genérico",
+        true
+      ],
+      [
+        1,
+        0,
+        "Sesión o acceso rechazado",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/auth/service.py, tests/test_login_lockout.py, migrations/versions/011_login_lockout.py, docs/epica-001-autenticacion-roles.md."
+  },
+  {
+    "id": "HU002",
+    "title": "Gestión de usuarios y roles",
+    "points": 5,
+    "sprint": 1,
+    "state": "En revisión funcional",
+    "owner": "Francisco Díaz",
+    "gap": "Validar CRUD en interfaz, conservación de historial y revisión de pares.",
+    "participants": [
+      "Usuario autorizado",
+      "auth.routes",
+      "auth.service",
+      "auth.audit"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Crear o editar usuario"
+      ],
+      [
+        1,
+        2,
+        "Administrar usuario con actor"
+      ],
+      [
+        2,
+        2,
+        "Autorizar y proteger último admin"
+      ],
+      [
+        2,
+        3,
+        "Registrar alta o modificación"
+      ],
+      [
+        3,
+        2,
+        "Evento agregado",
+        true
+      ],
+      [
+        2,
+        1,
+        "Usuario o conflicto",
+        true
+      ],
+      [
+        1,
+        0,
+        "Resultado de administración",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/auth/service.py, app/auth/models.py, tests/test_auth_epic_closure.py."
+  },
+  {
+    "id": "HU003",
+    "title": "Control de permisos por rol",
+    "points": 5,
+    "sprint": 2,
+    "state": "En revisión funcional",
+    "owner": "Francisco Díaz",
+    "gap": "Contrastar matriz completa y denegaciones auditadas; HU010/HU011 aún no existen.",
+    "participants": [
+      "Usuario autorizado",
+      "auth.dependencies",
+      "auth.access",
+      "auth.audit"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Solicitar operación protegida"
+      ],
+      [
+        1,
+        2,
+        "Verificar identidad y permiso"
+      ],
+      [
+        2,
+        2,
+        "Evaluar rol y recurso"
+      ],
+      [
+        2,
+        3,
+        "Registrar denegación si aplica"
+      ],
+      [
+        3,
+        2,
+        "Resultado de registro",
+        true
+      ],
+      [
+        2,
+        1,
+        "Autorizado o denegado",
+        true
+      ],
+      [
+        1,
+        0,
+        "Continuar o rechazar solicitud",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/auth/roles.py, app/auth/audit.py, app/auth/access.py."
+  },
+  {
+    "id": "HU004",
+    "title": "Integración con UniFi Controller y OPNsense",
+    "points": 8,
+    "sprint": 1,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Medir frescura y recuperación ante fallas en UniFi/OPNsense de laboratorio.",
+    "participants": [
+      "Ciclo programado",
+      "InventoryCollector",
+      "UnifiMonitoringProvider",
+      "OPNsenseMonitoringProvider"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Iniciar ciclo de lectura"
+      ],
+      [
+        1,
+        2,
+        "Recolectar inventario UniFi"
+      ],
+      [
+        2,
+        1,
+        "Inventario o error tipado",
+        true
+      ],
+      [
+        1,
+        3,
+        "Recolectar inventario OPNsense"
+      ],
+      [
+        3,
+        1,
+        "Inventario o error tipado",
+        true
+      ],
+      [
+        1,
+        1,
+        "Persistir datos y salud de fuentes"
+      ],
+      [
+        1,
+        0,
+        "Resultado de ciclo",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/monitoring/providers/base.py, app/monitoring/providers/unifi/provider.py, app/monitoring/inventory.py."
+  },
+  {
+    "id": "HU005",
+    "title": "Dashboard de monitoreo en tiempo real",
+    "points": 8,
+    "sprint": 2,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Validar ámbitos de los tres roles, latencia y criterio React del DoD frente a módulos ES.",
+    "participants": [
+      "Usuario autorizado",
+      "monitoring.mjs",
+      "monitoring.router",
+      "monitoring.inventory"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Abrir monitoreo autorizado"
+      ],
+      [
+        1,
+        2,
+        "Solicitar resumen y dispositivos"
+      ],
+      [
+        2,
+        3,
+        "summary() / list_devices()"
+      ],
+      [
+        3,
+        2,
+        "Estado, frescura y paginación",
+        true
+      ],
+      [
+        2,
+        1,
+        "Datos autorizados",
+        true
+      ],
+      [
+        1,
+        0,
+        "Representar estado y última lectura",
+        true
+      ],
+      [
+        1,
+        1,
+        "Programar siguiente consulta"
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: frontend/modules/inventory.mjs, frontend/modules/navigation.mjs, app/monitoring/router.py."
+  },
+  {
+    "id": "HU006",
+    "title": "Alertas y planos de cobertura",
+    "points": 5,
+    "sprint": 5,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Validar acceso técnico por ámbito, severidad, planos y estados sin ubicación.",
+    "participants": [
+      "Usuario autorizado",
+      "inventory.mjs",
+      "monitoring.router",
+      "monitoring.plans"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Consultar alertas y plano"
+      ],
+      [
+        1,
+        2,
+        "Solicitar datos autorizados"
+      ],
+      [
+        2,
+        3,
+        "Consultar plano y ubicaciones"
+      ],
+      [
+        3,
+        2,
+        "Plano y AP ubicados",
+        true
+      ],
+      [
+        2,
+        1,
+        "Alertas y cobertura",
+        true
+      ],
+      [
+        1,
+        0,
+        "Mostrar severidad y estado",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/monitoring/alerts.py, app/monitoring/plans.py, frontend/modules/inventory.mjs."
+  },
+  {
+    "id": "HU007",
+    "title": "Chat conversacional para consultas y solicitud de acciones",
+    "points": 13,
+    "sprint": 3,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Completar consultas globales de AP y propuestas de acciones; validar datos reales.",
+    "participants": [
+      "Usuario autorizado",
+      "chat.application",
+      "ChatService",
+      "chat.storage"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Enviar mensaje y versión"
+      ],
+      [
+        1,
+        3,
+        "Cargar conversación propia"
+      ],
+      [
+        3,
+        1,
+        "Historial autorizado",
+        true
+      ],
+      [
+        1,
+        2,
+        "Procesar mensaje con herramientas"
+      ],
+      [
+        2,
+        1,
+        "Respuesta o propuesta",
+        true
+      ],
+      [
+        1,
+        3,
+        "persist_exchange()"
+      ],
+      [
+        3,
+        1,
+        "Nueva versión",
+        true
+      ],
+      [
+        1,
+        0,
+        "Respuesta sin ejecución implícita",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/chat/tools.py, app/chat/policy.py, app/chat/service.py."
+  },
+  {
+    "id": "HU008",
+    "title": "Carga masiva de SSIDs vía CSV",
+    "points": 8,
+    "sprint": 4,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Completar edición y despliegue de lote, plantilla acordada y rollback; probar en laboratorio.",
+    "participants": [
+      "Usuario autorizado",
+      "changes.router",
+      "SsidPlanService",
+      "UniFiSsidWriter"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Cargar CSV de SSID"
+      ],
+      [
+        1,
+        2,
+        "csv(): validar y preparar plan"
+      ],
+      [
+        2,
+        1,
+        "Vista previa privada",
+        true
+      ],
+      [
+        1,
+        0,
+        "Solicitar confirmación del plan",
+        true
+      ],
+      [
+        0,
+        1,
+        "Confirmar identificador y versión"
+      ],
+      [
+        1,
+        2,
+        "confirm(): autorizar y encolar"
+      ],
+      [
+        2,
+        1,
+        "Plan encolado, aún no desplegado",
+        true
+      ],
+      [
+        1,
+        0,
+        "Consultar estado del plan",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/changes/csv_parser.py, app/changes/ssid_service.py, app/changes/ssid_executor.py."
+  },
+  {
+    "id": "HU009",
+    "title": "Reserva de VLAN",
+    "points": 5,
+    "sprint": 3,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Completar expiración, liberación automática, asignación final y contraste con ambas fuentes.",
+    "participants": [
+      "Usuario autorizado",
+      "changes.router",
+      "VlanReservationService",
+      "MonitoringService"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Solicitar VLAN para una red"
+      ],
+      [
+        1,
+        2,
+        "Validar y confirmar reserva"
+      ],
+      [
+        2,
+        3,
+        "Consultar inventario disponible"
+      ],
+      [
+        3,
+        2,
+        "VLAN y estado observado",
+        true
+      ],
+      [
+        2,
+        2,
+        "Comprobar unicidad y guardar"
+      ],
+      [
+        2,
+        1,
+        "Reserva local confirmada",
+        true
+      ],
+      [
+        1,
+        0,
+        "Mostrar reserva, sin asignación real",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/changes/models.py, app/changes/service.py, tests/test_vlan_reservations.py."
+  },
+  {
+    "id": "HU010",
+    "title": "Modificación de VLAN con confirmación",
+    "points": 8,
+    "sprint": 4,
+    "state": "Pendiente",
+    "owner": "Francisco Díaz",
+    "gap": "Implementar modificación de VLAN existente con confirmación y estado previo.",
+    "participants": [
+      "Usuario autorizado",
+      "chat.application",
+      "ChatService",
+      "chat.support"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Solicitar modificar VLAN"
+      ],
+      [
+        1,
+        2,
+        "Interpretar solicitud autorizada"
+      ],
+      [
+        2,
+        3,
+        "Consultar herramientas disponibles"
+      ],
+      [
+        3,
+        2,
+        "Sin operación de modificación",
+        true
+      ],
+      [
+        2,
+        1,
+        "Explicar límite o pedir aclaración",
+        true
+      ],
+      [
+        1,
+        0,
+        "No se modifica infraestructura",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/changes/ssid_service.py, app/changes/ssid_executor.py."
+  },
+  {
+    "id": "HU011",
+    "title": "Reinicio de dispositivos con confirmación",
+    "points": 5,
+    "sprint": 5,
+    "state": "Pendiente",
+    "owner": "Francisco Díaz",
+    "gap": "Implementar reinicio confirmado, exclusión concurrente y espera de recuperación.",
+    "participants": [
+      "Usuario autorizado",
+      "chat.application",
+      "ChatService",
+      "chat.support"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Solicitar reinicio de dispositivo"
+      ],
+      [
+        1,
+        2,
+        "Interpretar solicitud autorizada"
+      ],
+      [
+        2,
+        3,
+        "Consultar herramientas disponibles"
+      ],
+      [
+        3,
+        2,
+        "Sin herramienta de reinicio",
+        true
+      ],
+      [
+        2,
+        1,
+        "Informar capacidad no disponible",
+        true
+      ],
+      [
+        1,
+        0,
+        "Dispositivo sin cambios",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/changes/router.py, docs/contexto-desarrollo.md."
+  },
+  {
+    "id": "HU012",
+    "title": "Verificación post-ejecución y rollback",
+    "points": 8,
+    "sprint": 7,
+    "state": "Parcial",
+    "owner": "Francisco Díaz",
+    "gap": "Completar compensación, historial durable y escalamiento ante rollback fallido.",
+    "participants": [
+      "changes.cli",
+      "SsidPlanService",
+      "UniFiSsidWriter",
+      "SsidPlan"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Ejecutar plan confirmado"
+      ],
+      [
+        1,
+        1,
+        "Revalidar actor, ámbito e inventario"
+      ],
+      [
+        1,
+        2,
+        "create()"
+      ],
+      [
+        2,
+        1,
+        "Identificador o escritura incierta",
+        true
+      ],
+      [
+        1,
+        2,
+        "verify() cuando corresponde"
+      ],
+      [
+        2,
+        1,
+        "Coincidencia o resultado incierto",
+        true
+      ],
+      [
+        1,
+        3,
+        "Guardar resultado del plan"
+      ],
+      [
+        1,
+        0,
+        "Verificado o bloqueado para revisión",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/changes/ssid_executor.py, app/changes/ssid_service.py, tests/test_ssid_plans.py."
+  },
+  {
+    "id": "HU013",
+    "title": "Trazabilidad y auditoría de cambios",
+    "points": 3,
+    "sprint": 7,
+    "state": "Parcial",
+    "owner": "Francisco Díaz",
+    "gap": "Completar auditoría inmutable de ejecución, verificación y rollback; validar interfaz.",
+    "participants": [
+      "Usuario autorizado",
+      "audit.router",
+      "audit.service",
+      "auth.audit_queries"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Consultar filtros de auditoría"
+      ],
+      [
+        1,
+        2,
+        "list_entries() con actor"
+      ],
+      [
+        2,
+        2,
+        "Exigir permiso audit:read"
+      ],
+      [
+        2,
+        3,
+        "Consultar proyección de auth"
+      ],
+      [
+        3,
+        2,
+        "Metadatos sin secretos",
+        true
+      ],
+      [
+        2,
+        2,
+        "Agregar otras proyecciones públicas"
+      ],
+      [
+        2,
+        1,
+        "Página o export_csv()",
+        true
+      ],
+      [
+        1,
+        0,
+        "Resultados solo de lectura",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/audit/, frontend/modules/audit.mjs, tests/test_unified_audit.py, frontend/tests/audit.test.mjs. Commit eea0623; integración dev 44e9e86."
+  },
+  {
+    "id": "HU014",
+    "title": "Generación automática de tickets con criticidad",
+    "points": 5,
+    "sprint": 6,
+    "state": "En revisión funcional",
+    "owner": "Itamar Carrasco",
+    "gap": "Validar plazo de dos minutos y emisiones por verificación/rollback fallidos de HU012.",
+    "participants": [
+      "Ciclo programado",
+      "TicketAgent",
+      "tickets.agent",
+      "tickets.notifications"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Solicitar ciclo de incidentes"
+      ],
+      [
+        1,
+        1,
+        "Detectar condición en inventario"
+      ],
+      [
+        1,
+        2,
+        "open_incident()"
+      ],
+      [
+        2,
+        2,
+        "Clasificar y deduplicar ticket"
+      ],
+      [
+        2,
+        3,
+        "Preparar notificaciones"
+      ],
+      [
+        3,
+        2,
+        "Entregas registradas",
+        true
+      ],
+      [
+        2,
+        1,
+        "Ticket existente o nuevo",
+        true
+      ],
+      [
+        1,
+        0,
+        "Ciclo completado",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/tickets/agent.py, app/tickets/criticality.py, tests/test_ticket_incidents.py."
+  },
+  {
+    "id": "HU015",
+    "title": "Notificación al equipo técnico",
+    "points": 3,
+    "sprint": 7,
+    "state": "Parcial",
+    "owner": "Itamar Carrasco",
+    "gap": "Validar SMTP, reintentos, lectura y datos de dispositivo; revisar hora y contraste.",
+    "participants": [
+      "Equipo técnico",
+      "TicketAgent",
+      "tickets.notifications",
+      "notifications.mjs"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Procesar avisos pendientes"
+      ],
+      [
+        1,
+        2,
+        "Enviar o reintentar entregas"
+      ],
+      [
+        2,
+        2,
+        "Excluir usuarios desactivados"
+      ],
+      [
+        2,
+        1,
+        "Estado enviado o fallido",
+        true
+      ],
+      [
+        0,
+        3,
+        "Abrir bandeja de notificaciones"
+      ],
+      [
+        3,
+        0,
+        "Mostrar avisos autorizados",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/tickets/notifications.py, app/tickets/agent.py, frontend/modules/notifications.mjs."
+  },
+  {
+    "id": "HU016",
+    "title": "Seguimiento de tickets hasta su resolución",
+    "points": 5,
+    "sprint": 8,
+    "state": "En revisión funcional",
+    "owner": "Itamar Carrasco",
+    "gap": "Validar transiciones, resolución y escalamiento con pares; comprobar visualización.",
+    "participants": [
+      "Usuario autorizado",
+      "tickets.router",
+      "tickets.service",
+      "TicketAgent"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Asignar, comentar o resolver ticket"
+      ],
+      [
+        1,
+        2,
+        "Actualizar con versión vigente"
+      ],
+      [
+        2,
+        2,
+        "Validar transición y motivo"
+      ],
+      [
+        2,
+        1,
+        "Ticket e historial actualizados",
+        true
+      ],
+      [
+        1,
+        0,
+        "Estado confirmado",
+        true
+      ],
+      [
+        0,
+        3,
+        "Ciclo de seguimiento programado"
+      ],
+      [
+        3,
+        3,
+        "Revisar recuperación y vencimientos"
+      ],
+      [
+        3,
+        0,
+        "Escalar o resolver según condición",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/tickets/service.py, app/tickets/router.py, app/tickets/agent.py."
+  },
+  {
+    "id": "HU017",
+    "title": "Agente de monitoreo continuo en background",
+    "points": 8,
+    "sprint": 5,
+    "state": "Parcial",
+    "owner": "Francisco Díaz",
+    "gap": "Detectar SSID/VLAN inactivo, ventana de mantenimiento y tiempos máximos.",
+    "participants": [
+      "Operador despliegue",
+      "lifecycle",
+      "InventoryCollector",
+      "monitoring.alerts"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Arrancar aplicación"
+      ],
+      [
+        1,
+        2,
+        "run_forever()"
+      ],
+      [
+        2,
+        2,
+        "run_cycle(): leer fuentes"
+      ],
+      [
+        2,
+        3,
+        "Actualizar alertas de inventario"
+      ],
+      [
+        3,
+        2,
+        "Alertas creadas o resueltas",
+        true
+      ],
+      [
+        2,
+        2,
+        "Esperar intervalo y reintentar"
+      ],
+      [
+        0,
+        1,
+        "Detener aplicación"
+      ],
+      [
+        1,
+        2,
+        "Cancelar y cerrar tarea"
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/monitoring/inventory.py, app/monitoring/alerts.py, app/lifecycle.py."
+  },
+  {
+    "id": "HU018",
+    "title": "Orquestación multi-agente",
+    "points": 13,
+    "sprint": 6,
+    "state": "Parcial",
+    "owner": "Francisco Díaz",
+    "gap": "Completar contratos, trazas por agente y ambos flujos E2E con fallas.",
+    "participants": [
+      "Operador despliegue",
+      "lifecycle",
+      "InventoryCollector",
+      "TicketAgent"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Arrancar aplicación"
+      ],
+      [
+        1,
+        2,
+        "Iniciar tarea de inventario"
+      ],
+      [
+        1,
+        3,
+        "Iniciar tarea de tickets"
+      ],
+      [
+        2,
+        2,
+        "Persistir observación normalizada"
+      ],
+      [
+        3,
+        3,
+        "Leer incidentes y seguir tickets"
+      ],
+      [
+        0,
+        1,
+        "Solicitar cierre"
+      ],
+      [
+        1,
+        2,
+        "Detener tarea de inventario"
+      ],
+      [
+        1,
+        3,
+        "Detener tarea de tickets"
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/monitoring/alerts.py, app/tickets/agent.py, app/chat/application.py."
+  },
+  {
+    "id": "HU019",
+    "title": "Configuración del proveedor LLM",
+    "points": 3,
+    "sprint": 2,
+    "state": "Parcial",
+    "owner": "Francisco Díaz",
+    "gap": "Agregar otro adaptador y health check; probar errores de cada proveedor.",
+    "participants": [
+      "Administrador",
+      "core.config",
+      "ChatService",
+      "OpenRouterProvider"
+    ],
+    "messages": [
+      [
+        0,
+        1,
+        "Configurar entorno del despliegue"
+      ],
+      [
+        1,
+        1,
+        "Validar Settings"
+      ],
+      [
+        0,
+        2,
+        "Enviar consulta autorizada"
+      ],
+      [
+        2,
+        3,
+        "complete() con contexto sin secretos"
+      ],
+      [
+        3,
+        2,
+        "ProviderCompletion o error seguro",
+        true
+      ],
+      [
+        2,
+        0,
+        "Respuesta o indisponibilidad",
+        true
+      ]
+    ],
+    "evidence": "Evidencia en netbot/: app/chat/provider.py, app/core/config.py, tests/test_chat_provider.py."
+  }
+]

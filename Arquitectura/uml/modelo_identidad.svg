@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="900" viewBox="0 0 1000 900">
+<rect width="1000" height="900" fill="white"/>
+<defs><marker id="call" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#17283b"/></marker><marker id="reply" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="#17283b"/></marker><marker id="general" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto"><path d="M0,0 L14,7 L0,14 Z" fill="white" stroke="#17283b"/></marker></defs>
+<text x="30" y="40" font-family="DejaVu Sans,Arial,sans-serif" font-size="25" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">class modelo_identidad</text>
+<rect x="60" y="95" width="280" height="164" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="200.0" y="126" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">User</text>
+<path d="M60,143 L340,143" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="72" y="174" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="72" y="206" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">email: str</text>
+<text x="72" y="238" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">is_active: bool</text>
+<rect x="650" y="95" width="280" height="132" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="790.0" y="126" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">Role</text>
+<path d="M650,143 L930,143" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="662" y="174" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="662" y="206" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">name: str</text>
+<rect x="60" y="420" width="280" height="164" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="200.0" y="451" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">RefreshToken</text>
+<path d="M60,468 L340,468" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="72" y="499" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="72" y="531" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">user_id: int</text>
+<text x="72" y="563" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">expires_at: datetime</text>
+<rect x="650" y="420" width="280" height="228" fill="white" stroke="#17283b" stroke-width="2"/>
+<text x="790.0" y="451" font-family="DejaVu Sans,Arial,sans-serif" font-size="22" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke" font-weight="bold">AuthAuditEvent</text>
+<path d="M650,468 L930,468" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="662" y="499" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">id: int</text>
+<text x="662" y="531" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">actor_id: int [0..1]</text>
+<text x="662" y="563" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">target_id: int [0..1]</text>
+<text x="662" y="595" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">action: str</text>
+<text x="662" y="627" font-family="DejaVu Sans,Arial,sans-serif" font-size="21" text-anchor="start" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">outcome: str</text>
+<path d="M340,155 L650,155" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="370" y="143" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+<text x="620" y="143" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+<path d="M200.0,259 L200.0,420" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="225.0" y="284" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">1</text>
+<text x="225.0" y="408" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+<path d="M270.0,259 L720.0,420" fill="none" stroke="#17283b" stroke-width="2"/>
+<text x="295.0" y="284" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..1</text>
+<text x="745.0" y="408" font-family="DejaVu Sans,Arial,sans-serif" font-size="20" text-anchor="middle" fill="#17283b" stroke="white" stroke-width="3" paint-order="stroke">0..*</text>
+</svg>
