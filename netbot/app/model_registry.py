@@ -7,3 +7,5 @@ def register_models() -> None:
     from app.networks import models as networks
     from app.networks import support_models
     from app.tickets import models as tickets
+
+    from app.telegram_recovery import models as telegram_recovery

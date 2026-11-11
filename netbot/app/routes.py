@@ -1,5 +1,6 @@
 """Registro HTTP: los dominios no importan este módulo de composición."""
 from fastapi import FastAPI
+from app.telegram_recovery.router import router as telegram_router
 from app.audit.router import router as audit_router
 from app.changes.router import router as changes_router
 from app.auth.routes import admin_router, router
@@ -22,5 +23,6 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(tickets_router, prefix="/api/v1")
     app.include_router(notifications_router, prefix="/api/v1")
     app.include_router(changes_router, prefix="/api/v1")
+    app.include_router(telegram_router)
     app.include_router(router)
     app.include_router(admin_router)

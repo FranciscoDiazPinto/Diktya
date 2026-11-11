@@ -20,6 +20,10 @@ class Settings(BaseSettings):
         populate_by_name=True,
     )
 
+    telegram_recovery_enabled: bool = False
+    telegram_bot_token: SecretStr | None = None
+    telegram_webhook_secret: SecretStr | None = None
+
     app_name: str = "Netbot"
     environment: Literal["development", "test", "production"] = "development"
     database_url: str = "sqlite:///./netbot.db"
