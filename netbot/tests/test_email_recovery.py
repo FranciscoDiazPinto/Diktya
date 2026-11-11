@@ -67,6 +67,11 @@ def test_explicit_confirmation_returns_qr_once_and_get_does_not_consume(client, 
     page = client.get(BASE+'/recovery/approve')
     assert page.status_code == 200 and page.headers['cache-control'].startswith('no-store')
     assert row.consumed_at is None
+    assert "style-src 'self'" in page.headers['content-security-policy']
+    styles = client.get(BASE+'/recovery/approval.css')
+    assert styles.status_code == 200
+    assert styles.headers['content-type'].startswith('text/css')
+    assert 'no-store' in styles.headers['cache-control']
     assert approve(client,token, 'https://foreign.example.com').status_code == 403
     result = approve(client,token)
     assert result.status_code == 200

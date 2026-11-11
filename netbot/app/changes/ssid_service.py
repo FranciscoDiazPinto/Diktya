@@ -8,7 +8,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.auth.models import User
-from app.auth.audit import queue_denial
+from app.auth.audit import queue_denial, record_event
 from app.auth.permissions import Permission
 from app.auth.access import require_user_permission
 from app.auth.roles import effective_permissions
@@ -16,8 +16,22 @@ from app.auth.service import user_exists, execution_actor
 from app.core.errors import NotFound, Conflict, InvalidInput, ServiceUnavailable
 from app.core.config import Settings
 from app.monitoring.service import MonitoringService
-from .models import WifiScope, WifiScopeGrant, SsidPlan, WifiWriteLease
-from .ssid_schemas import ScopeWrite, SsidProposal, SsidCsv, SsidConfirm, SsidPlanRead
+from .models import (
+    WifiScope,
+    WifiScopeGrant,
+    SsidPlan,
+    WifiWriteLease,
+    SsidVlanChangePlan,
+)
+from .ssid_schemas import (
+    ScopeWrite,
+    SsidProposal,
+    SsidCsv,
+    SsidConfirm,
+    SsidPlanRead,
+    SsidVlanChangeProposal,
+    SsidVlanChangeConfirm,
+)
 from .wifi_inventory import WifiInventory
 from .csv_parser import parse_csv
 from .csv_service import as_utc, utc_now
@@ -102,6 +116,294 @@ class SsidPlanService:
             raise Conflict('Perfil de seguridad no autorizado.')
         if any(b['ssid'].casefold()==proposal.ssid.casefold() for b in existing):
             raise Conflict('El SSID ya existe. No se sobrescribe mediante una creación.')
+
+    async def propose_vlan_change(
+        self,
+        actor: User,
+        proposal: SsidVlanChangeProposal,
+    ):
+        """Valida y guarda una vista previa H10; nunca escribe en UniFi."""
+        options, existing, fingerprint = await self.options(actor, proposal.scope_id)
+
+        if options["simulated"]:
+            raise Conflict("H10 requiere inventarios reales para preparar cambios.")
+
+        target_network = next(
+            (n for n in options["networks"] if n["id"] == proposal.network_id),
+            None,
+        )
+        if target_network is None:
+            raise Conflict("La red solicitada no existe o no está autorizada.")
+
+        target = next(
+            (s for s in existing if s["id"] == proposal.broadcast_id),
+            None,
+        )
+        if target is None:
+            raise Conflict("El SSID solicitado no existe en el inventario.")
+
+        scope = self.scope(actor, proposal.scope_id)
+        site_id = scope.site_id
+        resources = json.loads(json.dumps(scope.resources))
+        current = await self.inventory.read_broadcast(site_id, proposal.broadcast_id)
+
+        # Comprobar de nuevo permisos y ámbito después de la espera de red.
+        scope = self.scope(actor, proposal.scope_id)
+        if scope.site_id != site_id or scope.resources != resources:
+            raise Conflict("El ámbito cambió durante la consulta. Intenta nuevamente.")
+        if current["id"] != proposal.broadcast_id:
+            raise Conflict("El identificador del SSID no coincide.")
+        if current["ssid"] != target["ssid"]:
+            raise Conflict("La información del SSID cambió durante la consulta.")
+        if current["network_id"] == proposal.network_id:
+            raise Conflict("El SSID ya utiliza la red solicitada.")
+
+        revision = digest([
+            proposal.model_dump(), fingerprint, site_id,
+            current["id"], current["ssid"], current["network_id"],
+            proposal.network_id,
+        ])
+        now = utc_now()
+        plan = SsidVlanChangePlan(
+            id=str(uuid4()),
+            owner_id=actor.id,
+            scope_id=proposal.scope_id,
+            broadcast_id=proposal.broadcast_id,
+            site_id=site_id,
+            ssid=current["ssid"],
+            current_network_id=current["network_id"],
+            target_network_id=proposal.network_id,
+            purpose=proposal.purpose,
+            status="preview",
+            fingerprint=fingerprint,
+            revision=revision,
+            execution_results=[],
+            created_at=now,
+            expires_at=now + timedelta(seconds=self.settings.csv_preview_ttl_seconds),
+            confirmed_at=None,
+        )
+        self.db.add(plan)
+        self.db.commit()
+
+        return {
+            "id": plan.id,
+            "status": plan.status,
+            "scope_id": plan.scope_id,
+            "broadcast_id": plan.broadcast_id,
+            "ssid": plan.ssid,
+            "current_network_id": plan.current_network_id,
+            "target_network_id": plan.target_network_id,
+            "target_vlan": target_network["tag"],
+            "purpose": plan.purpose,
+            "fingerprint": plan.fingerprint,
+            "revision": plan.revision,
+            "expires_at": plan.expires_at.isoformat(),
+            "requires_confirmation": True,
+            "executed": False,
+        }
+
+    async def confirm_vlan_change(
+        self,
+        actor: User,
+        plan_id: str,
+        payload: SsidVlanChangeConfirm,
+    ):
+        """Confirma H10 tras revalidar el inventario. No escribe en UniFi."""
+        require_user_permission(self.db, actor, Permission.CHANGES_APPROVE)
+        plan = self.db.scalar(
+            select(SsidVlanChangePlan).where(
+                SsidVlanChangePlan.id == plan_id,
+                SsidVlanChangePlan.owner_id == actor.id,
+            )
+        )
+        if plan is None:
+            raise NotFound("Plan de cambio de VLAN no encontrado.")
+
+        self.scope(actor, plan.scope_id, Permission.CHANGES_APPROVE)
+        if plan.revision != payload.revision:
+            raise Conflict("La revisión no coincide con el plan mostrado.")
+        if plan.status == "confirmed":
+            return self.read_vlan_change_plan(plan)
+        if plan.status != "preview" or as_utc(plan.expires_at) <= utc_now():
+            raise Conflict("El plan ya no puede confirmarse o está vencido.")
+
+        site_id = plan.site_id
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_APPROVE)
+        scope_revision = digest([scope.site_id, scope.resources])
+        if scope.site_id != site_id:
+            raise Conflict("Cambió el sitio del ámbito. Prepara otra propuesta.")
+
+        options, existing, fingerprint = await self.options(actor, plan.scope_id)
+        current = await self.inventory.read_broadcast(site_id, plan.broadcast_id)
+
+        # Reautorizar después de todas las esperas de red.
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_APPROVE)
+        if digest([scope.site_id, scope.resources]) != scope_revision:
+            raise Conflict("Cambió el ámbito. Prepara otra propuesta.")
+        if options["simulated"] or fingerprint != plan.fingerprint:
+            raise Conflict("Cambió el inventario. Prepara otra propuesta.")
+        if plan.target_network_id not in {n["id"] for n in options["networks"]}:
+            raise Conflict("La VLAN de destino ya no está autorizada.")
+        target = next((s for s in existing if s["id"] == plan.broadcast_id), None)
+        if target is None or target["ssid"] != plan.ssid:
+            raise Conflict("El SSID ya no coincide con el inventario.")
+        if (
+            current["id"] != plan.broadcast_id
+            or current["ssid"] != plan.ssid
+            or current["network_id"] != plan.current_network_id
+        ):
+            raise Conflict("La configuración del SSID cambió. Prepara otra propuesta.")
+
+        result = self.db.execute(
+            update(SsidVlanChangePlan)
+            .where(
+                SsidVlanChangePlan.id == plan_id,
+                SsidVlanChangePlan.owner_id == actor.id,
+                SsidVlanChangePlan.status == "preview",
+                SsidVlanChangePlan.revision == payload.revision,
+                SsidVlanChangePlan.expires_at > utc_now(),
+            )
+            .values(status="confirmed", confirmed_at=utc_now()),
+            execution_options={"synchronize_session": False},
+        )
+        if result.rowcount != 1:
+            self.db.rollback()
+            raise Conflict("El plan fue modificado por otra solicitud.")
+        self.db.commit()
+        self.db.refresh(plan)
+        return self.read_vlan_change_plan(plan)
+
+    def read_vlan_change_plan(self, plan: SsidVlanChangePlan):
+        """Representación segura del estado H10; no contiene secretos."""
+        status = (
+            "expired"
+            if plan.status == "preview" and as_utc(plan.expires_at) <= utc_now()
+            else plan.status
+        )
+        return {
+            "id": plan.id,
+            "scope_id": plan.scope_id,
+            "broadcast_id": plan.broadcast_id,
+            "ssid": plan.ssid,
+            "current_network_id": plan.current_network_id,
+            "target_network_id": plan.target_network_id,
+            "purpose": plan.purpose,
+            "status": status,
+            "revision": plan.revision,
+            "expires_at": as_utc(plan.expires_at).isoformat(),
+            "confirmed_at": (
+                as_utc(plan.confirmed_at).isoformat()
+                if plan.confirmed_at is not None else None
+            ),
+            "requires_confirmation": status == "preview",
+            "executed": status == "completed",
+            "execution_results": plan.execution_results or [],
+        }
+
+    async def execute_vlan_change(self, plan_id: str):
+        """Worker interno H10. No se expone por HTTP ni al LLM.
+
+        El estado executing/uncertain y su lease son durables: no hay reintento
+        automático tras una interrupción o respuesta ambigua del controlador.
+        """
+        plan = self.db.get(SsidVlanChangePlan, plan_id)
+        if plan is None:
+            raise NotFound('Plan H10 no encontrado.')
+        actor = execution_actor(self.db, plan.owner_id)
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+        if plan.status != 'confirmed' or as_utc(plan.expires_at) <= utc_now():
+            raise Conflict('El plan no está confirmado o ya venció.')
+        if scope.site_id != plan.site_id:
+            raise Conflict('El sitio del ámbito cambió.')
+        if (not self.settings.unifi_write_enabled or self.settings.unifi_api_contract != '10.6.106'
+                or self.settings.unifi_inventory_mode != 'api'):
+            raise ServiceUnavailable('Ejecución H10 deshabilitada o contrato no autorizado.')
+
+        scope_revision = digest([scope.site_id, scope.resources])
+        options, existing, fingerprint = await self.options(actor, plan.scope_id)
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+        if digest([scope.site_id, scope.resources]) != scope_revision:
+            raise Conflict('Cambió el ámbito o se revocó la autorización.')
+        if options['simulated'] or fingerprint != plan.fingerprint:
+            raise Conflict('Cambió el inventario desde la confirmación.')
+        if plan.target_network_id not in {n['id'] for n in options['networks']}:
+            raise Conflict('La red destino ya no está autorizada.')
+        if not any(b['id'] == plan.broadcast_id and b['ssid'] == plan.ssid for b in existing):
+            raise Conflict('El SSID ya no coincide con el inventario.')
+        current = await self.inventory.read_broadcast(plan.site_id, plan.broadcast_id)
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+        if digest([scope.site_id, scope.resources]) != scope_revision:
+            raise Conflict('Cambió el ámbito o se revocó la autorización.')
+        if (current['id'] != plan.broadcast_id or current['ssid'] != plan.ssid
+                or current['network_id'] != plan.current_network_id):
+            raise Conflict('Cambió la VLAN original; prepara otro plan.')
+
+        # PK compartida con la creación: bloqueo durable por sitio + nombre de SSID.
+        resource_key = digest([plan.site_id, plan.ssid.casefold()])
+        try:
+            self.db.add(WifiWriteLease(resource_key=resource_key, vlan_plan_id=plan.id))
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            raise Conflict('El SSID está bloqueado por otra operación o conciliación pendiente.') from None
+        claim = self.db.execute(
+            update(SsidVlanChangePlan).where(
+                SsidVlanChangePlan.id == plan.id,
+                SsidVlanChangePlan.status == 'confirmed',
+                SsidVlanChangePlan.expires_at > utc_now(),
+            ).values(status='executing'),
+            execution_options={'synchronize_session': False},
+        )
+        if claim.rowcount != 1:
+            self.db.rollback()
+            raise Conflict('El plan ya fue tomado por otro ejecutor.')
+        record_event(self.db, 'wifi.ssid_vlan_change.started', actor_id=actor.id,
+                     target_id=actor.id, details={'plan_id': plan.id, 'scope_id': plan.scope_id,
+                     'broadcast_id': plan.broadcast_id})
+        self.db.commit()
+        self.db.refresh(plan)
+
+        def reauthorize():
+            active = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+            if digest([active.site_id, active.resources]) != scope_revision:
+                raise Conflict('Cambió el ámbito durante la ejecución.')
+
+        # Desde executing, cualquier excepción deja el plan incierto, nunca se reintenta.
+        try:
+            reauthorize()
+            await self.writer.update_vlan(
+                plan.site_id, plan.broadcast_id, plan.current_network_id,
+                plan.target_network_id, authorize=reauthorize,
+            )
+            plan.execution_results = [{'status': 'verifying', 'broadcast_id': plan.broadcast_id}]
+            self.db.commit()
+            verified = await self.writer.verify_vlan(
+                plan.site_id, plan.broadcast_id, plan.ssid, plan.target_network_id,
+            )
+            if not verified:
+                raise RuntimeError('Verificación inconclusa')
+            plan.status = 'completed'
+            plan.execution_results = [{'status': 'verified_configuration', 'broadcast_id': plan.broadcast_id}]
+            record_event(self.db, 'wifi.ssid_vlan_change.completed', actor_id=actor.id,
+                         target_id=actor.id, details={'plan_id': plan.id, 'scope_id': plan.scope_id,
+                         'broadcast_id': plan.broadcast_id})
+            self.db.execute(delete(WifiWriteLease).where(
+                WifiWriteLease.resource_key == resource_key,
+                WifiWriteLease.vlan_plan_id == plan.id,
+            ))
+            self.db.commit()
+        except Exception:
+            # No guardar respuestas, excepciones ni credenciales del proveedor.
+            self.db.rollback()
+            plan = self.db.get(SsidVlanChangePlan, plan_id)
+            plan.status = 'uncertain'
+            plan.execution_results = [{'status': 'uncertain', 'broadcast_id': plan.broadcast_id}]
+            record_event(self.db, 'wifi.ssid_vlan_change.uncertain', actor_id=actor.id,
+                         target_id=actor.id, outcome='uncertain',
+                         details={'plan_id': plan.id, 'scope_id': plan.scope_id,
+                                  'broadcast_id': plan.broadcast_id})
+            self.db.commit()  # conservar lease hasta conciliación manual
+        return self.read_vlan_change_plan(plan)
 
     async def propose(self, actor, proposal: SsidProposal):
         options, existing, _ = await self.options(actor,proposal.scope_id)

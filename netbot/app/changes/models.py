@@ -79,4 +79,57 @@ class SsidPlan(Base):
 class WifiWriteLease(Base):
     __tablename__ = "wifi_write_leases"
     resource_key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    plan_id: Mapped[str] = mapped_column(ForeignKey("ssid_plans.id"), index=True)
+    plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_plans.id"), index=True, nullable=True)
+    vlan_plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_vlan_change_plans.id"), index=True, nullable=True)
+
+
+class SsidVlanChangePlan(Base):
+    """Plan persistente para modificar la VLAN de un SSID existente."""
+
+    __tablename__ = "ssid_vlan_change_plans"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        index=True,
+    )
+
+    scope_id: Mapped[int] = mapped_column(
+        ForeignKey("wifi_scopes.id"),
+    )
+
+    broadcast_id: Mapped[str] = mapped_column(String(160))
+    site_id: Mapped[str] = mapped_column(String(160))
+    ssid: Mapped[str] = mapped_column(String(160))
+
+    current_network_id: Mapped[str] = mapped_column(String(160))
+    target_network_id: Mapped[str] = mapped_column(String(160))
+
+    purpose: Mapped[str] = mapped_column(String(500))
+
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="preview",
+    )
+
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    revision: Mapped[str] = mapped_column(String(64))
+
+    execution_results: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+    )
+
+    confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

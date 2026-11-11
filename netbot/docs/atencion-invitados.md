@@ -85,3 +85,5 @@ Instalar dependencias actualizadas con `pip install -r requirements.txt`, aplica
 Además del control compartido descrito en el README, límites por proceso: 200 sesiones simultáneas, 60 creaciones/minuto, 120 consultas o comprobaciones de contacto/minuto; 30 consultas al modelo y 5 identificaciones por atención. Una consulta al modelo en curso por sesión. El exceso de frecuencia usa HTTP 429. Se mantienen límites de mensaje, historial, salida y timeout.
 
 Pruebas desde `netbot/`: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Cubren rechazo de recuperación privada por contacto conocido/desconocido, registro administrativo, portal abierto, aislamiento del LLM, vencimiento y respuestas tardías. Las pruebas visuales usan datos ficticios, sin conexión Wi-Fi real.
+
+La página de confirmación de correo incluye una tarjeta adaptable a móvil, estados de carga/error y un QR por red. Sus estilos se sirven desde `/api/v1/guest/recovery/approval.css`, con CSP limitada al mismo origen y sin caché; conserva confirmación explícita y limpieza del QR a los 60 segundos.
