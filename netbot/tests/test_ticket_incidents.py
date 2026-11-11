@@ -368,3 +368,20 @@ def test_managers_see_delivery_record_but_viewer_does_not(client, team):
     path = f"{BASE}/{ticket['id']}"
     assert {d["channel"] for d in client.get(path, headers=team["tech"]).json()["deliveries"]} == {"in_app"}
     assert client.get(path, headers=team["visor"]).json()["deliveries"] == []
+
+
+async def test_smtp_can_be_used_for_wifi_without_ticket_emails():
+    from app.tickets.notifications import build_mailer
+    from app.networks.email_recovery import build_recovery_mailer
+
+    lab = Lab(smtp_host="smtp.test", notification_email_enabled=False)
+    try:
+        assert build_mailer(lab.settings) is None
+        assert build_recovery_mailer(lab.settings) is not None
+        lab.alert()
+        await lab.cycle()
+        assert len(lab.rows(channel="in_app")) == 2
+        assert lab.rows(channel="email") == []
+        assert lab.sent == []
+    finally:
+        lab.db.close()

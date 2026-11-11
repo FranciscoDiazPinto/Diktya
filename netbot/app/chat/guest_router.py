@@ -106,7 +106,7 @@ from fastapi import BackgroundTasks, Request
 from fastapi.responses import HTMLResponse
 from pydantic import EmailStr
 from app.networks.email_recovery import prepare_email, approve_and_reveal, build_recovery_mailer, recovery_origin, GENERIC_MESSAGE
-from .recovery_pages import APPROVAL_HTML, APPROVAL_JS
+from .recovery_pages import APPROVAL_HTML, APPROVAL_JS, APPROVAL_CSS
 
 
 def get_recovery_mailer(settings: Settings = Depends(get_settings)):
@@ -134,8 +134,13 @@ def request_email_recovery(payload: EmailRecoveryRequest, background: Background
 @router.get('/recovery/approve', response_class=HTMLResponse)
 def recovery_approval_page():
     return HTMLResponse(APPROVAL_HTML, headers={
-        'Content-Security-Policy': "default-src 'none'; script-src 'self'; connect-src 'self'; img-src data:; base-uri 'none'; frame-ancestors 'none'",
+        'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src data:; base-uri 'none'; frame-ancestors 'none'",
         'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cache-Control': 'no-store, private'})
+
+
+@router.get('/recovery/approval.css')
+def recovery_approval_styles():
+    return Response(APPROVAL_CSS, media_type='text/css', headers={'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer'})
 
 
 @router.get('/recovery/approval.js')
