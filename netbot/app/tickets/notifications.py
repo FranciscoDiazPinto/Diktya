@@ -52,12 +52,12 @@ def enqueue(db: Session, ticket: Ticket, event: str, settings: Settings, now: da
         common = dict(ticket_id=ticket.id, user_id=person["id"], event=event, criticality=ticket.criticality,
                       highlighted=highlighted, title=title, body=body, link=link)
         db.add(Notification(channel="in_app", status="sent", sent_at=now, **common))
-        if settings.smtp_host:
+        if settings.smtp_host and settings.notification_email_enabled:
             db.add(Notification(channel="email", status="pending", next_attempt_at=now, **common))
 
 
 def build_mailer(settings: Settings) -> Mailer | None:
-    if not settings.smtp_host:
+    if not settings.smtp_host or not settings.notification_email_enabled:
         return None
 
     def send(recipient: str, subject: str, body: str) -> None:

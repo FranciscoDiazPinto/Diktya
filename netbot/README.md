@@ -121,3 +121,5 @@ La rama chatbot incorpora planes SSID para admin/técnico, selección de AP y VL
 Comprobar `/health`, login/logout, recarga de navegador, 429, QR abierto, rechazo de QR privado, certificados incorrectos y permisos reales del rol SQL antes de exponer una instalación. El frontend debe servirse por HTTPS en producción y dirigir `/auth`, `/admin` y `/api` a la API del mismo origen.
 
 Auditoría administrativa: consulta unificada y CSV de metadatos existentes en `/api/v1/audit`, limitada a `audit:read`. Contratos, cobertura y límites en [arquitectura modular](docs/arquitectura-modular.md#auditoría-unificada--hu013).
+
+Para usar SMTP solo en recuperación Wi-Fi, configurar `NOTIFICATION_EMAIL_ENABLED=false`: las notificaciones de tickets permanecen dentro de la aplicación.

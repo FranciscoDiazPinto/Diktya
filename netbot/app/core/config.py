@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     ticket_mass_incident_devices: int = Field(3, ge=2)
     # JSON {"critica": 15, ...}: minutos máximos sin atención por criticidad.
     ticket_attention_minutes_json: Optional[str] = None
+    notification_email_enabled: bool = True
     notification_email_max_attempts: int = Field(5, ge=1, le=20)
     notification_email_retry_seconds: float = Field(60.0, ge=1)
     public_app_url: str = "http://localhost:5173"
