@@ -8,7 +8,7 @@ from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.auth.models import User
-from app.auth.audit import queue_denial
+from app.auth.audit import queue_denial, record_event
 from app.auth.permissions import Permission
 from app.auth.access import require_user_permission
 from app.auth.roles import effective_permissions
@@ -296,8 +296,114 @@ class SsidPlanService:
                 if plan.confirmed_at is not None else None
             ),
             "requires_confirmation": status == "preview",
-            "executed": False,
+            "executed": status == "completed",
+            "execution_results": plan.execution_results or [],
         }
+
+    async def execute_vlan_change(self, plan_id: str):
+        """Worker interno H10. No se expone por HTTP ni al LLM.
+
+        El estado executing/uncertain y su lease son durables: no hay reintento
+        automático tras una interrupción o respuesta ambigua del controlador.
+        """
+        plan = self.db.get(SsidVlanChangePlan, plan_id)
+        if plan is None:
+            raise NotFound('Plan H10 no encontrado.')
+        actor = execution_actor(self.db, plan.owner_id)
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+        if plan.status != 'confirmed' or as_utc(plan.expires_at) <= utc_now():
+            raise Conflict('El plan no está confirmado o ya venció.')
+        if scope.site_id != plan.site_id:
+            raise Conflict('El sitio del ámbito cambió.')
+        if (not self.settings.unifi_write_enabled or self.settings.unifi_api_contract != '10.6.106'
+                or self.settings.unifi_inventory_mode != 'api'):
+            raise ServiceUnavailable('Ejecución H10 deshabilitada o contrato no autorizado.')
+
+        scope_revision = digest([scope.site_id, scope.resources])
+        options, existing, fingerprint = await self.options(actor, plan.scope_id)
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+        if digest([scope.site_id, scope.resources]) != scope_revision:
+            raise Conflict('Cambió el ámbito o se revocó la autorización.')
+        if options['simulated'] or fingerprint != plan.fingerprint:
+            raise Conflict('Cambió el inventario desde la confirmación.')
+        if plan.target_network_id not in {n['id'] for n in options['networks']}:
+            raise Conflict('La red destino ya no está autorizada.')
+        if not any(b['id'] == plan.broadcast_id and b['ssid'] == plan.ssid for b in existing):
+            raise Conflict('El SSID ya no coincide con el inventario.')
+        current = await self.inventory.read_broadcast(plan.site_id, plan.broadcast_id)
+        scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+        if digest([scope.site_id, scope.resources]) != scope_revision:
+            raise Conflict('Cambió el ámbito o se revocó la autorización.')
+        if (current['id'] != plan.broadcast_id or current['ssid'] != plan.ssid
+                or current['network_id'] != plan.current_network_id):
+            raise Conflict('Cambió la VLAN original; prepara otro plan.')
+
+        # PK compartida con la creación: bloqueo durable por sitio + nombre de SSID.
+        resource_key = digest([plan.site_id, plan.ssid.casefold()])
+        try:
+            self.db.add(WifiWriteLease(resource_key=resource_key, vlan_plan_id=plan.id))
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            raise Conflict('El SSID está bloqueado por otra operación o conciliación pendiente.') from None
+        claim = self.db.execute(
+            update(SsidVlanChangePlan).where(
+                SsidVlanChangePlan.id == plan.id,
+                SsidVlanChangePlan.status == 'confirmed',
+                SsidVlanChangePlan.expires_at > utc_now(),
+            ).values(status='executing'),
+            execution_options={'synchronize_session': False},
+        )
+        if claim.rowcount != 1:
+            self.db.rollback()
+            raise Conflict('El plan ya fue tomado por otro ejecutor.')
+        record_event(self.db, 'wifi.ssid_vlan_change.started', actor_id=actor.id,
+                     target_id=actor.id, details={'plan_id': plan.id, 'scope_id': plan.scope_id,
+                     'broadcast_id': plan.broadcast_id})
+        self.db.commit()
+        self.db.refresh(plan)
+
+        def reauthorize():
+            active = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
+            if digest([active.site_id, active.resources]) != scope_revision:
+                raise Conflict('Cambió el ámbito durante la ejecución.')
+
+        # Desde executing, cualquier excepción deja el plan incierto, nunca se reintenta.
+        try:
+            reauthorize()
+            await self.writer.update_vlan(
+                plan.site_id, plan.broadcast_id, plan.current_network_id,
+                plan.target_network_id, authorize=reauthorize,
+            )
+            plan.execution_results = [{'status': 'verifying', 'broadcast_id': plan.broadcast_id}]
+            self.db.commit()
+            verified = await self.writer.verify_vlan(
+                plan.site_id, plan.broadcast_id, plan.ssid, plan.target_network_id,
+            )
+            if not verified:
+                raise RuntimeError('Verificación inconclusa')
+            plan.status = 'completed'
+            plan.execution_results = [{'status': 'verified_configuration', 'broadcast_id': plan.broadcast_id}]
+            record_event(self.db, 'wifi.ssid_vlan_change.completed', actor_id=actor.id,
+                         target_id=actor.id, details={'plan_id': plan.id, 'scope_id': plan.scope_id,
+                         'broadcast_id': plan.broadcast_id})
+            self.db.execute(delete(WifiWriteLease).where(
+                WifiWriteLease.resource_key == resource_key,
+                WifiWriteLease.vlan_plan_id == plan.id,
+            ))
+            self.db.commit()
+        except Exception:
+            # No guardar respuestas, excepciones ni credenciales del proveedor.
+            self.db.rollback()
+            plan = self.db.get(SsidVlanChangePlan, plan_id)
+            plan.status = 'uncertain'
+            plan.execution_results = [{'status': 'uncertain', 'broadcast_id': plan.broadcast_id}]
+            record_event(self.db, 'wifi.ssid_vlan_change.uncertain', actor_id=actor.id,
+                         target_id=actor.id, outcome='uncertain',
+                         details={'plan_id': plan.id, 'scope_id': plan.scope_id,
+                                  'broadcast_id': plan.broadcast_id})
+            self.db.commit()  # conservar lease hasta conciliación manual
+        return self.read_vlan_change_plan(plan)
 
     async def propose(self, actor, proposal: SsidProposal):
         options, existing, _ = await self.options(actor,proposal.scope_id)

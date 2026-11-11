@@ -86,3 +86,71 @@ class UniFiSsidWriter:
                     and b.get('securityConfiguration',{}).get('type')=='WPA2_PERSONAL')
         except (httpx.HTTPError,ValueError,TypeError,KeyError):
             return False
+
+
+    async def update_vlan(self, site_id, broadcast_id, current_network_id, target_network_id, authorize):
+        """H10: PATCH mínimo; contrato de actualización pendiente de validación en UniFi real.
+
+        No se envían campos de seguridad, nombre, AP ni contraseña.
+        Un error después de iniciar PATCH siempre es incierto y no debe reintentarse.
+        """
+        from urllib.parse import urlsplit
+        s = self.settings
+        if not (s.unifi_write_enabled and s.unifi_api_contract == '10.6.106'
+                and s.unifi_inventory_mode == 'api'):
+            raise ServiceUnavailable('Escritura H10 deshabilitada o contrato no autorizado.')
+        base = urlsplit(s.unifi_api_base_url or '')
+        if (base.scheme != 'https' or base.username or base.password or base.query
+                or base.fragment or not s.unifi_api_key):
+            raise ServiceUnavailable('Configuración UniFi inválida.')
+        if (not all(isinstance(x, str) and x for x in
+                    (site_id, broadcast_id, current_network_id, target_network_id))
+                or current_network_id == target_network_id):
+            raise ServiceUnavailable('Identificadores de VLAN/SSID inválidos.')
+        path = f'sites/{quote(site_id,safe="")}/wifi/broadcasts/{quote(broadcast_id,safe="")}'
+        async with httpx.AsyncClient(
+            base_url=s.unifi_api_base_url.rstrip('/')+'/',
+            headers={'X-API-Key': s.unifi_api_key.get_secret_value()},
+            verify=s.unifi_ca_bundle or True, timeout=s.unifi_timeout_seconds,
+            follow_redirects=False, transport=self.transport,
+        ) as client:
+            try:
+                info = await client.get('info')
+                if info.status_code != 200 or info.json().get('applicationVersion') != s.unifi_api_contract:
+                    raise ServiceUnavailable('Versión UniFi no compatible con el contrato autorizado.')
+                before = await client.get(path)
+                before.raise_for_status()
+                data = before.json()
+                if (data.get('id') != broadcast_id
+                        or data.get('network') != {'type': 'SPECIFIC', 'networkId': current_network_id}):
+                    raise ServiceUnavailable('El SSID cambió antes de la escritura; requiere otra propuesta.')
+            except (httpx.HTTPError, ValueError, TypeError, KeyError):
+                raise ServiceUnavailable('No fue posible revalidar el SSID antes de escribir.') from None
+            authorize()  # última autorización inmediatamente antes del PATCH
+            try:
+                response = await client.patch(path, json={
+                    'network': {'type': 'SPECIFIC', 'networkId': target_network_id},
+                })
+                if response.status_code not in (200, 204):
+                    raise WriteUncertain()
+            except (httpx.HTTPError, ValueError, TypeError):
+                raise WriteUncertain() from None
+
+    async def verify_vlan(self, site_id, broadcast_id, ssid, target_network_id):
+        """Comprobación read-only de identidad y red, sin revelar datos sensibles."""
+        s = self.settings
+        path = f'sites/{quote(site_id,safe="")}/wifi/broadcasts/{quote(broadcast_id,safe="")}'
+        try:
+            async with httpx.AsyncClient(
+                base_url=s.unifi_api_base_url.rstrip('/')+'/',
+                headers={'X-API-Key': s.unifi_api_key.get_secret_value()},
+                verify=s.unifi_ca_bundle or True, timeout=s.unifi_timeout_seconds,
+                follow_redirects=False, transport=self.transport,
+            ) as client:
+                response = await client.get(path)
+                response.raise_for_status()
+                data = response.json()
+                return (data.get('id') == broadcast_id and data.get('name') == ssid
+                        and data.get('network') == {'type': 'SPECIFIC', 'networkId': target_network_id})
+        except (httpx.HTTPError, ValueError, TypeError, KeyError):
+            return False

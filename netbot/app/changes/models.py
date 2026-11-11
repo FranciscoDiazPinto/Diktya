@@ -79,7 +79,8 @@ class SsidPlan(Base):
 class WifiWriteLease(Base):
     __tablename__ = "wifi_write_leases"
     resource_key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    plan_id: Mapped[str] = mapped_column(ForeignKey("ssid_plans.id"), index=True)
+    plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_plans.id"), index=True, nullable=True)
+    vlan_plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_vlan_change_plans.id"), index=True, nullable=True)
 
 
 class SsidVlanChangePlan(Base):
