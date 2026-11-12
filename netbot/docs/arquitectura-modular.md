@@ -4,7 +4,7 @@ La entrada pública incluye [autoatención de invitados y QR Wi-Fi](atencion-inv
 
 Esta guía describe el código implementado. Es el punto de entrada técnico junto con [AGENTS.md](../../AGENTS.md). El [documento de referencia](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo, separado del estado real.
 
-Para continuar las integraciones se dispone de una [síntesis técnica de Atlas](contexto-desarrollo.md#contexto), con [contratos observados](contexto-desarrollo.md#integraciones), [decisiones propias](contexto-desarrollo.md#continuidad) y [evidencia](contexto-desarrollo.md#evidencias). No introduce dependencias hacia el producto del cliente ni cambia el stack. El siguiente bloque aprobado es SSID/AP con **VLAN existentes**, todavía sin ejecución real en Netbot.
+Para continuar las integraciones se dispone de una [síntesis técnica de Atlas](contexto-desarrollo.md#contexto), con [contratos observados](contexto-desarrollo.md#integraciones), [decisiones propias](contexto-desarrollo.md#continuidad) y [evidencia](contexto-desarrollo.md#evidencias). No introduce dependencias hacia el producto del cliente ni cambia el stack. El bloque SSID/AP trabaja con **VLAN existentes**. Hay ejecutor optativo de creación y servicio de cambio de VLAN (HU010), ambos pendientes de validación física. HU010 aún no está conectado al chat/panel ni al CLI; no existe rollback completo.
 
 ## Organización
 
@@ -43,7 +43,7 @@ flowchart TD
 | tickets | Tablas Ticket/Event/Notification y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización; `criticality.py` las reglas; `notifications.py` las entregas; `agent.py` el agente en memoria de incidentes, escalamiento y correo. |
 | monitoring | Contratos `InfrastructureSource` y `NetworkMonitoringProvider`, normalización, servicio/cache/historial, fábrica de adaptadores mock/OPNsense/UniFi, inventario persistido y colector (`inventory.py`), alertas (`alerts.py`) y planos (`plans.py`). Tablas `monitoring_*`, migración 007. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
-| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). No ejecuta configuración de infraestructura. |
+| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). Incluye un ejecutor optativo de creación SSID y servicio de reasociación VLAN UniFi; no modifica OPNsense. HU010 necesita conexión al flujo operativo; rollback y validación física pendientes. |
 | agents | Reservado para trabajos futuros; no tiene workers operativos. |
 | core | Configuración, conexión SQL y errores de aplicación. No coordina dominios. |
 

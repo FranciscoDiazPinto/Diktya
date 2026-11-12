@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1223" viewBox="0 0 1500 1223">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<rect x="10" y="10" width="1480" height="1203" rx="0" fill="white" stroke="#20333f" stroke-width="2"/>
+<text x="30" y="42" font-family="Arial,DejaVu Sans,sans-serif" font-size="25" text-anchor="start" fill="#20333f" font-weight="bold">sd S01_2</text>
+<rect x="10.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="110.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Técnico</text>
+<polyline points="110.0,132 110.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="223.33333333333337" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="323.33333333333337" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Chat</text>
+<polyline points="323.33333333333337,132 323.33333333333337,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="436.66666666666674" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="536.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Cambios</text>
+<polyline points="536.6666666666667,132 536.6666666666667,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="650.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="750.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">UniFi</text>
+<polyline points="750.0,132 750.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="863.3333333333334" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="963.3333333333334" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">OPNsense</text>
+<polyline points="963.3333333333334,132 963.3333333333334,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1076.6666666666667" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1176.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Auditoría</text>
+<polyline points="1176.6666666666667,132 1176.6666666666667,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1290.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1390.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Tickets</text>
+<polyline points="1390.0,132 1390.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="38" y="175" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">opt [plan confirmado; sin ejecución previa]</text>
+<polyline points="536.6666666666667,304 750.0,304" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="257" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Aplicar únicamente cambios UniFi incluidos en el resumen</text>
+<polyline points="536.6666666666667,393 963.3333333333334,393" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="346" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Aplicar solo cambios OPNsense confirmados, si la operación los requiere</text>
+<polyline points="536.6666666666667,482 750.0,482" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="435" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Releer y verificar recursos UniFi</text>
+<polyline points="536.6666666666667,571 963.3333333333334,571" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="524" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Releer y verificar estado pertinente OPNsense</text>
+<text x="52" y="620" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">alt [resultado esperado comprobado]</text>
+<polyline points="536.6666666666667,749 1176.6666666666667,749" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="702" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Registrar verificación y pasar reserva a asignada según operación</text>
+<polyline points="39,778 1456,778" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="52" y="803" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">[API fallida, resultado ambiguo o verificación inconclusa]</text>
+<polyline points="536.6666666666667,907 591.6666666666667,907 591.6666666666667,932 536.6666666666667,932" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="880" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Detener; conservar exclusión y estado previo; iniciar recuperación S01_3</text>
+<rect x="37" y="595" width="1422" height="401" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="52" y="981" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+<rect x="23" y="150" width="1450" height="935" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="38" y="1070" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+<rect x="60" y="1131" width="1380" height="65" rx="0" fill="#fff9e8" stroke="#20333f" stroke-width="2"/>
+<text x="750" y="1159" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Una lectura de configuración no acredita por sí sola conectividad Wi-Fi o Internet.</text>
+</svg>

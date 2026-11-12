@@ -47,7 +47,7 @@ Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-mod
 - `app/monitoring`: proveedores OPNsense/UniFi/mock, inventario, alertas y planos (Épica 002). Ver `docs/epica-002-monitoreo.md`.
 - `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
 - `app/networks`: registro local y asignación de acceso por red.
-- `app/changes`: reservas VLAN locales confirmadas; ejecución real y rollback pendientes.
+- `app/changes`: reservas VLAN locales, planes SSID y servicio de modificación VLAN con confirmación, ejecución UniFi optativa y verificación de configuración. Integración operativa completa y rollback pendientes.
 - `app/tickets`: tickets internos y de incidentes, criticidad, notificaciones y seguimiento (Épica 005). Ver `docs/soporte-cliente.md`.
 - `app/agents`: espacio reservado; workers durables pendientes.
 - `migrations`: historial de migraciones de Alembic.
@@ -73,7 +73,7 @@ migración `007_monitoring_inventory` crea las tablas de inventario, alertas y p
 
 El endpoint `POST /api/v1/chat/messages` requiere autenticación y `chat:use`. El servidor carga el historial persistente de la conversación y comprueba propietario, rol y ámbito antes de enviar contexto al proveedor. No acepta historial desde el navegador. Las herramientas se filtran por permisos y vuelven a autorizarlos antes de ejecutarse.
 
-Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Las operaciones de escritura en UniFi siguen pendientes. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
+Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. La creación SSID dispone de un ejecutor CLI optativo; HU010 incorpora servicio de reasociación de un SSID a una VLAN existente y API de propuesta/confirmación, pero aún no está conectada al chat, al panel ni a ese CLI. Las escrituras no están validadas en equipos reales y el rollback sigue pendiente. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
 
 Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en OpenRouter para generar respuestas.
 
@@ -101,7 +101,7 @@ configurado en OpenRouter.
 
 Admin puede validar la [plantilla y contrato CSV](docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
 
-La rama chatbot incorpora planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado. Aplicar migración 007; consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
+Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado están integrados. Aplicar `alembic upgrade head` (incluidas 013 y 014 para HU010); consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
 
 ## Seguridad de despliegue y remediación de auditoría
 
@@ -123,3 +123,15 @@ Comprobar `/health`, login/logout, recarga de navegador, 429, QR abierto, rechaz
 Auditoría administrativa: consulta unificada y CSV de metadatos existentes en `/api/v1/audit`, limitada a `audit:read`. Contratos, cobertura y límites en [arquitectura modular](docs/arquitectura-modular.md#auditoría-unificada--hu013).
 
 Para usar SMTP solo en recuperación Wi-Fi, configurar `NOTIFICATION_EMAIL_ENABLED=false`: las notificaciones de tickets permanecen dentro de la aplicación.
+
+## Estado de implementación al 12 de noviembre de 2026
+
+El objetivo se mantiene: autenticar usuarios, consultar UniFi/OPNsense, asistir mediante chat y gestionar incidentes. El código integrado tiene 495 pruebas backend y 81 frontend aprobadas en la revisión local. Las pruebas simuladas no acreditan operación física ni aceptación del proyecto.
+
+- Disponibles: autenticación/roles, inventario y dashboard, chat con propuestas, reservas locales, tickets, auditoría y recuperación Wi-Fi por correo. Brevo y QR de demostración se probaron con el usuario el 11/11; no es una validación del correo de tickets.
+- Parciales: despliegue CSV, ciclo de reserva/asignación y cambio VLAN de extremo a extremo, trazabilidad completa de ejecución, monitoreo con garantías de tiempo y orquestación multi-agente. HU010 tiene servicio y pruebas, pero falta conectar la operación al flujo del usuario y al ejecutor.
+- Pendientes: reinicio confirmado de dispositivos, compensación/rollback y conciliación completa, segundo adaptador LLM y validación de laboratorio.
+
+El frontend usa módulos ES, mientras el DoD académico de HU005 exige React. El monitoreo técnico se limita a recursos asignados; el CSV separa validación/reserva de despliegue y evita contraseñas. Estas diferencias requieren acordar el alcance o completar los criterios; no se dan por resueltas por actualizar esta guía. El backend es un monolito modular, con tareas periódicas y un CLI; HU018 no está cerrada como arquitectura multi-agente completa.
+
+El backlog académico conserva 19 HU y 121 puntos: 5 en revisión funcional, 13 parciales y 1 pendiente (HU011), sin cierres integrales acreditados. Ver [Product Backlog](../Fase%202/Evidencias%20Proyecto/Documento_02-_Product_Backlog.docx) y [Netbot2 actualizado](../Netbot2_actualizado.pptx). La Gantt conserva nueve sprints de dos semanas como línea base y muestra por separado el estado del corte; las fechas de reprogramación quedan por acordar. Priorizar aceptación de funciones candidatas y un flujo completo de cambio con verificación y rollback antes de ampliar canales.

@@ -1,0 +1,816 @@
+{
+  "S01_1": {
+    "participants": [
+      "Técnico",
+      "Chat",
+      "Cambios",
+      "UniFi",
+      "OPNsense",
+      "Auditoría",
+      "Tickets"
+    ],
+    "rows": [
+      [
+        "msg",
+        0,
+        1,
+        "Solicitar cambio de VLAN"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "Autorizar recurso y obtener inventario de ambas fuentes"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Leer configuración UniFi y recursos afectados"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Leer VLAN y estado pertinente OPNsense"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Reservar exclusivamente; guardar estado previo y resumen con versión"
+      ],
+      [
+        "msg",
+        2,
+        1,
+        "Devolver resumen y vencimiento de la reserva",
+        true
+      ],
+      [
+        "msg",
+        1,
+        0,
+        "Pedir confirmación explícita del resumen",
+        true
+      ],
+      [
+        "frame",
+        "alt",
+        "rechazo, permiso revocado o reserva vencida"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "Cancelar y liberar; auditar denegación cuando corresponda"
+      ],
+      [
+        "else",
+        "[confirmación explícita vigente]"
+      ],
+      [
+        "msg",
+        0,
+        1,
+        "Confirmar recursos y versión"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "Reautorizar y tomar ejecución idempotente"
+      ],
+      [
+        "end"
+      ],
+      [
+        "note",
+        "Continuación S01_2 solo cuando el plan quedó confirmado y autorizado."
+      ]
+    ]
+  },
+  "S01_2": {
+    "participants": [
+      "Técnico",
+      "Chat",
+      "Cambios",
+      "UniFi",
+      "OPNsense",
+      "Auditoría",
+      "Tickets"
+    ],
+    "rows": [
+      [
+        "frame",
+        "opt",
+        "plan confirmado; sin ejecución previa"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Aplicar únicamente cambios UniFi incluidos en el resumen"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Aplicar solo cambios OPNsense confirmados, si la operación los requiere"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Releer y verificar recursos UniFi"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Releer y verificar estado pertinente OPNsense"
+      ],
+      [
+        "frame",
+        "alt",
+        "resultado esperado comprobado"
+      ],
+      [
+        "msg",
+        2,
+        5,
+        "Registrar verificación y pasar reserva a asignada según operación"
+      ],
+      [
+        "else",
+        "[API fallida, resultado ambiguo o verificación inconclusa]"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Detener; conservar exclusión y estado previo; iniciar recuperación S01_3"
+      ],
+      [
+        "end"
+      ],
+      [
+        "end"
+      ],
+      [
+        "note",
+        "Una lectura de configuración no acredita por sí sola conectividad Wi-Fi o Internet."
+      ]
+    ]
+  },
+  "S01_3": {
+    "participants": [
+      "Técnico",
+      "Chat",
+      "Cambios",
+      "UniFi",
+      "OPNsense",
+      "Auditoría",
+      "Tickets"
+    ],
+    "rows": [
+      [
+        "frame",
+        "opt",
+        "fallo registrado en S01_2"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Conciliar y restaurar configuración UniFi reversible afectada"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Conciliar y restaurar configuración OPNsense reversible afectada"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Releer ambas fuentes y verificar la restauración"
+      ],
+      [
+        "frame",
+        "alt",
+        "restauración verificada"
+      ],
+      [
+        "msg",
+        2,
+        5,
+        "Registrar restaurado; liberar recursos que ya no estén asignados"
+      ],
+      [
+        "else",
+        "[restauración fallida o incierta]"
+      ],
+      [
+        "msg",
+        2,
+        6,
+        "Emitir incidente crítico; conservar exclusión para conciliación"
+      ],
+      [
+        "msg",
+        2,
+        5,
+        "Auditar fallo crítico y recursos pendientes"
+      ],
+      [
+        "end"
+      ],
+      [
+        "end"
+      ],
+      [
+        "msg",
+        2,
+        1,
+        "Devolver resultado final seguro y estado de la reserva",
+        true
+      ],
+      [
+        "msg",
+        1,
+        0,
+        "Notificar resultado verificado, restaurado o pendiente",
+        true
+      ]
+    ]
+  },
+  "S02_1": {
+    "participants": [
+      "Técnico",
+      "Interfaz CSV",
+      "Gestión lote",
+      "UniFi",
+      "OPNsense",
+      "Auditoría",
+      "Tickets"
+    ],
+    "rows": [
+      [
+        "msg",
+        0,
+        1,
+        "Cargar CSV"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "Validar encabezados, estructura y contenido"
+      ],
+      [
+        "frame",
+        "alt",
+        "archivo vacío o estructura inválida"
+      ],
+      [
+        "msg",
+        2,
+        1,
+        "Rechazar archivo completo sin aplicar filas",
+        true
+      ],
+      [
+        "else",
+        "[estructura válida]"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Consultar SSID y VLAN del ámbito autorizado"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Contrastar VLAN y conflictos pertinentes"
+      ],
+      [
+        "msg",
+        2,
+        1,
+        "Entregar vista previa: válidas, inválidas y sobrescrituras",
+        true
+      ],
+      [
+        "msg",
+        1,
+        0,
+        "Ofrecer corregir o seleccionar filas válidas",
+        true
+      ],
+      [
+        "msg",
+        0,
+        1,
+        "Confirmar selección y versión; cancelar no modifica infraestructura"
+      ],
+      [
+        "end"
+      ],
+      [
+        "note",
+        "S02_2 requiere confirmación vigente y reservas revalidadas; ningún secreto llega al LLM."
+      ]
+    ]
+  },
+  "S02_2": {
+    "participants": [
+      "Técnico",
+      "Interfaz CSV",
+      "Gestión lote",
+      "UniFi",
+      "OPNsense",
+      "Auditoría",
+      "Tickets"
+    ],
+    "rows": [
+      [
+        "frame",
+        "loop",
+        "cada fila confirmada mientras no exista fallo"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "Reautorizar, reservar y capturar estado previo por fila"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Aplicar fila UniFi de forma idempotente"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Aplicar solo recursos OPNsense confirmados, si corresponde"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Releer fuentes y comparar con resultado esperado"
+      ],
+      [
+        "frame",
+        "break",
+        "error de aplicación o verificación"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Marcar fallo; detener nuevas filas y descartar trabajo aún no iniciado"
+      ],
+      [
+        "note",
+        "Ejecutar recuperación S02_3; este break impide continuar con la siguiente fila."
+      ],
+      [
+        "end",
+        "break"
+      ],
+      [
+        "msg",
+        2,
+        5,
+        "Registrar fila verificada y consumir su reserva"
+      ],
+      [
+        "end",
+        "loop"
+      ],
+      [
+        "note",
+        "S02_3 registra también el resultado del lote sin falla; no repite el procesamiento."
+      ]
+    ]
+  },
+  "S02_3": {
+    "participants": [
+      "Técnico",
+      "Interfaz CSV",
+      "Gestión lote",
+      "UniFi",
+      "OPNsense",
+      "Auditoría",
+      "Tickets"
+    ],
+    "rows": [
+      [
+        "frame",
+        "alt",
+        "lote detenido por fallo"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Delimitar recursos afectados: fila fallida y cambios no consolidados"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Conciliar y compensar configuración UniFi reversible del alcance afectado"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Conciliar y compensar configuración OPNsense reversible del alcance afectado"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Verificar compensación; liberar reservas no aplicadas o restauradas"
+      ],
+      [
+        "frame",
+        "opt",
+        "compensación fallida o incierta"
+      ],
+      [
+        "msg",
+        2,
+        6,
+        "Emitir incidente crítico; conservar exclusión de recursos inciertos"
+      ],
+      [
+        "end"
+      ],
+      [
+        "else",
+        "[todas las filas procesadas sin fallo]"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Conservar cambios verificados y reservas asignadas"
+      ],
+      [
+        "end"
+      ],
+      [
+        "msg",
+        2,
+        5,
+        "Auditar resultado por fila y estado final de reservas"
+      ],
+      [
+        "msg",
+        2,
+        1,
+        "Entregar resumen por fila: verificada, restaurada, fallida o no iniciada",
+        true
+      ],
+      [
+        "msg",
+        1,
+        0,
+        "Mostrar resultado sin secretos",
+        true
+      ]
+    ]
+  },
+  "S03_1": {
+    "participants": [
+      "Monitoreo",
+      "Fuentes de red",
+      "Tickets",
+      "Notificaciones",
+      "Equipo técnico",
+      "Auditoría"
+    ],
+    "rows": [
+      [
+        "frame",
+        "loop",
+        "muestreo periódico independiente del dashboard"
+      ],
+      [
+        "msg",
+        0,
+        1,
+        "Consultar fuentes y conservar observación con fecha"
+      ],
+      [
+        "msg",
+        1,
+        0,
+        "Entregar estado, frescura o error de fuente",
+        true
+      ],
+      [
+        "msg",
+        0,
+        0,
+        "Evaluar mantenimiento vigente y condición con evidencia"
+      ],
+      [
+        "frame",
+        "alt",
+        "caída esperada durante mantenimiento"
+      ],
+      [
+        "msg",
+        0,
+        0,
+        "Suprimir solo alarma esperada; no ocultar falla del controlador"
+      ],
+      [
+        "else",
+        "[incidente confirmado]"
+      ],
+      [
+        "msg",
+        0,
+        2,
+        "Publicar incidente con agent_id y correlation_id"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Deduplicar y clasificar; Media y revisión si es inconcluyente"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Registrar avisos para técnicos y administradores activos"
+      ],
+      [
+        "msg",
+        3,
+        4,
+        "Publicar aviso interno e intentar correo"
+      ],
+      [
+        "end"
+      ],
+      [
+        "end"
+      ]
+    ]
+  },
+  "S03_2": {
+    "participants": [
+      "Monitoreo",
+      "Fuentes de red",
+      "Tickets",
+      "Notificaciones",
+      "Equipo técnico",
+      "Auditoría"
+    ],
+    "rows": [
+      [
+        "frame",
+        "opt",
+        "correo falló"
+      ],
+      [
+        "msg",
+        3,
+        3,
+        "Programar reintento sin retirar aviso interno"
+      ],
+      [
+        "end"
+      ],
+      [
+        "msg",
+        4,
+        2,
+        "Asignar, comentar o resolver con motivo e historial"
+      ],
+      [
+        "frame",
+        "opt",
+        "ticket abierto supera plazo sin atención"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Escalar criticidad y reenviar aviso"
+      ],
+      [
+        "end"
+      ],
+      [
+        "frame",
+        "opt",
+        "condición recuperada con evidencia"
+      ],
+      [
+        "msg",
+        0,
+        2,
+        "Resolver automáticamente; conservar causa y evidencia"
+      ],
+      [
+        "end"
+      ],
+      [
+        "frame",
+        "opt",
+        "un agente falla"
+      ],
+      [
+        "msg",
+        0,
+        5,
+        "Registrar agente y correlación; aislar falla y reintentar según política"
+      ],
+      [
+        "msg",
+        0,
+        2,
+        "Emitir incidente de falla sin depender del agente fallido"
+      ],
+      [
+        "end"
+      ],
+      [
+        "note",
+        "No repetir ticket abierto; cierre manual con motivo; detección AP <2 min y ticket <=2 min."
+      ]
+    ]
+  },
+  "S04_reinicio": {
+    "participants": [
+      "Técnico o admin",
+      "Interfaz",
+      "Gestión reinicio",
+      "Adaptador",
+      "Tickets",
+      "Auditoría"
+    ],
+    "rows": [
+      [
+        "msg",
+        0,
+        1,
+        "Solicitar reinicio de dispositivo identificado"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "Validar permiso; bloquear gateway/firewall para técnico"
+      ],
+      [
+        "msg",
+        2,
+        0,
+        "Pedir confirmación del impacto y resumen vigente",
+        true
+      ],
+      [
+        "msg",
+        0,
+        2,
+        "Confirmar explícitamente"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Reautorizar; adquirir exclusión y abrir ventana de mantenimiento"
+      ],
+      [
+        "msg",
+        2,
+        3,
+        "Enviar reinicio una vez y comprobar retorno con timeout"
+      ],
+      [
+        "frame",
+        "alt",
+        "dispositivo vuelve en línea"
+      ],
+      [
+        "msg",
+        2,
+        5,
+        "Auditar recuperación comprobada"
+      ],
+      [
+        "else",
+        "[vence timeout o respuesta incierta]"
+      ],
+      [
+        "msg",
+        2,
+        4,
+        "Generar alerta y ticket; no afirmar que se deshizo el reinicio"
+      ],
+      [
+        "end"
+      ],
+      [
+        "msg",
+        2,
+        2,
+        "Cerrar mantenimiento y liberar o transferir exclusión a conciliación"
+      ],
+      [
+        "msg",
+        2,
+        0,
+        "Informar resultado o recuperación pendiente",
+        true
+      ]
+    ]
+  },
+  "HU010_actual": {
+    "participants": [
+      "Actor API",
+      "SsidPlanService",
+      "WifiInventory",
+      "UniFiSsidWriter"
+    ],
+    "rows": [
+      [
+        "msg",
+        0,
+        1,
+        "propose_vlan_change(actor, proposal)"
+      ],
+      [
+        "msg",
+        1,
+        2,
+        "read_broadcast(site_id, broadcast_id)"
+      ],
+      [
+        "msg",
+        1,
+        1,
+        "Reautorizar; persistir SsidVlanChangePlan en preview"
+      ],
+      [
+        "msg",
+        0,
+        1,
+        "confirm_vlan_change(actor, plan_id, payload)"
+      ],
+      [
+        "msg",
+        1,
+        1,
+        "Revalidar inventario y revisión; persistir confirmed"
+      ],
+      [
+        "note",
+        "HTTP termina aquí. Chat/panel y CLI de ejecución HU010 todavía no están conectados."
+      ],
+      [
+        "msg",
+        1,
+        1,
+        "execute_vlan_change(plan_id): servicio interno invocado explícitamente"
+      ],
+      [
+        "msg",
+        1,
+        3,
+        "update_vlan(..., authorize=reauthorize)"
+      ],
+      [
+        "msg",
+        1,
+        3,
+        "verify_vlan(site_id, broadcast_id, ssid, target_network_id)"
+      ],
+      [
+        "msg",
+        1,
+        1,
+        "Persistir completed o uncertain y eventos; conservar lease ante incertidumbre"
+      ],
+      [
+        "note",
+        "Servicio probado con simulaciones. No hay rollback automático ni validación física acreditada."
+      ]
+    ]
+  }
+}

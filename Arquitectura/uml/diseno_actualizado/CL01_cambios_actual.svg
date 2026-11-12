@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1130" viewBox="0 0 1280 1130">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<g transform="translate(40 40)">
+<polyline points="430,95.0 215.0,95.0 215.0,310" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="404" y="83.0" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="235.0" y="297" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="760,95.0 960.0,95.0 960.0,310" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="786" y="83.0" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="980.0" y="297" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="215.0,535 430,535 430,857.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="235.0" y="562" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="404" y="845.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="960.0,620 800,620 800,857.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="980.0" y="647" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="826" y="845.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<rect x="430" y="25" width="330" height="140" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="595.0" y="57" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">WifiScope</text>
+<polyline points="430,74 760,74" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="442" y="105" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">id: int</text>
+<text x="442" y="134" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">site_id: str</text>
+<rect x="35" y="310" width="360" height="225" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="215.0" y="342" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">SsidPlan</text>
+<polyline points="35,359 395,359" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="47" y="390" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">id: str</text>
+<text x="47" y="419" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">scope_id: int</text>
+<text x="47" y="448" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">owner_id: int</text>
+<text x="47" y="477" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">status: str</text>
+<text x="47" y="506" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">execution_results: JSON</text>
+<rect x="760" y="310" width="400" height="310" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="960.0" y="342" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">SsidVlanChangePlan</text>
+<polyline points="760,359 1160,359" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="772" y="390" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">id: str</text>
+<text x="772" y="419" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">scope_id: int</text>
+<text x="772" y="448" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">broadcast_id: str</text>
+<text x="772" y="477" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">current_network_id: str</text>
+<text x="772" y="506" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">target_network_id: str</text>
+<text x="772" y="535" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">revision: str</text>
+<text x="772" y="564" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">status: str</text>
+<text x="772" y="593" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">execution_results: JSON</text>
+<rect x="430" y="760" width="370" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="615.0" y="792" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">WifiWriteLease</text>
+<polyline points="430,809 800,809" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="442" y="840" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">resource_key: str [PK]</text>
+<text x="442" y="869" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">plan_id: str [0..1]</text>
+<text x="442" y="898" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">vlan_plan_id: str [0..1]</text>
+<text x="442" y="927" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">{exclusión compartida}</text>
+<text x="600" y="1020" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">CsvImport y VlanReservation conservan el flujo local. Modelos físicos:</text>
+<text x="600" y="1046" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">app/changes/models.py.</text>
+</g>
+</svg>

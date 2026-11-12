@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1223" viewBox="0 0 1500 1223">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<rect x="10" y="10" width="1480" height="1203" rx="0" fill="white" stroke="#20333f" stroke-width="2"/>
+<text x="30" y="42" font-family="Arial,DejaVu Sans,sans-serif" font-size="25" text-anchor="start" fill="#20333f" font-weight="bold">sd S02_2</text>
+<rect x="10.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="110.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Técnico</text>
+<polyline points="110.0,132 110.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="223.33333333333337" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="323.33333333333337" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Interfaz CSV</text>
+<polyline points="323.33333333333337,132 323.33333333333337,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="436.66666666666674" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="536.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Gestión lote</text>
+<polyline points="536.6666666666667,132 536.6666666666667,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="650.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="750.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">UniFi</text>
+<polyline points="750.0,132 750.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="863.3333333333334" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="963.3333333333334" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">OPNsense</text>
+<polyline points="963.3333333333334,132 963.3333333333334,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1076.6666666666667" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1176.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Auditoría</text>
+<polyline points="1176.6666666666667,132 1176.6666666666667,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1290.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1390.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Tickets</text>
+<polyline points="1390.0,132 1390.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="38" y="175" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">loop [cada fila confirmada mientras no exista fallo]</text>
+<polyline points="323.33333333333337,304 536.6666666666667,304" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="257" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Reautorizar, reservar y capturar estado previo por fila</text>
+<polyline points="536.6666666666667,393 750.0,393" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="346" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Aplicar fila UniFi de forma idempotente</text>
+<polyline points="536.6666666666667,482 963.3333333333334,482" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="435" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Aplicar solo recursos OPNsense confirmados, si corresponde</text>
+<polyline points="536.6666666666667,551 591.6666666666667,551 591.6666666666667,576 536.6666666666667,576" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="524" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Releer fuentes y comparar con resultado esperado</text>
+<text x="52" y="620" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">break [error de aplicación o verificación]</text>
+<polyline points="536.6666666666667,729 591.6666666666667,729 591.6666666666667,754 536.6666666666667,754" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="702" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Marcar fallo; detener nuevas filas y descartar trabajo aún no iniciado</text>
+<rect x="60" y="775" width="1380" height="65" rx="0" fill="#fff9e8" stroke="#20333f" stroke-width="2"/>
+<text x="750" y="803" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Ejecutar recuperación S02_3; este break impide continuar con la siguiente fila.</text>
+<rect x="37" y="595" width="1422" height="312" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="52" y="892" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin break</text>
+<polyline points="536.6666666666667,1016 1176.6666666666667,1016" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="969" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Registrar fila verificada y consumir su reserva</text>
+<rect x="23" y="150" width="1450" height="935" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="38" y="1070" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin loop</text>
+<rect x="60" y="1131" width="1380" height="65" rx="0" fill="#fff9e8" stroke="#20333f" stroke-width="2"/>
+<text x="750" y="1159" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">S02_3 registra también el resultado del lote sin falla; no repite el procesamiento.</text>
+</svg>

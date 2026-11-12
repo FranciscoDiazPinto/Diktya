@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1223" viewBox="0 0 1500 1223">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<rect x="10" y="10" width="1480" height="1203" rx="0" fill="white" stroke="#20333f" stroke-width="2"/>
+<text x="30" y="42" font-family="Arial,DejaVu Sans,sans-serif" font-size="25" text-anchor="start" fill="#20333f" font-weight="bold">sd S02_1</text>
+<rect x="10.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="110.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Técnico</text>
+<polyline points="110.0,132 110.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="223.33333333333337" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="323.33333333333337" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Interfaz CSV</text>
+<polyline points="323.33333333333337,132 323.33333333333337,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="436.66666666666674" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="536.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Gestión lote</text>
+<polyline points="536.6666666666667,132 536.6666666666667,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="650.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="750.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">UniFi</text>
+<polyline points="750.0,132 750.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="863.3333333333334" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="963.3333333333334" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">OPNsense</text>
+<polyline points="963.3333333333334,132 963.3333333333334,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1076.6666666666667" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1176.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Auditoría</text>
+<polyline points="1176.6666666666667,132 1176.6666666666667,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1290.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1390.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Tickets</text>
+<polyline points="1390.0,132 1390.0,1198" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<polyline points="110.0,215 323.33333333333337,215" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="168" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Cargar CSV</text>
+<polyline points="323.33333333333337,304 536.6666666666667,304" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="257" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Validar encabezados, estructura y contenido</text>
+<text x="38" y="353" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">alt [archivo vacío o estructura inválida]</text>
+<polyline points="536.6666666666667,482 323.33333333333337,482" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="750" y="435" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Rechazar archivo completo sin aplicar filas</text>
+<polyline points="25,511 1470,511" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="38" y="536" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">[estructura válida]</text>
+<polyline points="536.6666666666667,660 750.0,660" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="613" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Consultar SSID y VLAN del ámbito autorizado</text>
+<polyline points="536.6666666666667,749 963.3333333333334,749" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="702" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Contrastar VLAN y conflictos pertinentes</text>
+<polyline points="536.6666666666667,838 323.33333333333337,838" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="750" y="791" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Entregar vista previa: válidas, inválidas y sobrescrituras</text>
+<polyline points="323.33333333333337,927 110.0,927" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="750" y="880" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Ofrecer corregir o seleccionar filas válidas</text>
+<polyline points="110.0,1016 323.33333333333337,1016" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="969" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Confirmar selección y versión; cancelar no modifica infraestructura</text>
+<rect x="23" y="328" width="1450" height="757" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="38" y="1070" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+<rect x="60" y="1131" width="1380" height="65" rx="0" fill="#fff9e8" stroke="#20333f" stroke-width="2"/>
+<text x="750" y="1159" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">S02_2 requiere confirmación vigente y reservas revalidadas; ningún secreto llega al LLM.</text>
+</svg>

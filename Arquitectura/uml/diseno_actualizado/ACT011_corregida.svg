@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1100" viewBox="0 0 1000 1100">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<circle cx="500" cy="25" r="10" fill="#20333f"/>
+<rect x="240" y="65" width="520" height="72" rx="15" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="94" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">Validar identidad, permiso y recurso</text>
+<rect x="240" y="190" width="520" height="72" rx="15" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="219" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">Preparar resumen y pedir confirmación</text>
+<polyline points="500,35 500,65" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="500,137 500,190" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="500,262 500,310" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<polygon points="500,310 760,365 500,420 240,365" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="360" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">¿Confirmación y permiso vigentes?</text>
+<polyline points="500,420 500,475" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="545" y="453" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" text-anchor="middle" fill="#20333f">[sí]</text>
+<rect x="240" y="475" width="520" height="72" rx="15" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="504" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">Adquirir exclusión y activar mantenimiento</text>
+<rect x="240" y="600" width="520" height="72" rx="15" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="629" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">Enviar reinicio; esperar retorno con</text>
+<text x="500" y="658" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">timeout</text>
+<rect x="240" y="725" width="520" height="72" rx="15" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="754" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">Registrar recuperación o emitir</text>
+<text x="500" y="783" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">alerta/ticket</text>
+<rect x="240" y="850" width="520" height="72" rx="15" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="500" y="879" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">Cerrar mantenimiento; liberar o transferir</text>
+<text x="500" y="908" font-family="Arial,DejaVu Sans,sans-serif" font-size="23" text-anchor="middle" fill="#20333f">bloqueo</text>
+<polyline points="500,547 500,600" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="500,672 500,725" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<polyline points="500,797 500,850" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="5" y="455" width="205" height="160" rx="12" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="108" y="486" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">Rechazar y</text>
+<text x="108" y="512" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">auditar; no</text>
+<text x="108" y="538" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">adquirir exclusión</text>
+<text x="108" y="564" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">ni activar</text>
+<text x="108" y="590" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">mantenimiento</text>
+<polyline points="240,365 108,365 108,455" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="150" y="350" font-family="Arial,DejaVu Sans,sans-serif" font-size="21" text-anchor="middle" fill="#20333f">[no]</text>
+<polyline points="108,615 108,1000 500,1000" fill="none" stroke="#20333f" stroke-width="2"/>
+<polyline points="500,922 500,1000" fill="none" stroke="#20333f" stroke-width="2"/>
+<circle cx="500" cy="1035" r="16" fill="white" stroke="#20333f" stroke-width="2"/><circle cx="500" cy="1035" r="10" fill="#20333f"/>
+<polyline points="500,1000 500,1018" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>
