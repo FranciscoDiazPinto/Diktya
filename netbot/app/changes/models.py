@@ -9,8 +9,10 @@ from app.core.database import Base
 class VlanReservation(Base):
     __tablename__ = "vlan_reservations"
     __table_args__ = (
+        # Reservada o asignada: en ambos casos la VLAN ya no está libre para otro cambio.
         Index("uq_active_vlan_reservation", "parent_interface", "tag", unique=True,
-              sqlite_where=text("status = 'reserved'"), postgresql_where=text("status = 'reserved'")),
+              sqlite_where=text("status IN ('reserved', 'assigned')"),
+              postgresql_where=text("status IN ('reserved', 'assigned')")),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,8 +26,11 @@ class VlanReservation(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="reserved")
     requested_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # released_by_id nulo con released_at = liberada por el sistema (vencimiento).
     released_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class CsvImport(Base):
@@ -81,6 +86,7 @@ class WifiWriteLease(Base):
     resource_key: Mapped[str] = mapped_column(String(64), primary_key=True)
     plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_plans.id"), index=True, nullable=True)
     vlan_plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_vlan_change_plans.id"), index=True, nullable=True)
+    restart_plan_id: Mapped[str | None] = mapped_column(ForeignKey("device_restart_plans.id"), index=True, nullable=True)
 
 
 class SsidVlanChangePlan(Base):
@@ -133,3 +139,25 @@ class SsidVlanChangePlan(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+class DeviceRestartPlan(Base):
+    """Reinicio confirmado de un equipo (HU011). Un reinicio no se deshace: se recupera o escala."""
+
+    __tablename__ = "device_restart_plans"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    scope_id: Mapped[int] = mapped_column(ForeignKey("wifi_scopes.id"))
+    site_id: Mapped[str] = mapped_column(String(160))
+    device_id: Mapped[str] = mapped_column(String(160))
+    device_name: Mapped[str] = mapped_column(String(255))
+    # False = no se pudo acreditar que sea un AP: se trata como equipo crítico.
+    access_point: Mapped[bool] = mapped_column(default=False)
+    connected_clients: Mapped[int | None] = mapped_column(Integer)
+    purpose: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(32), default="preview")
+    revision: Mapped[str] = mapped_column(String(64))
+    execution_results: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

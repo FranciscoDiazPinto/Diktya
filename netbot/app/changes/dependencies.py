@@ -40,3 +40,10 @@ from .ssid_service import SsidPlanService
 def get_ssid_service(monitoring: MonitoringServiceDep, db: Session = Depends(get_db),
                      settings: Settings = Depends(get_settings)) -> SsidPlanService:
     return SsidPlanService(db, settings, monitoring)
+
+
+from .restart_service import DeviceRestartService
+
+
+def get_restart_service(db: Session = Depends(get_db), settings: Settings = Depends(get_settings)) -> DeviceRestartService:
+    return DeviceRestartService(db, settings)

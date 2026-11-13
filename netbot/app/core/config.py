@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     monitoring_retry_max_seconds: float = Field(300.0, ge=1)
     monitoring_source_failure_threshold: int = Field(2, ge=1)
     monitoring_availability_window_hours: int = Field(24, ge=1, le=720)
+    # Horas durante las que se alerta un SSID/VLAN que dejó de estar activo.
+    monitoring_inactive_alert_hours: float = Field(24.0, gt=0, le=720)
     monitoring_plan_max_bytes: int = Field(5_242_880, ge=1024, le=20_971_520)
 
     # Redes cuyo acceso se publica deliberadamente sin cuenta. Vacío = ninguna.
@@ -118,6 +120,13 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     smtp_timeout_seconds: float = Field(10.0, gt=0)
 
+    # Una reserva sin asignar se libera sola al vencer (HU009).
+    vlan_reservation_ttl_hours: float = Field(72.0, gt=0, le=8760)
+    # Reinicio de equipos (HU011): espera máxima del retorno y frecuencia de consulta.
+    device_restart_timeout_seconds: float = Field(300.0, ge=10, le=3600)
+    device_restart_poll_seconds: float = Field(5.0, gt=0, le=60)
+    # Worker de cambios (proceso propio): frecuencia con que busca trabajos aprobados.
+    change_worker_interval_seconds: float = Field(5.0, ge=1, le=300)
     csv_max_bytes: int = Field(1_048_576, ge=1024, le=10_485_760)
     csv_max_rows: int = Field(500, ge=1, le=1000)
     csv_preview_ttl_seconds: int = Field(900, ge=30, le=86400)

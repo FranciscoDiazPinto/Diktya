@@ -347,41 +347,67 @@ def test_h10_blocks_stale_vlan_before_write(db_session, ssid_setup):
     writer.update_vlan.assert_not_awaited()
 
 
-def test_h10_writer_sends_only_network_patch_and_verifies():
-    import json
+def _writer_settings(**extra):
     from app.core.config import Settings
+    return Settings(_env_file=None, unifi_inventory_mode='api',
+        unifi_write_enabled=True, unifi_api_contract='10.6.106',
+        unifi_api_base_url='https://controller.example.test/proxy/network/integration/v1',
+        unifi_api_key='test-only-key', **extra)
+
+
+def _broadcast(network_id, passphrase='test-only-passphrase'):
+    return {'id': 'ssid-123', 'type': 'STANDARD', 'name': 'WiFi-Invitados', 'enabled': True,
+            'metadata': {'origin': 'USER_DEFINED'},
+            'network': {'type': 'SPECIFIC', 'networkId': network_id},
+            'broadcastingDeviceFilter': {'type': 'DEVICES', 'deviceIds': ['ap-1']},
+            'securityConfiguration': {'type': 'WPA2_PERSONAL', 'passphrase': passphrase},
+            'clientIsolationEnabled': True, 'hideName': False}
+
+
+def test_h10_writer_replaces_with_official_put_preserving_configuration():
+    """El contrato 10.6.106 no ofrece PATCH: PUT completo que solo cambia la red."""
+    import json
     from app.changes.ssid_executor import UniFiSsidWriter
-    requests = []
+    requests, state = [], {'network': 'network-20'}
     def handler(request):
         requests.append(request)
         if request.url.path.endswith('/info'):
             return httpx.Response(200, json={'applicationVersion': '10.6.106'})
-        if request.method == 'PATCH':
-            assert json.loads(request.content) == {
-                'network': {'type': 'SPECIFIC', 'networkId': 'network-30'},
-            }
-            return httpx.Response(204)
-        if len([r for r in requests if r.method == 'PATCH']):
-            return httpx.Response(200, json={
-                'id': 'ssid-123', 'name': 'WiFi-Invitados',
-                'network': {'type': 'SPECIFIC', 'networkId': 'network-30'},
-            })
-        return httpx.Response(200, json={
-            'id': 'ssid-123', 'name': 'WiFi-Invitados',
-            'network': {'type': 'SPECIFIC', 'networkId': 'network-20'},
-        })
-    settings = Settings(_env_file=None, unifi_inventory_mode='api',
-        unifi_write_enabled=True, unifi_api_contract='10.6.106',
-        unifi_api_base_url='https://controller.example.test/proxy/network/integration/v1',
-        unifi_api_key='test-only-key')
-    writer = UniFiSsidWriter(settings, httpx.MockTransport(handler))
+        if request.method == 'PUT':
+            body = json.loads(request.content)
+            expected = _broadcast('network-30')
+            del expected['id'], expected['metadata']  # solo lectura en el contrato
+            assert body == expected
+            state['network'] = body['network']['networkId']
+            return httpx.Response(200, json=_broadcast(state['network']))
+        assert request.method == 'GET'
+        return httpx.Response(200, json=_broadcast(state['network']))
+    writer = UniFiSsidWriter(_writer_settings(unifi_write_api_key='write-only-key'), httpx.MockTransport(handler))
     authorized = []
     asyncio.run(writer.update_vlan('demo-site', 'ssid-123', 'network-20',
                                    'network-30', lambda: authorized.append(True)))
     assert asyncio.run(writer.verify_vlan('demo-site', 'ssid-123',
                                          'WiFi-Invitados', 'network-30'))
+    assert asyncio.run(writer.read_network('demo-site', 'ssid-123')) == 'network-30'
     assert authorized == [True]
-    assert [r.method for r in requests].count('PATCH') == 1
+    assert [r.method for r in requests].count('PUT') == 1
+    # La clave de escritura es exclusiva del ejecutor y nunca se mezcla con la de lectura.
+    assert {r.headers['x-api-key'] for r in requests} == {'write-only-key'}
+
+
+@pytest.mark.parametrize('passphrase', ['********', '', None])
+def test_h10_writer_never_replaces_a_masked_passphrase(passphrase):
+    from app.changes.ssid_executor import UniFiSsidWriter
+    seen = []
+    def handler(request):
+        seen.append(request.method)
+        if request.url.path.endswith('/info'):
+            return httpx.Response(200, json={'applicationVersion': '10.6.106'})
+        return httpx.Response(200, json=_broadcast('network-20', passphrase))
+    writer = UniFiSsidWriter(_writer_settings(), httpx.MockTransport(handler))
+    with pytest.raises(ServiceUnavailable):
+        asyncio.run(writer.update_vlan('demo-site', 'ssid-123', 'network-20', 'network-30', lambda: None))
+    assert 'PUT' not in seen
 
 
 def test_h10_writer_never_writes_if_version_differs():
