@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
+from sqlalchemy.exc import DataError
 from app.core.errors import (ApplicationError, Unauthenticated, AccessDenied,
                              NotFound, Conflict, InvalidInput, ServiceUnavailable, PayloadTooLarge, RateLimited)
 
@@ -27,6 +28,13 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return await request_validation_exception_handler(request, exc)
 
 
+async def out_of_range_handler(request: Request, exc: Exception):
+    # Identificadores o paginación mayores que el tipo de la columna: dato inválido, no fallo interno.
+    return JSONResponse(status_code=422, content={"detail": "Valor numérico fuera de rango."})
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(ApplicationError, application_error_handler)
+    app.add_exception_handler(OverflowError, out_of_range_handler)
+    app.add_exception_handler(DataError, out_of_range_handler)

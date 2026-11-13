@@ -43,6 +43,7 @@ def get_chat_service(
         reservation_service=VlanReservationService(monitoring_service, db),
         customer_support=CustomerSupport(db, user, monitoring_service, settings),
         ssid_context=(SsidPlanService(db, settings, monitoring_service), user),
+        release_connection=db.rollback,
     )
 
 

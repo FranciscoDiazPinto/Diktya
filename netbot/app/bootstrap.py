@@ -1,4 +1,6 @@
 """Preparación de base/roles para API y CLI; no importa main ni FastAPI."""
+import contextlib
+import os
 from pathlib import Path
 from alembic.script import ScriptDirectory
 from sqlalchemy import select, inspect, text
@@ -11,6 +13,14 @@ from app.auth.models import Role, User
 from app.auth.roles import DEFAULT_ROLES
 from app.auth.security import hash_password
 from app.auth.audit import record_event
+
+def _restrict_sqlite_file(bind: Engine) -> None:
+    """El archivo guarda hashes de contraseñas: solo lo lee la cuenta del servicio."""
+    database = bind.url.database
+    if bind.url.get_backend_name() == "sqlite" and database and database != ":memory:":
+        with contextlib.suppress(OSError):
+            os.chmod(database, 0o600)
+
 
 def initialize_database(config: Settings | None = None, bind: Engine | None = None) -> None:
     """Preparación explícita. Producción exige migraciones previas; nunca create_all."""
@@ -27,6 +37,7 @@ def initialize_database(config: Settings | None = None, bind: Engine | None = No
             versions = set(connection.execute(text("SELECT version_num FROM alembic_version")).scalars())
         if versions != set(scripts.get_heads()):
             raise RuntimeError("La base debe migrarse antes del arranque: alembic upgrade head")
+    _restrict_sqlite_file(bind)
     db = Session(bind)
     try:
         for role_name, role_definition in DEFAULT_ROLES.items():

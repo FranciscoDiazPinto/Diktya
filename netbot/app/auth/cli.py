@@ -1,11 +1,13 @@
 """Alta de usuarios desde la terminal.
 
-Uso: python -m app.auth.cli correo contraseña [--role admin] [--name "Nombre"]
+Uso: python -m app.auth.cli correo [--role tecnico] [--name "Nombre"] [--password-stdin]
 
-Si el correo ya existe, actualiza su contraseña, nombre y rol.
+La contraseña nunca se recibe como argumento: quedaría en el historial y en la lista
+de procesos. Si el correo ya existe, actualiza su contraseña, nombre y rol.
 """
 
 import argparse
+import sys
 from getpass import getpass
 from pydantic import ValidationError
 
@@ -21,15 +23,15 @@ from .service import provision_user
 def main() -> None:
     parser = argparse.ArgumentParser(description="Crea o actualiza un usuario de Netbot.")
     parser.add_argument("email")
-    parser.add_argument("password", nargs="?", help="Si se omite, se solicita sin mostrarla.")
-    parser.add_argument("--role", choices=[role.value for role in RoleName], default=RoleName.ADMIN.value)
+    parser.add_argument("--password-stdin", action="store_true", help="Lee la contraseña desde la entrada estándar.")
+    parser.add_argument("--role", choices=[role.value for role in RoleName], required=True)
     parser.add_argument("--name", default=None)
     args = parser.parse_args()
-    password = args.password if args.password is not None else getpass("Contraseña: ")
+    password = sys.stdin.readline().rstrip("\n") if args.password_stdin else getpass("Contraseña: ")
     try:
         data = UserCreate(email=args.email, password=password, full_name=args.name, roles=[args.role])
     except ValidationError:
-        parser.error("revisa el correo, el nombre y la contraseña (8 a 128 caracteres)")
+        parser.error("revisa el correo, el nombre y la contraseña (12 a 128 caracteres, sin claves comunes)")
     initialize_database()
     try:
         with SessionLocal() as db:

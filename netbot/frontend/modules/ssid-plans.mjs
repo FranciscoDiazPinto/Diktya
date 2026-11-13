@@ -1,5 +1,5 @@
 // Propuestas y confirmación por API; ninguna escritura de red desde el LLM.
-export function createSsidPlans({document, Option, state, api, textNode, captureChat, isChatCurrent, chatMessages}) {
+export function createSsidPlans({document, Option, state, api, textNode, captureChat, isChatCurrent, chatMessages, onOpenPlans = () => {}}) {
   const $ = s => document.querySelector(s), panel = $('#ssid-panel'), scope = $('#ssid-scope');
   let generation = 0, options = null, aps = [], busy = false;
   const capture = () => ({session:state.session,generation});

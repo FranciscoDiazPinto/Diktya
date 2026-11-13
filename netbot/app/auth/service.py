@@ -2,23 +2,26 @@
 import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select, update, func
+from sqlalchemy import delete, select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.errors import Unauthenticated, NotFound, Conflict, InvalidInput
 from .models import RefreshToken, Role, User, AuthAuditEvent, user_roles
-from .audit import record_event, bind_request
+from .audit import current_peer, record_event, bind_request
 from app.core.config import settings
+from app.core.keys import derive_key
 
 from .roles import effective_permissions
 from .access import require_user_permission
 from .permissions import Permission
-from .schemas import LoginRequest, RefreshRequest, RoleCreate, TokenResponse, UserCreate, UserRead, UserUpdate, RoleRead
+from .schemas import LoginRequest, PasswordChange, RefreshRequest, RoleCreate, TokenResponse, UserCreate, UserRead, UserUpdate, RoleRead
 from .security import create_access_token, create_refresh_token, hash_password, verify_password
 
 _DUMMY_PASSWORD_HASH = hash_password("netbot-login-timing-placeholder")
 _LOGIN_FAILURE_LIMIT = 5
 _LOGIN_LOCK_DURATION = timedelta(minutes=15)
+# Dos envíos casi simultáneos del mismo cliente no son un robo de sesión.
+_REFRESH_REUSE_GRACE = timedelta(seconds=10)
 
 
 def _login_now() -> datetime:
@@ -31,14 +34,20 @@ def user_read(user: User) -> UserRead:
     )
 
 
-def _tokens(user: User, db: Session) -> TokenResponse:
+def _utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _tokens(user: User, db: Session, started_at: datetime | None = None) -> TokenResponse:
     raw, token_hash, expires = create_refresh_token()
-    db.add(RefreshToken(token_hash=token_hash, user_id=user.id, expires_at=expires))
+    started_at = started_at or datetime.now(timezone.utc)
+    db.add(RefreshToken(token_hash=token_hash, user_id=user.id, expires_at=expires, session_started_at=started_at))
     return TokenResponse(access_token=create_access_token(user.id, [r.name for r in user.roles], session_id=token_hash), refresh_token=raw)
 
 
 def _fingerprint(email: str) -> str:
-    return hmac.new(settings.jwt_secret_key.encode(), email.lower().encode(), hashlib.sha256).hexdigest()
+    key = derive_key(settings.jwt_secret_key, 'audit-subject')
+    return hmac.new(key.encode(), email.lower().encode(), hashlib.sha256).hexdigest()
 
 
 def login(data: LoginRequest, db: Session) -> TokenResponse:
@@ -59,10 +68,16 @@ def login(data: LoginRequest, db: Session) -> TokenResponse:
     if locked_until is not None and locked_until.tzinfo is None:
         locked_until = locked_until.replace(tzinfo=timezone.utc)
     locked = locked_until is not None and now < locked_until
+    # Terceros pueden bloquear una cuenta conociendo solo su correo: el último origen
+    # legítimo conserva el acceso con la clave correcta. Un fallo desde él retira la excepción.
+    peer = current_peer()
+    known_origin = bool(locked and peer and user and user.last_login_peer == peer)
+    if known_origin and not valid_password:
+        user.last_login_peer = None
     if user and locked_until is not None and not locked:
         user.failed_login_attempts = 0
         user.login_locked_until = None
-    if not user or not user.is_active or not valid_password or locked:
+    if not user or not user.is_active or not valid_password or (locked and not known_origin):
         if user and user.is_active and not locked:
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= _LOGIN_FAILURE_LIMIT:
@@ -73,6 +88,7 @@ def login(data: LoginRequest, db: Session) -> TokenResponse:
         raise Unauthenticated("Invalid credentials")
     user.failed_login_attempts = 0
     user.login_locked_until = None
+    user.last_login_peer = peer or user.last_login_peer
     tokens = _tokens(user, db)
     record_event(db, "auth.login.succeeded", actor_id=user.id)
     db.commit()
@@ -84,9 +100,18 @@ def refresh(data: RefreshRequest, db: Session) -> TokenResponse:
     _lock_administration(db)
     token_hash = hashlib.sha256(data.refresh_token.encode()).hexdigest()
     token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
-    now = datetime.now(timezone.utc)
-    expires_at = token.expires_at.replace(tzinfo=timezone.utc) if token and token.expires_at.tzinfo is None else (token.expires_at if token else None)
-    if not token or token.revoked_at or expires_at <= now or not token.user.is_active:
+    now = _login_now()
+    if token and token.revoked_at and now - _utc(token.revoked_at) > _REFRESH_REUSE_GRACE:
+        # Un token ya usado reaparece: alguien tiene una copia. No se sabe cuál de las dos
+        # partes es la legítima, así que se cierran todas las sesiones de la cuenta.
+        _revoke_sessions(db, token.user_id)
+        record_event(db, "auth.refresh.reuse_detected", target_id=token.user_id, outcome="denied")
+        db.commit()
+        raise Unauthenticated("Invalid refresh token")
+    expires_at = _utc(token.expires_at) if token else None
+    started_at = _utc(token.session_started_at or token.created_at) if token else None
+    limit = timedelta(days=settings.session_absolute_days)
+    if not token or token.revoked_at or expires_at <= now or now - started_at >= limit or not token.user.is_active:
         record_event(db, "auth.refresh.failed", outcome="failure")
         db.commit()
         raise Unauthenticated("Invalid refresh token")
@@ -99,10 +124,16 @@ def refresh(data: RefreshRequest, db: Session) -> TokenResponse:
         record_event(db, "auth.refresh.failed", outcome="failure")
         db.commit()
         raise Unauthenticated("Invalid refresh token")
-    fresh = _tokens(actor, db)
+    fresh = _tokens(actor, db, started_at)
     record_event(db, "auth.refresh.succeeded", actor_id=actor.id)
     db.commit()
     return fresh
+
+
+def purge_expired_sessions(db: Session, now: datetime) -> int:
+    """Conserva un día los tokens vencidos para distinguir reutilización de token inválido."""
+    result = db.execute(delete(RefreshToken).where(RefreshToken.expires_at < now - timedelta(days=1)))
+    return result.rowcount or 0
 
 
 def logout(data: RefreshRequest, db: Session) -> None:
@@ -203,6 +234,8 @@ def _update_user(user_id: int, data: UserUpdate, db: Session, actor_id, *, sourc
                      details={"before": old_roles, "after": new_roles}, source=source)
     if data.password is not None:
         user.hashed_password = hash_password(data.password)
+        user.failed_login_attempts = 0
+        user.login_locked_until = None
         changed.append("password")
         record_event(db, "user.password_changed", actor_id=actor_id, target_id=user.id, source=source)
     if changed:
@@ -211,6 +244,40 @@ def _update_user(user_id: int, data: UserUpdate, db: Session, actor_id, *, sourc
         record_event(db, "user.updated", actor_id=actor_id, target_id=user.id, details={"fields": changed}, source=source)
     db.commit()
     db.refresh(user)
+    return user_read(user)
+
+
+def change_own_password(data: PasswordChange, db: Session, actor: User) -> None:
+    """Cambio propio: exige la clave vigente y cierra todas las sesiones de la cuenta."""
+    bind_request(db, actor.id)
+    current_hash = actor.hashed_password
+    user_id = actor.id
+    db.rollback()
+    valid = verify_password(data.current_password, current_hash)
+    new_hash = hash_password(data.new_password)
+    _lock_administration(db)
+    user = db.get(User, user_id)
+    if not user or not user.is_active or user.hashed_password != current_hash or not valid:
+        record_event(db, "user.password_change_failed", actor_id=user_id, target_id=user_id, outcome="failure")
+        db.commit()
+        raise Unauthenticated("Invalid credentials")
+    user.hashed_password = new_hash
+    _revoke_sessions(db, user_id)
+    record_event(db, "user.password_changed", actor_id=user_id, target_id=user_id)
+    db.commit()
+
+
+def unlock_user(user_id: int, db: Session, actor: User) -> UserRead:
+    require_user_permission(db, actor, Permission.USERS_MANAGE)
+    _lock_administration(db)
+    require_user_permission(db, actor, Permission.USERS_MANAGE)
+    user = db.get(User, user_id)
+    if not user:
+        raise NotFound("User not found")
+    user.failed_login_attempts = 0
+    user.login_locked_until = None
+    record_event(db, "user.unlocked", actor_id=actor.id, target_id=user.id)
+    db.commit()
     return user_read(user)
 
 

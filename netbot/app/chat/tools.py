@@ -197,6 +197,14 @@ _tools = {
 TOOL_REGISTRY: Mapping[str, MonitoringTool] = MappingProxyType(_tools)
 
 
+def _minimized_clients(result: dict[str, Any]) -> dict[str, Any]:
+    """Salen del sistema hacia un proveedor externo: el fabricante basta, no la identidad."""
+    for lease in result.get("data") or []:
+        if isinstance(lease, dict) and lease.get("mac_address"):
+            lease["mac_address"] = lease["mac_address"][:8] + ":xx:xx:xx"
+    return result
+
+
 def openrouter_tool_definitions(permissions: frozenset[Permission] | None = None) -> list[dict[str, Any]]:
     tools = list(TOOL_REGISTRY.values())
     if permissions is not None:
@@ -288,6 +296,8 @@ async def invoke_tool(
         raise ChatToolError("Herramienta sin ejecutor.")
     response = await tool.executor(service, validated_arguments)
     result = response.model_dump(mode="json")
+    if name == "get_clients":
+        result = _minimized_clients(result)
     if len(json.dumps(result, ensure_ascii=False, separators=(",", ":"))) > MAX_TOOL_RESULT_CHARS:
         raise ChatToolError("El resultado de monitoreo es demasiado grande para el chat.")
     return result

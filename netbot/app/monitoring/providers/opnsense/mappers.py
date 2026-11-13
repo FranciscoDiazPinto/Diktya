@@ -76,6 +76,18 @@ def _clean_str(value: Any) -> str | None:
     return text if text and text != "*" else None
 
 
+_HOSTNAME_UNSAFE = re.compile(r"[^\w.\- ]")
+_HOSTNAME_MAX = 63
+
+
+def _clean_hostname(value: Any) -> str | None:
+    """El hostname DHCP lo elige cualquier dispositivo y llega al dashboard y al LLM."""
+    text = _clean_str(value)
+    if text is None:
+        return None
+    return _HOSTNAME_UNSAFE.sub("_", text)[:_HOSTNAME_MAX].strip() or None
+
+
 def extract_rows(payload: Any) -> list[dict[str, Any]]:
     """Normaliza las formas habituales de listados de OPNsense a una lista de dicts:
     lista directa, grid `{"rows": [...]}` o dict de dicts."""
@@ -503,7 +515,7 @@ def parse_dhcp_lease(row: dict[str, Any], *, now: datetime, kea: bool = False) -
         return DhcpLease(
             ip_address=ip.split("/", 1)[0],
             mac_address=mac,
-            hostname=_clean_str(row.get("hostname")),
+            hostname=_clean_hostname(row.get("hostname")),
             interface=_clean_str(row.get("if")) or _clean_str(row.get("if_descr")),
             expires_at=expires_at,
             active=active,

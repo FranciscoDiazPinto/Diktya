@@ -9,7 +9,7 @@ from app.core.database import get_db
 from .dependencies import get_current_user, require_permission
 from .models import User
 from . import service
-from .schemas import AuthAuditRead, LoginRequest, RefreshRequest, RoleCreate, RoleRead, TokenResponse, UserCreate, UserRead, UserUpdate
+from .schemas import AuthAuditRead, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, RoleRead, TokenResponse, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 admin_router = APIRouter(prefix="/admin", tags=["administration"])
@@ -30,6 +30,11 @@ def logout(data: RefreshRequest, db: Session = Depends(get_db)) -> None:
     return service.logout(data, db)
 
 
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(data: PasswordChange, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
+    return service.change_own_password(data, db, user)
+
+
 @router.get("/me", response_model=UserRead)
 def current_user(user: User = Depends(get_current_user)) -> UserRead:
     return service.user_read(user)
@@ -48,6 +53,11 @@ def create_user(data: UserCreate, db: Session = Depends(get_db), actor: User = D
 @admin_router.patch("/users/{user_id}", response_model=UserRead)
 def update_user(user_id: int, data: UserUpdate, db: Session = Depends(get_db), actor: User = Depends(require_permission("users:manage"))) -> UserRead:
     return service.update_user(user_id, data, db, actor)
+
+
+@admin_router.post("/users/{user_id}/unlock", response_model=UserRead)
+def unlock_user(user_id: int, db: Session = Depends(get_db), actor: User = Depends(require_permission("users:manage"))) -> UserRead:
+    return service.unlock_user(user_id, db, actor)
 
 
 @admin_router.get("/roles", response_model=list[RoleRead])

@@ -15,6 +15,9 @@ class UniFiSsidWriter:
     def __init__(self, settings, transport=None):
         self.settings, self.transport = settings, transport
 
+    def api_key(self):
+        return (self.settings.unifi_write_api_key or self.settings.unifi_api_key).get_secret_value()
+
     def profile(self, name):
         try:
             profiles=json.loads(self.settings.ssid_security_profiles_json.get_secret_value())
@@ -47,12 +50,12 @@ class UniFiSsidWriter:
         # Reutilizar la validación de URL/TLS del inventario antes de construir este cliente.
         from urllib.parse import urlsplit
         base=urlsplit(s.unifi_api_base_url or '')
-        if base.scheme!='https' or base.username or base.password or base.query or base.fragment or not s.unifi_api_key:
+        if base.scheme!='https' or base.username or base.password or base.query or base.fragment or not (s.unifi_write_api_key or s.unifi_api_key):
             raise ServiceUnavailable('La conexión UniFi no está configurada de forma válida.')
         body=self.body(proposal)
         path=f'sites/{quote(site_id,safe="")}/wifi/broadcasts'
         try:
-            async with httpx.AsyncClient(base_url=s.unifi_api_base_url.rstrip('/')+'/',headers={'X-API-Key':s.unifi_api_key.get_secret_value()},
+            async with httpx.AsyncClient(base_url=s.unifi_api_base_url.rstrip('/')+'/',headers={'X-API-Key':self.api_key()},
                 verify=s.unifi_ca_bundle or True,timeout=s.unifi_timeout_seconds,follow_redirects=False,transport=self.transport) as client:
                 info=await client.get('info')
                 if info.status_code!=200 or info.json().get('applicationVersion')!=s.unifi_api_contract:
@@ -73,7 +76,7 @@ class UniFiSsidWriter:
         s=self.settings
         path=f'sites/{quote(site_id,safe="")}/wifi/broadcasts/{quote(external_id,safe="")}'
         try:
-            async with httpx.AsyncClient(base_url=s.unifi_api_base_url.rstrip('/')+'/',headers={'X-API-Key':s.unifi_api_key.get_secret_value()},
+            async with httpx.AsyncClient(base_url=s.unifi_api_base_url.rstrip('/')+'/',headers={'X-API-Key':self.api_key()},
                     verify=s.unifi_ca_bundle or True,timeout=s.unifi_timeout_seconds,follow_redirects=False,transport=self.transport) as client:
                 response=await client.get(path);response.raise_for_status();b=response.json()
                 expected=self.body(proposal)

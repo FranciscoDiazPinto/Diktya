@@ -4,11 +4,14 @@ import contextlib
 import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from fastapi import FastAPI
 from app.bootstrap import initialize_database
 from app.core.config import get_settings
+from app.auth.service import purge_expired_sessions
 from app.core.database import SessionLocal
 from app.chat.guest import expire_guest_sessions, sessions
+from app.networks.email_recovery import purge_expired as purge_wifi_recoveries
 from app.monitoring.factory import build_monitoring_service, build_unifi_source
 from app.monitoring.inventory import InventoryCollector
 from app.tickets.agent import TicketAgent
@@ -26,6 +29,23 @@ async def sample_traffic_forever(service: MonitoringService, interval: float) ->
         await asyncio.sleep(interval)
 
 
+def purge_expired_data() -> None:
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        purge_expired_sessions(db, now)
+        purge_wifi_recoveries(db, now)
+        db.commit()
+
+
+async def maintenance_forever(interval: float = 3600) -> None:
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await asyncio.to_thread(purge_expired_data)
+        except Exception:
+            logger.exception("Falló la purga de datos vencidos")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     initialize_database()
@@ -36,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sample_traffic_forever(service, settings.monitoring_sample_interval_seconds)
     )
     guest_expiry = asyncio.create_task(expire_guest_sessions())
+    maintenance = asyncio.create_task(maintenance_forever())
     unifi = build_unifi_source(settings)
     collector = None
     if settings.monitoring_collector_enabled:
@@ -57,6 +78,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await collector
         if unifi:
             await unifi.aclose()
+        maintenance.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await maintenance
         guest_expiry.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await guest_expiry

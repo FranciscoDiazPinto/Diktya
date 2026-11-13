@@ -22,14 +22,14 @@ La entrada abre un chat de invitados sin cuenta. «Iniciar sesión · Equipo» l
 
 El dashboard estático puede servirse en otra terminal con `python3 -m http.server 5173 --directory frontend`. Iniciar sesión con un usuario `cliente`, `tecnico`, `operador`, `visor` o `admin`. Las conversaciones autenticadas se guardan en la base por usuario y se recuperan al iniciar sesión. Cliente y técnico acceden únicamente a redes asignadas; visor es un rol interno de monitoreo global.
 
-La documentación interactiva de la API estará en `/docs` al iniciar el servidor.
+La documentación interactiva de la API está en `/docs` fuera de producción. En producción `/docs`, `/redoc` y `/openapi.json` no se publican.
 
 Sin PostgreSQL se puede omitir `DATABASE_URL`: la API usa SQLite (`netbot.db`).
 
 ### Crear un usuario
 
-`python -m app.auth.cli correo@dominio.cl contraseña --role admin --name "Nombre"`
-(roles: `admin`, `tecnico`, `operador`, `cliente`, `visor`). Si el correo existe, actualiza su contraseña y rol.
+`python -m app.auth.cli correo@dominio.cl --role admin --name "Nombre"`
+(roles: `admin`, `tecnico`, `operador`, `cliente`, `visor`). La contraseña se solicita sin mostrarla o se lee con `--password-stdin`; nunca como argumento. Si el correo existe, actualiza su contraseña y rol.
 
 ### Dashboard
 
@@ -113,10 +113,16 @@ Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecut
 - Los tokens del navegador viven solo en memoria: no se guardan en localStorage, sessionStorage ni cookies. Se eliminan valores persistidos de versiones anteriores. Recargar exige login; una XSS activa seguiría siendo peligrosa, por lo que se conserva el escape de contenido externo.
 - Un técnico sin permiso global de monitoreo no puede asociar IDs de dispositivos globales a tickets manuales. Continúa pudiendo crear los tickets permitidos sin esa asociación.
 - Invitados: QR abierto explícito o recuperación de expositor mediante enlace de correo de un uso y cinco minutos. Administración, Marketing y Servicios están excluidas. Requiere finalidad `expositor`, SMTP y GUEST_EMAIL_RECOVERY_ENABLED/PUBLIC_URL; apagado por defecto. SMS/Telegram pendientes. Ver [autoatención](docs/atencion-invitados.md).
-- `core/request_security.py` aplica ventanas de un minuto antes de autenticar o llamar al proveedor: login/refresh 10 por IP y 60 globales; nuevas sesiones invitadas 5 por IP y 120 globales; chat 10 por IP y 60 globales; identificación 5 por IP y 60 globales. Devuelve 429 y Retry-After y limita a 64 KiB el cuerpo recibido en esas rutas antes de analizar JSON. Los contadores son transaccionales y compartidos entre procesos del mismo equipo en `SECURITY_RATE_LIMIT_PATH` (por defecto `netbot-rate-limits.db`, permiso 0600). Comparten el mismo archivo absoluto y clave; no borrar o cambiar el archivo durante operación. Fallos del almacén rechazan con 503. Una IP no agota por sí sola el cupo global; detrás de NAT varios usuarios comparten cuota. Las sesiones invitadas aún requieren un worker por su almacenamiento en memoria.
+- `core/request_security.py` aplica ventanas de un minuto antes de autenticar o llamar al proveedor, con un grupo por frontera (`EXACT_POLICIES`): un invitado no consume el cupo del chat autenticado ni el login el de la renovación. Devuelve 429 y Retry-After, limita a 64 KiB esas rutas y a `MAX_JSON_BODY_BYTES` el resto, antes de leer el cuerpo. `GUEST_LLM_DAILY_BUDGET` y `CHAT_LLM_DAILY_BUDGET` acotan las llamadas diarias al LLM; al agotarse, el asistente responde 429 y el QR sigue disponible. Los contadores son transaccionales y compartidos entre procesos del mismo equipo en `SECURITY_RATE_LIMIT_PATH` (por defecto `netbot-rate-limits.db`, permiso 0600). Comparten el mismo archivo absoluto y clave; no borrar o cambiar el archivo durante operación. Fallos del almacén rechazan con 503. Una IP no agota por sí sola el cupo global; detrás de NAT varios usuarios comparten cuota. Las sesiones invitadas aún requieren un worker por su almacenamiento en memoria.
 - Instalación local/rack: usar un volumen local persistente para contadores, nunca NFS. Para réplicas en equipos distintos sustituir este almacén por un limitador centralizado; los archivos locales no comparten cuotas entre máquinas. Configurar el servidor ASGI para confiar cabeceras de proxy solo desde IPs del proxy propio, nunca desde cualquier origen. Limitar también tamaño de cuerpo/concurrencia en el proxy HTTPS. Un atacante con múltiples orígenes aún puede consumir la cuota global; el presupuesto limita consumo, no elimina toda denegación de servicio.
 - La verificación Argon2 ocurre fuera del bloqueo global y revalida ID, hash, actividad, bloqueo y permisos antes de emitir sesión. El bloqueo persistente de cinco fallos/15 minutos permanece.
 - Secretos, variantes `.env`, claves privadas, bases/copies y metadatos Finder se excluyen mediante `.gitignore` raíz. No se publican valores locales ni se reescribe el historial. Eliminar del índice no borra archivos locales.
+
+- Proxy: `deploy/nginx/netbot.conf` es la plantilla con TLS, HSTS, CSP y `X-Forwarded-For` reemplazado. Sin proxy local, iniciar uvicorn con `--no-proxy-headers`: por defecto confía esa cabecera desde loopback.
+- `POST /auth/password` cambia la clave propia y cierra todas las sesiones. `POST /admin/users/{id}/unlock` levanta un bloqueo. El último origen legítimo conserva el acceso durante un bloqueo mientras no falle desde él.
+- Sesiones: una reutilización de refresh tras 10 s cierra todas las sesiones de la cuenta; `SESSION_ABSOLUTE_DAYS` limita la vida total aunque se renueve.
+- `UNIFI_WRITE_API_KEY` se define solo en el entorno del ejecutor; el proceso web conserva `UNIFI_API_KEY` de lectura.
+- Antes de instalar en producción usar `requirements.lock`. Regenerarlo al actualizar dependencias y revisar `pip-audit`.
 
 Comprobar `/health`, login/logout, recarga de navegador, 429, QR abierto, rechazo de QR privado, certificados incorrectos y permisos reales del rol SQL antes de exponer una instalación. El frontend debe servirse por HTTPS en producción y dirigir `/auth`, `/admin` y `/api` a la API del mismo origen.
 

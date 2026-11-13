@@ -1,4 +1,5 @@
 """Ambas líneas publicadas convergen sin borrar datos ni cambiar revisiones."""
+from alembic.script import ScriptDirectory
 import os
 from pathlib import Path
 import subprocess
@@ -29,7 +30,7 @@ def test_upgrade_each_history_preserves_records_and_converges(previous, tmp_path
             db.execute(text("INSERT INTO monitoring_sources (source,status,consecutive_failures) VALUES ('mock','ok',0)"))
     migrate('head')
     with engine.connect() as db:
-        assert db.scalar(text('SELECT version_num FROM alembic_version')) == '014_h10_shared_wifi_lease'
+        assert db.scalar(text('SELECT version_num FROM alembic_version')) == ScriptDirectory(str(ROOT / 'migrations')).get_current_head()
         assert db.scalar(text('SELECT email FROM users WHERE id=17')) == 'preserved@example.com'
         assert db.scalar(text('SELECT failed_login_attempts FROM users WHERE id=17')) == 0
         assert db.scalar(text('SELECT login_locked_until FROM users WHERE id=17')) is None

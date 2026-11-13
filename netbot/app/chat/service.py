@@ -46,7 +46,9 @@ class ChatService:
         reservation_service: VlanReservationService | None = None,
         customer_support: CustomerSupport | None = None,
         ssid_context=None,
+        release_connection=None,
     ) -> None:
+        self._release_connection = release_connection or (lambda: None)
         self._settings = settings
         self._provider = provider
         self._monitoring = monitoring_service
@@ -84,6 +86,8 @@ class ChatService:
         tool_rounds = 0
 
         while True:
+            # Las herramientas consultan la base entre rondas: soltarla antes de cada espera.
+            self._release_connection()
             completion = await self._provider.complete(messages=messages, tools=tools)
             if not completion.tool_calls:
                 answer = (completion.content or "").strip()

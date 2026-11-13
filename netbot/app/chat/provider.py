@@ -67,6 +67,8 @@ class OpenRouterProvider:
             "model": model,
             "messages": messages,
             "max_tokens": self._settings.chat_max_output_tokens,
+            # Solo proveedores que no retienen ni entrenan con el contenido.
+            "provider": {"data_collection": self._settings.openrouter_data_collection},
         }
         if tools:
             payload.update(tools=tools, tool_choice="auto", parallel_tool_calls=False)

@@ -16,6 +16,8 @@ from app.networks.recipients import has_contact_data
 
 TTL = 60
 MAX_SESSIONS = 200
+MAX_SESSIONS_PER_PEER = 20  # acota la ocupación del cupo desde un mismo origen
+MAX_LIFETIME = 900  # la actividad extiende una atención, no la vuelve permanente
 POLICY = """Eres Netbot, asistente de autoatención en español para invitados sin cuenta.
 Ayuda con conexión Wi-Fi y dudas generales de redes. No tienes acceso al monitoreo,
 inventario privado, tickets ni administración. No afirmes consultar o cambiar infraestructura.
@@ -44,6 +46,8 @@ class GuestSession:
     identification_attempts: int = 0
     awaiting_credential_kind: bool = False
     dialogue_state: Literal["needs_information", "answered", "closed"] = "needs_information"
+    peer: str | None = None
+    deadline: float = float('inf')
 
 
 class GuestModelAnswer(BaseModel):
@@ -126,13 +130,16 @@ class GuestSessions:
             raise RateLimited("Demasiadas consultas. Espera un minuto antes de reintentar.")
         events.append(now)
 
-    def create(self) -> str:
+    def create(self, peer: str | None = None) -> str:
         self.purge()
         if len(self.sessions) >= MAX_SESSIONS:
             raise ServiceUnavailable("La autoatención está ocupada. Inténtalo en un minuto.")
+        if peer is not None and sum(s.peer == peer for s in self.sessions.values()) >= MAX_SESSIONS_PER_PEER:
+            raise RateLimited("Hay demasiadas atenciones abiertas desde este dispositivo.")
         self.admit(self.starts, 60)
         token = secrets.token_urlsafe(32)
-        self.sessions[token] = GuestSession(self.clock() + TTL)
+        now = self.clock()
+        self.sessions[token] = GuestSession(now + TTL, peer=peer, deadline=now + MAX_LIFETIME)
         return token
 
     def get(self, token: str) -> GuestSession:
@@ -143,7 +150,8 @@ class GuestSessions:
         return session
 
     def touch(self, token: str):
-        self.get(token).expires = self.clock() + TTL
+        session = self.get(token)
+        session.expires = min(self.clock() + TTL, session.deadline)
 
     def delete(self, token: str):
         session = self.sessions.pop(token, None)
@@ -197,7 +205,7 @@ class GuestSessions:
         self.admit(self.messages, 120)
         session.busy = True
         session.count += 1
-        session.expires = self.clock() + TTL
+        session.expires = min(self.clock() + TTL, session.deadline)
         try:
             completion = await provider.complete(messages=[
                 {"role": "system", "content": POLICY},

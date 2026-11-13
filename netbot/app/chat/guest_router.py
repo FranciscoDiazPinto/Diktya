@@ -1,10 +1,11 @@
 """Frontera pública de autoatención, separada de la API autenticada."""
 from typing import Literal
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
+from app.core.request_security import client_peer
 from app.networks.guest_access import GuestNetwork, GuestWifiQr, list_guest_networks, guest_wifi_qr
 from .guest import sessions, TTL
 from .provider import OpenRouterProvider, ChatProviderError, ChatProviderNotConfigured
@@ -46,8 +47,8 @@ def get_guest_provider(settings: Settings = Depends(get_settings)):
 
 
 @router.post("/sessions", response_model=GuestSessionCreated, status_code=201)
-def create_session():
-    return GuestSessionCreated(token=sessions.create())
+def create_session(request: Request):
+    return GuestSessionCreated(token=sessions.create(client_peer(request.scope)))
 
 
 @router.delete("/session", status_code=204)
@@ -102,7 +103,7 @@ def identify(payload: GuestIdentification, token: str = Depends(guest_token), db
 
 
 # Recuperación verificada por correo, independiente del historial y del modelo.
-from fastapi import BackgroundTasks, Request
+from fastapi import BackgroundTasks
 from fastapi.responses import HTMLResponse
 from pydantic import EmailStr
 from app.networks.email_recovery import prepare_email, approve_and_reveal, build_recovery_mailer, recovery_origin, GENERIC_MESSAGE

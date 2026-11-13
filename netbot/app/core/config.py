@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import secrets
 from functools import lru_cache
 from urllib.parse import urlsplit
 from typing import Literal, Optional
@@ -9,6 +11,16 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+logger = logging.getLogger("netbot.config")
+_PUBLIC_PLACEHOLDERS = {"change-me-in-production", "replace-with-a-long-random-secret"}
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _plain_http_to_remote_host(url: str) -> bool:
+    parts = urlsplit(url.strip())
+    return parts.scheme.lower() == "http" and (parts.hostname or "") not in _LOCAL_HOSTS
 
 
 class Settings(BaseSettings):
@@ -21,14 +33,16 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Netbot"
-    environment: Literal["development", "test", "production"] = "development"
-    database_url: str = "sqlite:///./netbot.db"
-    jwt_secret_key: str = "change-me-in-production"
+    # Sin declarar el entorno rigen los controles de producción: olvidarlo no los apaga.
+    environment: Literal["development", "test", "production"] = "production"
+    database_url: str = Field("sqlite:///./netbot.db", repr=False)
+    jwt_secret_key: str = Field("", repr=False)
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    session_absolute_days: int = Field(30, ge=1, le=365)
     admin_email: Optional[str] = None
-    admin_password: Optional[str] = None
+    admin_password: Optional[str] = Field(None, repr=False)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
 
     # --- Monitoreo (Épica 002) ---
@@ -67,6 +81,7 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str | None = None
     openrouter_timeout_seconds: float = Field(20.0, gt=0)
+    openrouter_data_collection: Literal["allow", "deny"] = "deny"
     chat_max_message_chars: int = Field(2000, ge=1)
     chat_max_history_chars: int = Field(8000, ge=0)
     chat_max_history_turns: int = Field(8, ge=0)
@@ -86,6 +101,8 @@ class Settings(BaseSettings):
     ticket_criticality_rules_json: Optional[str] = None
     # Dispositivos afectados a la vez desde los que se sube un nivel de criticidad.
     ticket_mass_incident_devices: int = Field(3, ge=2)
+    # Cada ticket notifica a todo el equipo: una cuenta no debe poder inundarlo.
+    ticket_create_limit_per_10min: int = Field(20, ge=1)
     # JSON {"critica": 15, ...}: minutos máximos sin atención por criticidad.
     ticket_attention_minutes_json: Optional[str] = None
     notification_email_enabled: bool = True
@@ -127,6 +144,8 @@ class Settings(BaseSettings):
     unifi_base_url: Optional[str] = None  # direct: https://<consola>
     unifi_console_id: Optional[str] = None  # connector: ID en Site Manager
     unifi_api_key: Optional[SecretStr] = None
+    # Solo en el entorno del ejecutor CLI: el proceso web no necesita permiso de escritura.
+    unifi_write_api_key: Optional[SecretStr] = None
     unifi_site: Optional[str] = None  # UUID o internalReference; opcional con un solo sitio
     unifi_verify_tls: bool = True
     unifi_ca_bundle: Optional[str] = None
@@ -141,6 +160,7 @@ class Settings(BaseSettings):
         "unifi_base_url",
         "unifi_console_id",
         "unifi_api_key",
+        "unifi_write_api_key",
         "unifi_site",
         "unifi_ca_bundle",
         "ticket_criticality_rules_json",
@@ -182,12 +202,31 @@ class Settings(BaseSettings):
 
     # SQLite compartido por workers en este equipo, separado de datos de negocio.
     security_rate_limit_path: str = "netbot-rate-limits.db"
+    # Tope de cuerpo en rutas JSON sin regla propia. Se aplica antes de autenticar.
+    max_json_body_bytes: int = Field(262_144, ge=65_536, le=4_194_304)
+    # Llamadas diarias al proveedor LLM: acotan el costo aunque cambien las IP de origen.
+    guest_llm_daily_budget: int = Field(2000, ge=1)
+    chat_llm_daily_budget: int = Field(5000, ge=1)
 
     @model_validator(mode="after")
     def _production_security(self) -> "Settings":
+        if self.environment != "production" and (not self.jwt_secret_key or self.jwt_secret_key in _PUBLIC_PLACEHOLDERS):
+            # Un valor publicado en el repositorio nunca firma tokens, tampoco en desarrollo.
+            self.jwt_secret_key = secrets.token_urlsafe(64)
+            logger.warning("JWT_SECRET_KEY no configurada: se usa una clave temporal de este proceso.")
         if self.environment.lower() in {"production", "prod"}:
-            if len(self.jwt_secret_key) < 64 or self.jwt_secret_key == "change-me-in-production":
-                raise ValueError("JWT_SECRET_KEY requiere al menos 64 caracteres aleatorios")
+            if (len(self.jwt_secret_key) < 64 or len(set(self.jwt_secret_key)) < 16
+                    or self.jwt_secret_key in _PUBLIC_PLACEHOLDERS):
+                raise ValueError("JWT_SECRET_KEY requiere al menos 64 caracteres aleatorios. "
+                                 "Sin ENVIRONMENT=development rigen las reglas de producción.")
+            if self.admin_password and len(self.admin_password) < 12:
+                raise ValueError("ADMIN_PASSWORD requiere al menos 12 caracteres")
+            if _plain_http_to_remote_host(self.public_app_url):
+                raise ValueError("PUBLIC_APP_URL requiere HTTPS en producción")
+            if self.smtp_host and not self.smtp_starttls and self.smtp_host not in _LOCAL_HOSTS:
+                raise ValueError("SMTP remoto requiere STARTTLS en producción")
+            if self.database_url.startswith("sqlite"):
+                logger.warning("Producción sobre SQLite: sin separación de roles ni privilegios de PostgreSQL.")
             if not self.unifi_verify_tls or not self.opnsense_verify_tls:
                 raise ValueError("Producción requiere verificación TLS")
             for url in (self.unifi_base_url, self.opnsense_base_url, self.unifi_api_base_url):
@@ -197,8 +236,8 @@ class Settings(BaseSettings):
                 if urlsplit(self.guest_email_recovery_public_url).scheme != "https" or not self.smtp_starttls:
                     raise ValueError("La recuperación por correo requiere HTTPS y SMTP STARTTLS")
             for origin in self.cors_origins.split(","):
-                if origin.strip() in {"null", "*"}:
-                    raise ValueError("CORS requiere orígenes explícitos en producción")
+                if origin.strip() in {"null", "*"} or _plain_http_to_remote_host(origin):
+                    raise ValueError("CORS requiere orígenes HTTPS explícitos en producción")
         return self
 
     @property

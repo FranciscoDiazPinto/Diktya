@@ -1,7 +1,7 @@
-from app.core.errors import Unauthenticated, AccessDenied, NotFound, Conflict
-from datetime import datetime, timezone
+from app.core.errors import Unauthenticated, AccessDenied, NotFound, Conflict, RateLimited
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -77,10 +77,17 @@ def _get_ticket(db: Session, user: User, ticket_id: int) -> Ticket:
     return ticket
 
 
-def _same_request(ticket: Ticket, payload: TicketCreate) -> Ticket:
+def _same_request(ticket: Ticket, payload: TicketCreate | TicketManualCreate) -> Ticket:
     if (ticket.network_id, ticket.summary, ticket.description) != (payload.network_id, payload.summary, payload.description):
         raise Conflict("La clave de solicitud ya se utilizó con otros datos.")
     return ticket
+
+
+def _enforce_creation_quota(db: Session, user: User, settings: Settings) -> None:
+    since = datetime.now(timezone.utc) - timedelta(minutes=10)
+    recent = db.scalar(select(func.count()).select_from(Ticket).where(Ticket.created_by_id == user.id, Ticket.created_at >= since))
+    if recent >= settings.ticket_create_limit_per_10min:
+        raise RateLimited("Demasiados tickets en poco tiempo. Espera unos minutos.")
 
 
 async def create_ticket(db: Session, user: User, payload: TicketCreate,
@@ -89,6 +96,7 @@ async def create_ticket(db: Session, user: User, payload: TicketCreate,
     existing = db.scalar(select(Ticket).where(Ticket.created_by_id == user.id, Ticket.request_key == str(payload.request_key)))
     if existing:
         return TicketRead.model_validate(_same_request(existing, payload))
+    _enforce_creation_quota(db, user, settings)
     snapshot = await network_status(db, user, payload.network_id, monitoring, settings)
     authorize(db, user, Permission.TICKETS_CREATE_OWN, payload.network_id)
     now = datetime.now(timezone.utc)
@@ -127,9 +135,11 @@ async def create_manual_ticket(db: Session, user: User, payload: TicketManualCre
     if Permission.TICKETS_MANAGE not in permissions:
         require_user_permission(db, user, Permission.TICKETS_MANAGE_ASSIGNED)
     key = str(payload.request_key)
-    existing = db.scalar(select(Ticket).where(Ticket.created_by_id == user.id, Ticket.request_key == key))
+    # La idempotencia no entrega un ticket que la cuenta ya no puede consultar.
+    existing = db.scalar(_ticket_query(db, user).where(Ticket.created_by_id == user.id, Ticket.request_key == key))
     if existing:
-        return TicketRead.model_validate(existing)
+        return TicketRead.model_validate(_same_request(existing, payload))
+    _enforce_creation_quota(db, user, settings)
     snapshot = None
     if payload.network_id is not None:
         authorize(db, user, Permission.TICKETS_CREATE_OWN, payload.network_id)

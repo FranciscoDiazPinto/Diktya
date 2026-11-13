@@ -26,6 +26,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     login_locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_login_peer: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     roles: Mapped[list["Role"]] = relationship(secondary=user_roles, back_populates="users")
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -49,6 +50,7 @@ class RefreshToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    session_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     user: Mapped[User] = relationship(back_populates="refresh_tokens")
 
 

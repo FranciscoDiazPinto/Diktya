@@ -75,6 +75,8 @@ class SsidPlanService:
         self.db.add(scope); self.db.flush()
         self.db.execute(delete(WifiScopeGrant).where(WifiScopeGrant.scope_id == scope.id))
         self.db.add_all([WifiScopeGrant(scope_id=scope.id, user_id=i) for i in sorted(set(payload.user_ids))])
+        record_event(self.db, 'wifi.scope.saved', actor_id=actor.id,
+                     details={'scope_id': scope.id, 'site_id': scope.site_id, 'user_ids': sorted(set(payload.user_ids))})
         self.db.commit()
         return {'id':scope.id, **payload.model_dump()}
 
@@ -418,7 +420,10 @@ class SsidPlanService:
         plan=SsidPlan(id=str(uuid4()),owner_id=actor.id,scope_id=scope_id,status='preview',
                       source='mock' if options['simulated'] else 'unifi', fingerprint=fingerprint,revision=revision,
                       rows=rows,selection=[],created_at=now,expires_at=now+timedelta(seconds=self.settings.csv_preview_ttl_seconds))
-        self.db.add(plan); self.db.commit()
+        self.db.add(plan)
+        record_event(self.db, 'ssid.plan.prepared', actor_id=actor.id,
+                     details={'plan_id': plan.id, 'scope_id': scope_id, 'revision': revision})
+        self.db.commit()
         return self.read(plan)
 
     async def prepare(self, actor, proposal):
@@ -498,6 +503,8 @@ class SsidPlanService:
             selection=payload.row_numbers,confirmed_at=utc_now()),execution_options={'synchronize_session':False})
         if result.rowcount!=1:
             self.db.rollback(); raise Conflict('Otra solicitud modificó el plan. Recarga su estado.')
+        record_event(self.db, 'ssid.plan.confirmed', actor_id=actor.id,
+                     details={'plan_id': plan_id, 'revision': payload.revision, 'rows': payload.row_numbers})
         self.db.commit(); self.db.refresh(plan)
         return self.read(plan)
 
@@ -506,6 +513,7 @@ class SsidPlanService:
         result=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan.id,SsidPlan.status=='preview').values(status='cancelled'),execution_options={'synchronize_session':False})
         if result.rowcount!=1:
             self.db.rollback(); raise Conflict('Un plan confirmado no puede cancelarse como vista previa.')
+        record_event(self.db, 'ssid.plan.cancelled', actor_id=actor.id, details={'plan_id': plan_id})
         self.db.commit(); self.db.refresh(plan)
         return self.read(plan)
 
@@ -543,8 +551,13 @@ class SsidPlanService:
         claimed=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan_id,SsidPlan.status=='confirmed',SsidPlan.expires_at>utc_now()).values(status='executing'),execution_options={'synchronize_session':False})
         if claimed.rowcount!=1:
             self.db.rollback(); raise Conflict('El plan fue tomado por otro ejecutor.')
-        self.db.commit(); self.db.refresh(plan)
+        def trace(outcome):
+            record_event(self.db, 'ssid.plan.executed', actor_id=actor.id, source='worker',
+                         outcome='success' if outcome == 'completed' else 'failure',
+                         details={'plan_id': plan_id, 'status': outcome, 'ssids': [r['ssid'] for r in results]})
         results=[]
+        record_event(self.db, 'ssid.plan.claimed', actor_id=actor.id, source='worker', details={'plan_id': plan_id})
+        self.db.commit(); self.db.refresh(plan)
         scope_revision=digest([scope.site_id,scope.resources])
         def reauthorize():
             active=self.scope(actor,plan.scope_id,Permission.CHANGES_EXECUTE)
@@ -561,15 +574,16 @@ class SsidPlanService:
                 results[-1]['status']='verified_configuration' if verified else 'uncertain'
                 if not verified:
                     # No borrar/reintentar: otra configuración puede haber cambiado.
-                    plan.status='uncertain';plan.execution_results=list(results);self.db.commit()
+                    plan.status='uncertain';plan.execution_results=list(results);trace('uncertain');self.db.commit()
                     return self.read(plan)
             except Exception:
                 # No guardar excepción/cuerpo externo: puede contener secretos del proveedor.
                 results.append({'ssid':proposal.ssid,'status':'uncertain'})
                 self.db.rollback()
-                plan=self.db.get(SsidPlan,plan_id);plan.status='uncertain';plan.execution_results=list(results);self.db.commit()
+                plan=self.db.get(SsidPlan,plan_id);plan.status='uncertain';plan.execution_results=list(results);trace('uncertain');self.db.commit()
                 return self.read(plan)
         plan.status='completed';plan.execution_results=list(results)
         self.db.execute(delete(WifiWriteLease).where(WifiWriteLease.plan_id==plan_id))
+        trace('completed')
         self.db.commit()
         return self.read(plan)

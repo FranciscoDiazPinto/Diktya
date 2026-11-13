@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.auth.access import require_user_permission
+from app.auth.audit import record_event
 from app.auth.service import user_exists
 from app.auth.permissions import Permission
 from .models import Network, NetworkAssignment
@@ -23,6 +24,8 @@ def create_network(payload: NetworkCreate, db: Session, actor: User) -> NetworkR
     network = Network(**payload.model_dump())
     db.add(network)
     try:
+        db.flush()
+        record_event(db, "network.created", actor_id=actor.id, details={"network_id": network.id})
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -37,6 +40,7 @@ def assign_network(network_id: int, user_id: int, db: Session, actor: User) -> N
         raise NotFound("Red o usuario no encontrado.")
     if not db.get(NetworkAssignment, (network_id, user_id)):
         db.add(NetworkAssignment(network_id=network_id, user_id=user_id))
+        record_event(db, "network.assigned", actor_id=actor.id, target_id=user_id, details={"network_id": network_id})
         try:
             db.commit()
         except IntegrityError:
@@ -50,4 +54,5 @@ def unassign_network(network_id: int, user_id: int, db: Session, actor: User) ->
     assignment = db.get(NetworkAssignment, (network_id, user_id))
     if assignment:
         db.delete(assignment)
+        record_event(db, "network.unassigned", actor_id=actor.id, target_id=user_id, details={"network_id": network_id})
         db.commit()
