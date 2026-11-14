@@ -97,7 +97,7 @@ services:
     profiles: ["worker"]
 
   proxy:
-    image: nginx:1.27-alpine
+    image: nginx:1.29-alpine
     restart: unless-stopped
     environment:
       NETBOT_SERVER_NAME: ${NETBOT_SERVER_NAME:?Configure el nombre DNS del equipo}
