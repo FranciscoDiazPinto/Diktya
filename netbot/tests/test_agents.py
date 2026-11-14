@@ -173,3 +173,73 @@ def test_changes_cli_keeps_working_without_loading_the_http_application():
         cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True,
         env=dict(os.environ, DATABASE_URL="sqlite://", MONITORING_PROVIDER="mock"))
     assert result.returncode == 0, result.stderr
+
+
+def test_end_to_end_vlan_change_from_request_to_verified_result(client, db_session, admin_user, login):
+    """HU018: solicitud -> confirmación explícita -> worker -> verificación -> trazas, por las fronteras reales."""
+    from sqlalchemy.orm import sessionmaker
+    from app.changes.dependencies import get_ssid_service
+    from app.changes.restart_service import DeviceRestartService
+    from app.changes.ssid_service import SsidPlanService
+    from app.main import app
+    from app.auth.security import hash_password
+
+    role = db_session.scalar(select(Role).where(Role.name == "tecnico"))
+    tech = User(email="e2e-tech@example.com", hashed_password=hash_password("test-password-e2e"), roles=[role])
+    db_session.add(tech)
+    db_session.commit()
+    _, admin = login("admin@example.com", "admin-password")
+    _, headers = login("e2e-tech@example.com", "test-password-e2e")
+    scope = client.post("/api/v1/changes/wifi-scopes", headers=admin, json={
+        "name": "Feria", "site_id": "demo-site", "event_name": "Feria", "ap_ids": ["ap-1"],
+        "networks": [{"id": "network-30", "parent_interface": "igc1", "tag": 30}],
+        "security_profiles": ["perfil"], "user_ids": [tech.id]}).json()["id"]
+
+    live = Settings(_env_file=None, unifi_inventory_mode="api", unifi_write_enabled=True, unifi_api_contract="10.6.106")
+    network = {"value": "network-20"}
+
+    async def update_vlan(site, broadcast, current, target, authorize):
+        authorize()
+        network["value"] = target
+
+    writer = SimpleNamespace(update_vlan=AsyncMock(side_effect=update_vlan),
+                             verify_vlan=AsyncMock(side_effect=lambda s, b, name, target: network["value"] == target))
+
+    def service(db):
+        plans = SsidPlanService(db, live, monitoring=None, writer=writer)
+        plans.options = AsyncMock(return_value=({"simulated": False, "networks": [{"id": "network-30", "tag": 30}]},
+                                                [{"id": "ssid-1", "ssid": "Expositores"}], "fingerprint"))
+        plans.inventory.read_broadcast = AsyncMock(side_effect=lambda site, broadcast: {
+            "id": "ssid-1", "ssid": "Expositores", "network_id": network["value"]})
+        return plans
+
+    app.dependency_overrides[get_ssid_service] = lambda: service(db_session)
+    proposal = {"scope_id": scope, "broadcast_id": "ssid-1", "network_id": "network-30", "purpose": "Mover expositores"}
+    plan = client.post("/api/v1/changes/ssid-vlan-change-plans", headers=headers, json=proposal).json()
+    assert plan["status"] == "preview" and plan["executed"] is False
+
+    factory = sessionmaker(bind=db_session.get_bind(), expire_on_commit=False)
+    worker = ChangeWorker(factory, live, monitoring=None)
+
+    def composed(db):
+        plans = service(db)
+        plans.incidents = worker._report
+        return plans, DeviceRestartService(db, live, writer=writer, incidents=worker._report)
+    worker._services = composed
+    asyncio.run(worker.run_cycle())
+    writer.update_vlan.assert_not_awaited()  # sin confirmación humana el worker no ejecuta nada
+
+    confirmed = client.post(f"/api/v1/changes/ssid-vlan-change-plans/{plan['id']}/confirm", headers=headers,
+                            json={"revision": plan["revision"]})
+    assert confirmed.status_code == 200 and confirmed.json()["status"] == "confirmed"
+    asyncio.run(worker.run_cycle())
+    asyncio.run(worker.run_cycle())  # una aprobación, una sola ejecución
+    assert writer.update_vlan.await_count == 1 and network["value"] == "network-30"
+
+    result = client.get(f"/api/v1/changes/ssid-vlan-change-plans/{plan['id']}", headers=headers).json()
+    assert result["status"] == "completed" and result["executed"] is True
+    trail = [item["action"] for item in client.get("/api/v1/audit/mine", headers=headers).json()["items"]]
+    for action in ("requested", "confirmed", "started", "completed"):
+        assert f"wifi.ssid_vlan_change.{action}" in trail
+    traces = client.get(f"/api/v1/agents/events?correlation_id=change:vlan:{plan['id']}", headers=admin).json()
+    assert [(t["agent_id"], t["event_type"], t["outcome"]) for t in traces] == [("changes", "change.vlan.executed", "success")]

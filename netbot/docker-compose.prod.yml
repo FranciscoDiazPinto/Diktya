@@ -1,0 +1,128 @@
+# Despliegue local en el rack: proxy TLS + API + worker de cambios + PostgreSQL.
+#
+#   cp deploy/production.env.example .env          # completar; nunca versionar
+#   docker compose -f docker-compose.prod.yml build
+#   docker compose -f docker-compose.prod.yml run --rm migrate
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# El desarrollo local sigue usando docker-compose.yml (solo PostgreSQL).
+# Contraseñas: generarlas con `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+# para que sean válidas dentro de una URL sin codificar.
+
+x-app: &app
+  build: .
+  image: netbot:local
+  restart: unless-stopped
+  env_file:
+    - .env
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  networks:
+    - netbot
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-netbot}
+      POSTGRES_USER: ${POSTGRES_USER:?Configure POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure a random POSTGRES_PASSWORD}
+      NETBOT_APP_PASSWORD: ${NETBOT_APP_PASSWORD:?Configure a different random application password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/10-app-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?Configure POSTGRES_USER} -d ${POSTGRES_DB:-netbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - netbot
+
+  # Migraciones con el propietario del esquema. Se ejecuta a mano antes de cada versión:
+  # la API no migra al arrancar y se niega a iniciar con un esquema desactualizado.
+  migrate:
+    <<: *app
+    restart: "no"
+    profiles: ["tools"]
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-netbot}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    environment:
+      ENVIRONMENT: production
+      # Rol limitado: sin propiedad del esquema ni permisos sobre la auditoría.
+      DATABASE_URL: postgresql+psycopg://netbot_app:${NETBOT_APP_PASSWORD}@db:5432/${POSTGRES_DB:-netbot}
+      SECURITY_RATE_LIMIT_PATH: /var/lib/netbot/rate-limits.db
+      # El proceso expuesto no ejecuta cambios ni conoce la clave de escritura.
+      UNIFI_WRITE_API_KEY: ""
+    volumes:
+      - netbot_state:/var/lib/netbot
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Ejecutor de cambios aprobados. Sin puertos publicados. La clave de escritura UniFi
+  # (UNIFI_WRITE_API_KEY) se define solo en .env.worker.
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.agents.cli", "--loop"]
+    env_file:
+      - .env
+      - path: .env.worker
+        required: false
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://netbot_app:${NETBOT_APP_PASSWORD}@db:5432/${POSTGRES_DB:-netbot}
+      SECURITY_RATE_LIMIT_PATH: /var/lib/netbot/rate-limits.db
+    healthcheck:
+      disable: true
+    volumes:
+      - netbot_state:/var/lib/netbot
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["worker"]
+
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    environment:
+      NETBOT_SERVER_NAME: ${NETBOT_SERVER_NAME:?Configure el nombre DNS del equipo}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/netbot.compose.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./frontend:/opt/netbot/frontend:ro
+      # fullchain.pem y privkey.pem del sitio; nunca se versionan.
+      - ./deploy/tls:/etc/netbot/tls:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      netbot:
+        # IP fija: es la única de la que la API acepta cabeceras de proxy.
+        ipv4_address: 172.28.0.10
+
+networks:
+  netbot:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  postgres_data:
+  netbot_state:

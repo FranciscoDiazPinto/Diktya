@@ -92,7 +92,10 @@ def test_production_starts_on_migrated_schema_without_changing_tables(tmp_path):
     from app.auth.roles import RoleName
 
     url = f"sqlite:///{tmp_path / 'migrated.db'}"
-    result = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=ROOT,
+    # Se ejecuta fuera del proyecto: el .env local de quien desarrolla no participa de la
+    # validación de producción ni puede hacerla fallar.
+    result = subprocess.run([sys.executable, "-m", "alembic", "-c", str(ROOT / "alembic.ini"), "upgrade", "head"],
+                            cwd=tmp_path,
                             env=dict(os.environ, DATABASE_URL=url, ENVIRONMENT="production", MONITORING_PROVIDER="mock"),
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

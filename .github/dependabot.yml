@@ -8,6 +8,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  - package-ecosystem: docker
+    directory: /netbot
+    schedule:
+      interval: weekly
   - package-ecosystem: docker-compose
     directory: /netbot
     schedule:

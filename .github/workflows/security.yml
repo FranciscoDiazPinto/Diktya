@@ -27,6 +27,33 @@ jobs:
       - run: python -m pytest -q
       - run: node --test frontend/tests/*.test.mjs
 
+  despliegue:
+    # Los artefactos de despliegue no se ejecutan en las pruebas: aquí se construyen y validan.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: netbot
+    env:
+      POSTGRES_USER: ci_owner
+      POSTGRES_PASSWORD: ci-only-owner
+      NETBOT_APP_PASSWORD: ci-only-app
+      NETBOT_SERVER_NAME: netbot.example.internal
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t netbot:ci .
+      - name: Validar Compose de producción
+        run: |
+          touch .env
+          docker compose -f docker-compose.prod.yml --profile worker --profile tools config --quiet
+      - name: Validar plantilla nginx
+        run: |
+          mkdir -p /tmp/tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$NETBOT_SERVER_NAME" \
+            -keyout /tmp/tls/privkey.pem -out /tmp/tls/fullchain.pem
+          docker run --rm --add-host api:127.0.0.1 -e NETBOT_SERVER_NAME \
+            -v "$PWD/deploy/nginx/netbot.compose.conf.template:/etc/nginx/templates/default.conf.template:ro" \
+            -v /tmp/tls:/etc/netbot/tls:ro nginx:1.27-alpine nginx -t
+
   analisis:
     runs-on: ubuntu-latest
     steps:

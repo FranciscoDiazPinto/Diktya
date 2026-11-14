@@ -1,0 +1,21 @@
+# Nada local entra a la imagen: ni secretos, ni bases, ni entornos virtuales.
+.env
+.env.*
+**/.env
+**/.env.*
+*.db
+*.db-wal
+*.db-shm
+*.pem
+*.key
+deploy/tls/
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+tests/
+frontend/
+docs/
+*.md
+docker-compose*.yml
