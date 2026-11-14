@@ -9,15 +9,19 @@ Asistente para consultar y gestionar soporte de redes de eventos, con permisos p
 - Monitoreo de solo lectura mediante OPNsense y UniFi Network o datos mock: inventario persistido, disponibilidad, alertas, planos de cobertura y dashboard. Falta validarlo contra equipos reales.
 - Entrega protegida de acceso Wi-Fi fuera del modelo y del historial.
 - Tickets internos persistentes, automáticos desde incidentes, con criticidad, notificaciones y escalamiento. El correo requiere SMTP y no se probó contra un servidor real.
-- Reservas VLAN locales con confirmación. No aprovisionan VLANs ni SSIDs en la infraestructura.
+- Reservas VLAN locales con confirmación, vencimiento y paso a asignada al verificarse el cambio.
+- Cambios controlados sobre UniFi: creación de SSID (individual o CSV), cambio de VLAN de un SSID y reinicio de equipos. Cada uno requiere propuesta, confirmación explícita y un worker separado que ejecuta, verifica y, si falla, restaura o abre un ticket. Deshabilitados por defecto.
+- Orquestador de agentes con trazas, estado visible y aislamiento de fallas; auditoría de solicitudes, confirmaciones y resultados.
+- Proveedor del asistente seleccionable (OpenRouter o Claude directo) con verificación de conexión.
+- Despliegue en contenedores con proxy TLS (`netbot/docker-compose.prod.yml`).
 
-Pendientes: reinicio/adopción de APs, aprovisionamiento SSID/VLAN, trabajos durables, verificación/compensación, administración por chat, y aprovisionamiento CSV. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
+Todo lo anterior está probado con controladores simulados. **Falta validarlo contra equipos reales** antes de habilitar escrituras: versión del controlador, contrato de actualización de SSID, reinicio y lectura de monitoreo. Siguen pendientes: MFA, edición de SSID en lote, creación de VLAN/DHCP/reglas en OPNsense (fuera de alcance), plazos de retención y la migración del frontend a React que exige el DoD de HU005. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
 
 ## Desarrollo y arquitectura
 
 Leer [AGENTS.md](AGENTS.md) y la [guía modular vigente](netbot/docs/arquitectura-modular.md) antes de modificar código. Las instrucciones para IA en [CLAUDE.md](CLAUDE.md) apuntan a la misma guía compartida.
 
-El proyecto ejecutable está en `netbot/`. Es un monolito modular Python/FastAPI y SQLAlchemy, con PostgreSQL para despliegue y SQLite para desarrollo/pruebas. El frontend actual es HTML/CSS y módulos ES, sin compilación ni React. OpenRouter se usa únicamente desde el backend. Docker Compose levanta PostgreSQL; API y frontend se arrancan por separado.
+El proyecto ejecutable está en `netbot/`. Es un monolito modular Python/FastAPI y SQLAlchemy, con PostgreSQL para despliegue y SQLite para desarrollo/pruebas. El frontend actual es HTML/CSS y módulos ES, sin compilación ni React. El proveedor del asistente se usa únicamente desde el backend. En desarrollo, Docker Compose levanta PostgreSQL y la API y el frontend se arrancan por separado; `docker-compose.prod.yml` levanta el conjunto completo detrás de un proxy TLS.
 
 Consultar [inicio local, migraciones y pruebas](netbot/README.md), [índice de documentación](netbot/docs/README.md) y [soporte al cliente](netbot/docs/soporte-cliente.md).
 

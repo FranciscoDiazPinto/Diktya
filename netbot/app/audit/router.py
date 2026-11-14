@@ -19,6 +19,15 @@ def list_audit(response: Response, filters: Annotated[AuditFilters, Query()],
     return service.list_entries(db, actor, filters, limit=limit, offset=offset)
 
 
+@router.get("/mine", response_model=AuditPage)
+def list_own_audit(response: Response, filters: Annotated[AuditFilters, Query()],
+                   limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0),
+                   db: Session = Depends(get_db), actor: User = Depends(require_permission("changes:request"))):
+    """Acciones propias del técnico (solicitudes, confirmaciones y resultados de sus cambios)."""
+    response.headers.update(NO_STORE)
+    return service.list_own_entries(db, actor, filters, limit=limit, offset=offset)
+
+
 @router.get("/export")
 def export_audit(filters: Annotated[AuditFilters, Query()], db: Session = Depends(get_db),
                  actor: User = Depends(require_permission("audit:read"))):

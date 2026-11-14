@@ -9,6 +9,7 @@ from email.message import EmailMessage
 from urllib.parse import urlsplit
 
 from sqlalchemy import delete, select, update
+from app.auth.audit import record_event
 from app.core.errors import NotFound, ServiceUnavailable
 from .support_models import NetworkSupportConfig, WifiEmailRecovery
 from .recipients import matching_networks, normalize_contact
@@ -51,6 +52,11 @@ def recovery_origin(settings):
     return f'{base.scheme}://{base.netloc}'
 
 
+def purge_expired(db, now):
+    """Sin solicitudes nuevas, los correos de enlaces vencidos no deben permanecer."""
+    return db.execute(delete(WifiEmailRecovery).where(WifiEmailRecovery.expires_at <= now)).rowcount or 0
+
+
 def eligible_networks(db, email):
     return [n for n in matching_networks(db, ('email', email))
             if expositor_network(n, db.get(NetworkSupportConfig, n.id))]
@@ -75,6 +81,7 @@ def prepare_email(db, settings, email, mailer):
     if networks:
         db.add(WifiEmailRecovery(id=secrets.token_urlsafe(24), token_hash=hashlib.sha256(raw.encode()).hexdigest(),
                                 email=email, network_ids=[n.id for n in networks], expires_at=now + timedelta(minutes=5)))
+        record_event(db, 'wifi.recovery.requested', details={'network_ids': [n.id for n in networks]}, source='guest')
     db.commit()
     def deliver():
         if not networks:
@@ -115,5 +122,7 @@ def approve_and_reveal(db, settings, raw):
     if claimed.rowcount != 1:
         db.rollback()
         raise error
+    # Sin destinatario: el correo es dato personal y el enlace ya se consumió.
+    record_event(db, 'wifi.recovery.revealed', details={'network_ids': sorted(n.id for n in networks)}, source='guest')
     db.commit()
     return result

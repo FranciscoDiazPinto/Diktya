@@ -1,10 +1,10 @@
 """Propiedad, ámbito y persistencia de conversaciones, independientes del LLM."""
-from app.core.errors import AccessDenied, NotFound, Conflict
+from app.core.errors import AccessDenied, NotFound, Conflict, RateLimited
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -13,6 +13,9 @@ from app.core.config import Settings
 from app.networks.access import accessible_network_ids, assert_network_access, authorized_network_data
 from .models import ChatMessage, Conversation
 from .schemas import ChatTurn, ConversationCreate, ConversationRead, ConversationDetail, StoredMessageRead
+
+
+CONVERSATIONS_PER_10_MIN = 60
 
 
 def authorization_key(db: Session, user: User) -> str:
@@ -45,6 +48,11 @@ def owned_conversation(db: Session, user: User, conversation_id: str) -> Convers
 def new_conversation(db: Session, user: User, payload: ConversationCreate) -> Conversation:
     if payload.network_id is not None:
         assert_network_access(db, user, payload.network_id)
+    since = datetime.now(timezone.utc) - timedelta(minutes=10)
+    recent = db.scalar(select(func.count()).select_from(Conversation).where(
+        Conversation.user_id == user.id, Conversation.created_at >= since))
+    if recent >= CONVERSATIONS_PER_10_MIN:
+        raise RateLimited("Demasiadas conversaciones nuevas. Espera unos minutos.")
     conversation = Conversation(
         user_id=user.id, network_id=payload.network_id, title=payload.title,
         authorization_key=authorization_key(db, user),
@@ -54,12 +62,9 @@ def new_conversation(db: Session, user: User, payload: ConversationCreate) -> Co
     return conversation
 
 
-def network_context(db: Session, user: User, conversation: Conversation) -> list[dict]:
-    return [
-        n.model_dump()
-        for n in authorized_network_data(db, user)
-        if conversation.network_id is None or n.id == conversation.network_id
-    ]
+def network_context(db: Session, user: User, conversation: Conversation | None) -> list[dict]:
+    network_id = conversation.network_id if conversation else None
+    return [n.model_dump() for n in authorized_network_data(db, user) if network_id is None or n.id == network_id]
 
 
 def history_for_model(db: Session, conversation: Conversation, settings: Settings) -> list[ChatTurn]:

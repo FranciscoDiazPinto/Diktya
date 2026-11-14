@@ -8,7 +8,7 @@ from app.auth.models import User
 from app.core.config import Settings
 from .service import ChatService
 from .schemas import ChatMessageRequest, ChatMessageResponse, ChatSendRequest, ConversationCreate, normalize_chat_request
-from .storage import owned_conversation, new_conversation, history_for_model, network_context, persist_exchange
+from .storage import authorization_key, owned_conversation, new_conversation, history_for_model, network_context, persist_exchange
 from .policy import profile_for_user
 
 async def answer_message(db: Session, user: User, payload: ChatSendRequest,
@@ -16,19 +16,23 @@ async def answer_message(db: Session, user: User, payload: ChatSendRequest,
     try:
         require_user_permission(db, user, Permission.CHAT_USE)
         request = normalize_chat_request(ChatMessageRequest(message=payload.message), settings)
-        conversation = (owned_conversation(db, user, str(payload.conversation_id))
-                        if payload.conversation_id else new_conversation(db, user, ConversationCreate()))
-        version = conversation.version
-        key = conversation.authorization_key
+        conversation = owned_conversation(db, user, str(payload.conversation_id)) if payload.conversation_id else None
+        version = conversation.version if conversation else 0
+        key = conversation.authorization_key if conversation else authorization_key(db, user)
         if payload.version is not None and payload.version != version:
             raise Conflict("La conversación cambió. Recárgala antes de enviar otro mensaje.")
-        response = await chat_service.answer(
+        context = dict(
             message=request.message,
-            history=history_for_model(db, conversation, settings),
+            history=history_for_model(db, conversation, settings) if conversation else [],
             permissions=effective_permissions(user),
             networks=network_context(db, user, conversation),
             profile=profile_for_user(user),
         )
+        # Sin transacción abierta durante el LLM: decenas de segundos por consulta
+        # agotarían el pool y dejarían sin base al resto de usuarios.
+        db.rollback()
+        response = await chat_service.answer(**context)
+        conversation = conversation or new_conversation(db, user, ConversationCreate())
         new_version = persist_exchange(db, user, conversation, version, request.message, response.answer, key)
         return response.model_copy(update={"conversation_id": conversation.id, "version": new_version})
     except Exception:

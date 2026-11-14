@@ -12,7 +12,13 @@ DEFAULT_RULES = {
     "device_missing": "media",
     "source_unavailable": "critica",
     "source_degraded": "media",
+    "ssid_missing": "media",
+    "ssid_disabled": "media",
+    "vlan_missing": "media",
+    "vlan_disabled": "media",
     "verification_failed": "alta",
+    "restart_failed": "alta",
+    "agent_failed": "alta",
     "rollback_failed": "critica",
 }
 DEFAULT_ATTENTION_MINUTES = {"critica": 15, "alta": 30, "media": 120, "baja": 480}

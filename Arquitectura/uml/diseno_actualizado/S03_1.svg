@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1312" viewBox="0 0 1500 1312">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<rect x="10" y="10" width="1480" height="1292" rx="0" fill="white" stroke="#20333f" stroke-width="2"/>
+<text x="30" y="42" font-family="Arial,DejaVu Sans,sans-serif" font-size="25" text-anchor="start" fill="#20333f" font-weight="bold">sd S03_1</text>
+<rect x="10.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="110.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Monitoreo</text>
+<polyline points="110.0,132 110.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="266.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="366.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Fuentes de red</text>
+<polyline points="366.0,132 366.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="522.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="622.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Tickets</text>
+<polyline points="622.0,132 622.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="778.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="878.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Notificaciones</text>
+<polyline points="878.0,132 878.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1034.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1134.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Equipo técnico</text>
+<polyline points="1134.0,132 1134.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1290.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1390.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Auditoría</text>
+<polyline points="1390.0,132 1390.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="38" y="175" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">loop [muestreo periódico independiente del dashboard]</text>
+<polyline points="110.0,304 366.0,304" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="257" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Consultar fuentes y conservar observación con fecha</text>
+<polyline points="366.0,393 110.0,393" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="750" y="346" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Entregar estado, frescura o error de fuente</text>
+<polyline points="110.0,462 165.0,462 165.0,487 110.0,487" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="435" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Evaluar mantenimiento vigente y condición con evidencia</text>
+<text x="52" y="531" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">alt [caída esperada durante mantenimiento]</text>
+<polyline points="110.0,640 165.0,640 165.0,665 110.0,665" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="613" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Suprimir solo alarma esperada; no ocultar falla del controlador</text>
+<polyline points="39,689 1456,689" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="52" y="714" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">[incidente confirmado]</text>
+<polyline points="110.0,838 622.0,838" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="791" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Publicar incidente con agent_id y correlation_id</text>
+<polyline points="622.0,907 677.0,907 677.0,932 622.0,932" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="880" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Deduplicar y clasificar; Media y revisión si es inconcluyente</text>
+<polyline points="622.0,1016 878.0,1016" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="969" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Registrar avisos para técnicos y administradores activos</text>
+<polyline points="878.0,1105 1134.0,1105" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="1058" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Publicar aviso interno e intentar correo</text>
+<rect x="37" y="506" width="1422" height="668" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="52" y="1159" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+<rect x="23" y="150" width="1450" height="1113" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="38" y="1248" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+</svg>

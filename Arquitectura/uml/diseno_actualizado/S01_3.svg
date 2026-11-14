@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1312" viewBox="0 0 1500 1312">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<rect x="10" y="10" width="1480" height="1292" rx="0" fill="white" stroke="#20333f" stroke-width="2"/>
+<text x="30" y="42" font-family="Arial,DejaVu Sans,sans-serif" font-size="25" text-anchor="start" fill="#20333f" font-weight="bold">sd S01_3</text>
+<rect x="10.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="110.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Técnico</text>
+<polyline points="110.0,132 110.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="223.33333333333337" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="323.33333333333337" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Chat</text>
+<polyline points="323.33333333333337,132 323.33333333333337,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="436.66666666666674" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="536.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Cambios</text>
+<polyline points="536.6666666666667,132 536.6666666666667,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="650.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="750.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">UniFi</text>
+<polyline points="750.0,132 750.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="863.3333333333334" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="963.3333333333334" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">OPNsense</text>
+<polyline points="963.3333333333334,132 963.3333333333334,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1076.6666666666667" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1176.6666666666667" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Auditoría</text>
+<polyline points="1176.6666666666667,132 1176.6666666666667,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="1290.0" y="68" width="200" height="64" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1390.0" y="92" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">Tickets</text>
+<polyline points="1390.0,132 1390.0,1287" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="38" y="175" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">opt [fallo registrado en S01_2]</text>
+<polyline points="536.6666666666667,304 750.0,304" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="257" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Conciliar y restaurar configuración UniFi reversible afectada</text>
+<polyline points="536.6666666666667,393 963.3333333333334,393" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="346" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Conciliar y restaurar configuración OPNsense reversible afectada</text>
+<polyline points="536.6666666666667,462 591.6666666666667,462 591.6666666666667,487 536.6666666666667,487" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="435" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Releer ambas fuentes y verificar la restauración</text>
+<text x="52" y="531" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">alt [restauración verificada]</text>
+<polyline points="536.6666666666667,660 1176.6666666666667,660" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="613" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Registrar restaurado; liberar recursos que ya no estén asignados</text>
+<polyline points="39,689 1456,689" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="52" y="714" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="start" fill="#20333f">[restauración fallida o incierta]</text>
+<polyline points="536.6666666666667,838 1390.0,838" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="791" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Emitir incidente crítico; conservar exclusión para conciliación</text>
+<polyline points="536.6666666666667,927 1176.6666666666667,927" fill="none" stroke="#20333f" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="750" y="880" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Auditar fallo crítico y recursos pendientes</text>
+<rect x="37" y="506" width="1422" height="490" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="52" y="981" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+<rect x="23" y="150" width="1450" height="935" rx="0" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="38" y="1070" font-family="Arial,DejaVu Sans,sans-serif" font-size="19" text-anchor="start" fill="#20333f">fin</text>
+<polyline points="536.6666666666667,1194 323.33333333333337,1194" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="750" y="1147" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Devolver resultado final seguro y estado de la reserva</text>
+<polyline points="323.33333333333337,1283 110.0,1283" fill="none" stroke="#20333f" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<text x="750" y="1236" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f">Notificar resultado verificado, restaurado o pendiente</text>
+</svg>

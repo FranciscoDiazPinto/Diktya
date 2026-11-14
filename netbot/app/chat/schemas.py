@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import Settings
 from app.networks.support_schemas import WifiAccessAction
 from app.tickets.schemas import TicketProposal
-from app.changes.ssid_schemas import SsidProposal
+from app.changes.ssid_schemas import DeviceRestartProposal, SsidProposal, SsidVlanChangeProposal
 
 
 class ChatTurn(BaseModel):
@@ -81,6 +81,8 @@ class ChatMessageResponse(BaseModel):
     wifi_access_action: WifiAccessAction | None = None
     ticket_proposal: TicketProposal | None = None
     ssid_proposal: SsidProposal | None = None
+    vlan_change_proposal: SsidVlanChangeProposal | None = None
+    restart_proposal: DeviceRestartProposal | None = None
     conversation_id: str | None = None
     version: int | None = None
 

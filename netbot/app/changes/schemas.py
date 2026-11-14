@@ -29,6 +29,8 @@ class VlanReservationRead(StrictModel):
     created_at: datetime
     released_by_id: int | None
     released_at: datetime | None
+    expires_at: datetime | None = None
+    assigned_at: datetime | None = None
 
     @classmethod
     def from_model(cls, row):

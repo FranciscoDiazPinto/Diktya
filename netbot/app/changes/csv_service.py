@@ -20,7 +20,7 @@ from .csv_parser import parse_csv
 from .csv_schemas import CsvImportRead, CsvImportSummary, CsvRow, CsvResult, CsvConfirm
 from .models import CsvImport, VlanReservation
 from .schemas import VlanReservationRead
-from .service import build_reservation
+from .service import ACTIVE, build_reservation, expire_due
 
 
 def utc_now() -> datetime:
@@ -79,8 +79,9 @@ class CsvImportService:
         return response.source, inventory
 
     def _active_keys(self):
+        expire_due(self.db, utc_now())
         return set(self.db.execute(select(VlanReservation.parent_interface, VlanReservation.tag)
-                                   .where(VlanReservation.status == "reserved")).all())
+                                   .where(VlanReservation.status.in_(ACTIVE))).all())
 
     async def preview(self, content: bytes, filename: str, actor: User) -> CsvImportRead:
         self._authorize(actor)
@@ -171,7 +172,8 @@ class CsvImportService:
             reservations = []
             for number in selected:
                 data = rows[number].data
-                reservation = build_reservation(data, inventory[data.parent_interface, data.tag], actor.id, now)
+                reservation = build_reservation(data, inventory[data.parent_interface, data.tag], actor.id, now,
+                                                self.settings.vlan_reservation_ttl_hours)
                 self.db.add(reservation)
                 reservations.append((number, reservation))
             self.db.flush()

@@ -1,0 +1,85 @@
+name: seguridad
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: netbot_test
+          POSTGRES_USER: netbot_test
+          POSTGRES_PASSWORD: ci-only-isolated-db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U netbot_test -d netbot_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NETBOT_TEST_POSTGRES_URL: postgresql+psycopg://netbot_test:ci-only-isolated-db@127.0.0.1:5432/netbot_test
+    defaults:
+      run:
+        working-directory: netbot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pip install -r requirements.lock pytest pytest-asyncio
+      - run: python -m pytest -q
+      - run: node --test frontend/tests/*.test.mjs
+
+  despliegue:
+    # Los artefactos de despliegue no se ejecutan en las pruebas: aquí se construyen y validan.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: netbot
+    env:
+      POSTGRES_USER: ci_owner
+      POSTGRES_PASSWORD: ci-only-owner
+      NETBOT_APP_PASSWORD: ci-only-app
+      NETBOT_SERVER_NAME: netbot.example.internal
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t netbot:ci .
+      - name: Validar Compose de producción
+        run: |
+          touch .env
+          docker compose -f docker-compose.prod.yml --profile worker --profile tools config --quiet
+      - name: Validar plantilla nginx
+        run: |
+          mkdir -p /tmp/tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=$NETBOT_SERVER_NAME" \
+            -keyout /tmp/tls/privkey.pem -out /tmp/tls/fullchain.pem
+          docker run --rm --add-host api:127.0.0.1 -e NETBOT_SERVER_NAME \
+            -v "$PWD/deploy/nginx/netbot.compose.conf.template:/etc/nginx/templates/default.conf.template:ro" \
+            -v /tmp/tls:/etc/netbot/tls:ro nginx:1.27-alpine nginx -t
+
+  analisis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pip-audit bandit
+      - run: pip-audit -r netbot/requirements.lock --no-deps --disable-pip
+      - run: bandit -q -r netbot/app --severity-level medium
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

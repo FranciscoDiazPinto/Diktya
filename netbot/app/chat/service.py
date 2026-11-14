@@ -46,7 +46,13 @@ class ChatService:
         reservation_service: VlanReservationService | None = None,
         customer_support: CustomerSupport | None = None,
         ssid_context=None,
+        release_connection=None,
+        restart_service=None,
+        access_points=None,
     ) -> None:
+        self._restarts = restart_service
+        self._access_points = access_points
+        self._release_connection = release_connection or (lambda: None)
         self._settings = settings
         self._provider = provider
         self._monitoring = monitoring_service
@@ -80,10 +86,14 @@ class ChatService:
         access_action = None
         ticket_proposal = None
         ssid_proposal = None
+        vlan_change_proposal = None
+        restart_proposal = None
         seen_call_ids: set[str] = set()
         tool_rounds = 0
 
         while True:
+            # Las herramientas consultan la base entre rondas: soltarla antes de cada espera.
+            self._release_connection()
             completion = await self._provider.complete(messages=messages, tools=tools)
             if not completion.tool_calls:
                 answer = (completion.content or "").strip()
@@ -91,7 +101,9 @@ class ChatService:
                     raise ChatProviderError("OpenRouter no devolvió una respuesta de texto.")
                 return ChatMessageResponse(answer=answer, tools_used=tools_used,
                                            reservation_proposal=proposal, wifi_access_action=access_action,
-                                           ticket_proposal=ticket_proposal, ssid_proposal=ssid_proposal)
+                                           ticket_proposal=ticket_proposal, ssid_proposal=ssid_proposal,
+                                           vlan_change_proposal=vlan_change_proposal,
+                                           restart_proposal=restart_proposal)
 
             if tool_rounds >= self._settings.chat_max_tool_rounds:
                 raise ChatProviderError("OpenRouter superó el límite de consultas de monitoreo.")
@@ -113,6 +125,8 @@ class ChatService:
                         networks,
                         self._support,
                         self._ssid_context,
+                        self._restarts,
+                        self._access_points,
                     )
                 except ChatToolPermissionError:
                     queue_denial(permission="chat:tool", reason="tool_permission")
@@ -129,6 +143,10 @@ class ChatService:
                     access_action = WifiAccessAction.model_validate(result["action"])
                 if call.name == "prepare_ssid_creation" and result.get("proposal"):
                     ssid_proposal = result["proposal"]
+                if call.name == "prepare_vlan_change" and result.get("proposal"):
+                    vlan_change_proposal = result["proposal"]
+                if call.name == "prepare_device_restart" and result.get("proposal"):
+                    restart_proposal = result["proposal"]
                 if call.name == "prepare_support_ticket":
                     ticket_proposal = TicketProposal.model_validate(result["proposal"])
                 messages.append(
@@ -142,7 +160,7 @@ class ChatService:
 
     @staticmethod
     def _assistant_tool_message(completion: ProviderCompletion) -> dict[str, Any]:
-        return {
+        message = {
             "role": "assistant",
             "content": completion.content,
             "tool_calls": [
@@ -159,3 +177,7 @@ class ChatService:
                 for call in completion.tool_calls
             ],
         }
+        if completion.raw_content is not None:
+            # Solo lo interpreta el adaptador que lo produjo; vive únicamente en esta solicitud.
+            message["_provider_content"] = completion.raw_content
+        return message

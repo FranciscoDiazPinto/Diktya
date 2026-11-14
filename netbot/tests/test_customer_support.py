@@ -297,7 +297,7 @@ def test_default_chat_factory_binds_support_to_authenticated_user(client, suppor
 
     app.dependency_overrides.pop(get_chat_service)
     monkeypatch.setattr(chat_router, "get_settings", lambda: settings)
-    monkeypatch.setattr(chat_router, "OpenRouterProvider", lambda _: Provider())
+    monkeypatch.setattr(chat_router, "build_provider", lambda _: Provider())
     response = client.post("/api/v1/chat/messages", json={"message": "Dame el acceso"}, headers=headers["b"])
     assert response.status_code == (200 if own_network else 404), response.text
     if own_network:

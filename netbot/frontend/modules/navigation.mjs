@@ -7,9 +7,12 @@ const VIEWS = [
   {key:'clients',nav:'clients-nav',title:'Clientes',description:'Consulta y filtra las concesiones DHCP.',allow:p=>p.has('monitoring:read')},
   {key:'firewall',nav:'firewall-nav',title:'Firewall',description:'Estadísticas y eventos del firewall.',allow:p=>p.has('monitoring:read')},
   {key:'support-panel',nav:'support-nav',title:'Mi red',description:'Comprueba una red autorizada, recupera su acceso o solicita soporte.',allow:p=>p.has('networks:read:own')||p.has('wifi:access:read:own')||p.has('networks:manage')},
-  {key:'tickets-panel',nav:'tickets-nav',title:'Tickets',description:'Consulta el seguimiento y gestiona las solicitudes autorizadas.',allow:p=>['tickets:read:own','tickets:read:assigned','tickets:read','tickets:manage'].some(x=>p.has(x))},
-  {key:'provisioning',nav:'provisioning-nav',title:'Aprovisionamiento',description:'Revisa planes SSID, cargas CSV y reservas antes de confirmar.',allow:p=>p.has('changes:request')||p.has('vlan:reserve')},
-  {key:'audit',nav:'audit-nav',title:'Auditoría',description:'Trazabilidad de acciones y estados registrados.',allow:p=>p.has('audit:read')},
+  {key:'tickets-panel',nav:'tickets-nav',title:'Tickets',description:'Consulta el seguimiento y gestiona las solicitudes autorizadas.',allow:p=>['tickets:read:own','tickets:read:assigned','tickets:read','tickets:manage','monitoring:read'].some(x=>p.has(x))},
+  {key:'provisioning',nav:'provisioning-nav',title:'Aprovisionamiento',description:'Revisa planes SSID, cambios de VLAN, reinicios, cargas CSV y reservas antes de confirmar.',allow:p=>p.has('changes:request')||p.has('vlan:reserve')},
+  {key:'audit',nav:'audit-nav',title:'Auditoría',description:'Trazabilidad de acciones y estados registrados.',allow:p=>p.has('audit:read')||p.has('changes:request')},
+  {key:'users',nav:'users-nav',title:'Usuarios',description:'Crea, edita y desactiva cuentas y asigna sus roles.',allow:p=>p.has('users:manage')},
+  {key:'system',nav:'system-nav',title:'Estado del sistema',description:'Agentes en segundo plano y proveedor de IA.',allow:p=>p.has('monitoring:read')},
+  {key:'account',nav:'account-nav',title:'Mi cuenta',description:'Cambia tu contraseña de acceso.',allow:()=>true},
 ];
 const MONITORING_VIEWS=new Set(['overview','interfaces','clients','firewall']);
 

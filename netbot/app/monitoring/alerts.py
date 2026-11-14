@@ -7,12 +7,13 @@ resuelven solas. Lo no observado no resuelve nada: una fuente caída no "normali
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import MonitoredDevice, MonitoringAlert
+from .maintenance import devices_in_maintenance
+from .models import MonitoredDevice, MonitoredSsid, MonitoredVlan, MonitoringAlert
 from .schemas import AlertSeverity
 
 SEVERITY_RANK = {AlertSeverity.CRITICAL: 0, AlertSeverity.WARNING: 1}
@@ -28,9 +29,13 @@ class AlertCondition:
     device_name: str | None = None
 
 
-def device_conditions(db: Session, source: str) -> list[AlertCondition]:
+def device_conditions(db: Session, source: str, now: datetime | None = None) -> list[AlertCondition]:
+    """Un equipo en mantenimiento declarado no alerta por su caída esperada."""
+    maintenance = devices_in_maintenance(db, source, now) if now is not None else set()
     conditions = []
     for row in db.scalars(select(MonitoredDevice).where(MonitoredDevice.source == source)):
+        if row.external_id in maintenance:
+            continue
         key = f"device:{row.id}"
         if row.missing_since is not None:
             conditions.append(AlertCondition(f"{key}:missing", "device", AlertSeverity.WARNING,
@@ -42,6 +47,27 @@ def device_conditions(db: Session, source: str) -> list[AlertCondition]:
         elif row.state == "degraded":
             conditions.append(AlertCondition(f"{key}:degraded", "device", AlertSeverity.WARNING,
                                              f"{row.name} perdió parte de su conexión.", row.id, row.name))
+    return conditions
+
+
+def inactive_conditions(db: Session, source: str, category: str, now: datetime,
+                        window: timedelta) -> list[AlertCondition]:
+    """VLAN o SSID que dejó de estar activo de forma inesperada.
+
+    Se alerta la transición (desapareció del inventario o pasó a deshabilitado), acotada a
+    una ventana: una baja deliberada no debe quedar como alerta permanente.
+    """
+    model, label = (MonitoredSsid, "El SSID") if category == "ssid" else (MonitoredVlan, "La VLAN")
+    conditions = []
+    for row in db.scalars(select(model).where(model.source == source)):
+        name = row.name or (f"tag {row.tag}" if category == "vlan" else row.external_id)
+        if row.missing_since is not None:
+            if now - row.missing_since <= window:
+                conditions.append(AlertCondition(f"{category}:{row.id}:missing", category, AlertSeverity.WARNING,
+                                                 f"{label} {name} dejó de aparecer en el inventario de {source}."))
+        elif row.disabled_since is not None and now - row.disabled_since <= window:
+            conditions.append(AlertCondition(f"{category}:{row.id}:disabled", category, AlertSeverity.WARNING,
+                                             f"{label} {name} quedó deshabilitado en {source}."))
     return conditions
 
 

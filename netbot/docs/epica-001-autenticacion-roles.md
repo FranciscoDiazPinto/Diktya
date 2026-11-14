@@ -44,7 +44,9 @@ Permisos iniciales en `auth/roles.py`. Un rol personalizado creado por API es me
 | Reserva VLAN global | Sí | No | No | No |
 | Preparar / aprobar planes SSID | Sí | Ámbitos concedidos | No | No |
 | Ejecutar SSID | Ejecutor separado | Ejecutor separado, ámbito vigente | No | No |
-| Reiniciar equipos | Sin operación implementada | Sin operación implementada | No | No |
+| Proponer / aprobar reinicio | Cualquier equipo del sitio | Solo AP de sus ámbitos | No | No |
+| Conciliar trabajos detenidos | Sí | No | No | No |
+| Auditoría de acciones propias | Sí (completa) | Sí (`/audit/mine`) | No | No |
 
 La exclusión del técnico del monitoreo global y de la reserva VLAN global corresponde al alcance vigente de módulos 002/003 y debe resolverse contra sus propias historias. No se agregan capacidades de infraestructura para cerrar autenticación. Cuando exista reinicio, necesitará permiso específico y pruebas por tipo de equipo; el permiso genérico de cambios no autoriza reinicios críticos.
 
@@ -143,3 +145,12 @@ La migración `011_login_lockout` agrega contador y vencimiento en `users`: el e
 Se conserva la respuesta genérica HTTP 401 de credenciales inválidas para cuentas desconocidas, inactivas y temporalmente bloqueadas. No se publican contadores ni fechas de bloqueo en el perfil ni se guardan contraseñas en auditoría. Cada rechazo conserva `auth.login.failed`; la transición al bloqueo registra una sola vez `auth.login.locked` con la cuenta objetivo.
 
 `tests/test_login_lockout.py` cubre el quinto fallo, contraseña correcta durante bloqueo, vencimiento exacto, reinicio de conteo, aislamiento por cuenta, cuentas inactivas, persistencia entre sesiones de base de datos y fallos concurrentes. Las pruebas de migración verifican datos existentes y defaults de las columnas nuevas. Esto completa el comportamiento de bloqueo del backlog; la aceptación de HU001 por el equipo y los demás criterios de entrega se revisan por separado.
+
+
+## Remediación de auditoría y pantallas (14-11-2026)
+
+- Contraseñas nuevas o cambiadas: mínimo 12 caracteres. `POST /auth/password` exige la contraseña vigente y cierra todas las sesiones; la interfaz lo ofrece en **Mi cuenta**.
+- Bloqueo: el último origen con ingreso correcto conserva el acceso durante un bloqueo. `POST /admin/users/{id}/unlock` lo levanta; la vista **Usuarios** lo expone junto al alta, edición, roles y desactivación. Migración 015.
+- Sesiones: reutilizar un refresh ya rotado cierra todas las sesiones de la cuenta (`auth.refresh.reuse_detected`) y `SESSION_ABSOLUTE_DAYS` limita su vida total. Migración 016.
+- El reinicio no agregó un permiso: usa `changes:request/approve/execute` más el ámbito por recurso, y los equipos críticos o no clasificados exigen `networks:manage`. Agregar un permiso cambiaría la huella de autorización y ocultaría conversaciones existentes.
+- MFA sigue pendiente de decisión (TOTP u OIDC).

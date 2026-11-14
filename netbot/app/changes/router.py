@@ -64,7 +64,7 @@ def cancel_csv(import_id: UUID, actor: User = Depends(require_permission(Permiss
 
 
 def _service(monitoring: MonitoringServiceDep, db: Session) -> VlanReservationService:
-    return VlanReservationService(monitoring, db)
+    return VlanReservationService(monitoring, db, get_settings().vlan_reservation_ttl_hours)
 
 
 @router.get("/vlan-options", response_model=list[AvailableVlan])
@@ -92,8 +92,8 @@ async def create_reservation(payload: VlanReservationCreate, monitoring: Monitor
         return await _service(monitoring, db).create(payload, user)
     except InventoryUnavailable:
         raise HTTPException(status_code=503, detail="Inventario VLAN no disponible.") from None
-    except VlanConflict:
-        raise HTTPException(status_code=409, detail="La VLAN ya no está disponible.") from None
+    except VlanConflict as conflict:
+        raise HTTPException(status_code=409, detail=conflict.detail) from None
 
 
 @router.post("/vlan-reservations/{reservation_id}/release", response_model=VlanReservationRead)
@@ -111,6 +111,8 @@ def release_reservation(reservation_id: int, monitoring: MonitoringServiceDep,
 from .dependencies import get_ssid_service
 from .ssid_service import SsidPlanService
 from .ssid_schemas import (
+    DeviceRestartProposal,
+    PlanRevision,
     ScopeWrite,
     SsidProposal,
     SsidCsv,
@@ -119,6 +121,9 @@ from .ssid_schemas import (
     SsidVlanChangeProposal,
     SsidVlanChangeConfirm,
 )
+from .dependencies import get_restart_service
+from .restart_service import DeviceRestartService
+from .reconciliation import reconcile_plan
 
 
 @router.get('/wifi-scopes')
@@ -191,3 +196,71 @@ async def confirm_ssid_vlan_change(
 ):
     """H10: confirma el plan tras revalidar inventario; no modifica UniFi."""
     return await service.confirm_vlan_change(actor, str(plan_id), payload)
+
+
+@router.get('/ssid-vlan-change-plans')
+def ssid_vlan_changes(actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                      service: SsidPlanService = Depends(get_ssid_service)):
+    return service.list_vlan_changes(actor)
+
+
+@router.get('/ssid-vlan-change-plans/{plan_id}')
+def ssid_vlan_change(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                     service: SsidPlanService = Depends(get_ssid_service)):
+    return service.get_vlan_change(actor, str(plan_id))
+
+
+@router.post('/ssid-vlan-change-plans/{plan_id}/cancel')
+def cancel_ssid_vlan_change(plan_id: UUID,
+                            actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                            service: SsidPlanService = Depends(get_ssid_service)):
+    return service.cancel_vlan_change(actor, str(plan_id))
+
+
+@router.get('/wifi-scopes/{scope_id}/ssids')
+async def wifi_scope_ssids(scope_id: int, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                           service: SsidPlanService = Depends(get_ssid_service)):
+    return await service.scope_ssids(actor, scope_id)
+
+
+@router.get('/device-restart-plans')
+def device_restarts(actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                    service: DeviceRestartService = Depends(get_restart_service)):
+    return service.list(actor)
+
+
+@router.post('/device-restart-plans', status_code=201)
+async def prepare_device_restart(payload: DeviceRestartProposal,
+                                 actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                                 service: DeviceRestartService = Depends(get_restart_service)):
+    """HU011: prepara la propuesta con su impacto; no reinicia nada."""
+    return await service.propose(actor, payload)
+
+
+@router.get('/device-restart-plans/{plan_id}')
+def device_restart(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                   service: DeviceRestartService = Depends(get_restart_service)):
+    return service.get(actor, str(plan_id))
+
+
+@router.post('/device-restart-plans/{plan_id}/confirm')
+def confirm_device_restart(plan_id: UUID, payload: PlanRevision,
+                           actor: User = Depends(require_permission(Permission.CHANGES_APPROVE.value)),
+                           service: DeviceRestartService = Depends(get_restart_service)):
+    """HU011: registra la aprobación. El reinicio lo ejecuta el worker, no esta solicitud."""
+    return service.confirm(actor, str(plan_id), payload)
+
+
+@router.post('/device-restart-plans/{plan_id}/cancel')
+def cancel_device_restart(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+                          service: DeviceRestartService = Depends(get_restart_service)):
+    return service.cancel(actor, str(plan_id))
+
+
+@router.post('/reconcile/{kind}/{plan_id}')
+async def reconcile(kind: str, plan_id: UUID,
+                    actor: User = Depends(require_permission(Permission.NETWORKS_MANAGE.value)),
+                    plans: SsidPlanService = Depends(get_ssid_service),
+                    restarts: DeviceRestartService = Depends(get_restart_service)):
+    """Conciliación administrativa de un trabajo detenido: solo lee el controlador."""
+    return await reconcile_plan(actor, kind, str(plan_id), plans, restarts)

@@ -30,6 +30,28 @@ def test_domains_do_not_import_http_composition():
                     assert path.name == "cli.py", str(path)
 
 
+def test_only_entry_adapters_depend_on_the_agents_module():
+    """agents coordina a los demás dominios; depender de él en sentido inverso los acoplaría."""
+    for owner, path, tree in domain_sources():
+        if owner == "agents" or path.name == "cli.py":
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert not node.module.startswith("app.agents"), str(path)
+            if isinstance(node, ast.Import):
+                assert all(not alias.name.startswith("app.agents") for alias in node.names), str(path)
+
+
+def test_changes_never_imports_tickets():
+    """Los incidentes de cambios viajan por el puerto inyectado, no por una dependencia directa."""
+    for owner, path, tree in domain_sources():
+        if owner != "changes":
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert not node.module.startswith("app.tickets"), str(path)
+
+
 def test_http_and_database_logic_stay_on_their_respective_layers():
     for _, path, tree in domain_sources():
         http_boundary = path.name in {"routes.py", "router.py", "support_router.py", "guest_router.py", "dependencies.py"}
@@ -92,7 +114,10 @@ def test_production_starts_on_migrated_schema_without_changing_tables(tmp_path):
     from app.auth.roles import RoleName
 
     url = f"sqlite:///{tmp_path / 'migrated.db'}"
-    result = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=ROOT,
+    # Se ejecuta fuera del proyecto: el .env local de quien desarrolla no participa de la
+    # validación de producción ni puede hacerla fallar.
+    result = subprocess.run([sys.executable, "-m", "alembic", "-c", str(ROOT / "alembic.ini"), "upgrade", "head"],
+                            cwd=tmp_path,
                             env=dict(os.environ, DATABASE_URL=url, ENVIRONMENT="production", MONITORING_PROVIDER="mock"),
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

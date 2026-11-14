@@ -1,21 +1,38 @@
 import hashlib
 import secrets
+import threading
 from datetime import datetime, timedelta, timezone
 
 import jwt
 from pwdlib import PasswordHash
 
 from app.core.config import settings
+from app.core.errors import ServiceUnavailable
 
 password_hash = PasswordHash.recommended()
+# Argon2 usa decenas de MiB por verificación: acotar la concurrencia acota memoria y CPU.
+_ARGON2_SLOTS = threading.BoundedSemaphore(4)
+
+
+def _argon2_slot():
+    if not _ARGON2_SLOTS.acquire(timeout=10):
+        raise ServiceUnavailable("La autenticación está ocupada. Inténtalo en unos segundos.")
 
 
 def hash_password(password: str) -> str:
-    return password_hash.hash(password)
+    _argon2_slot()
+    try:
+        return password_hash.hash(password)
+    finally:
+        _ARGON2_SLOTS.release()
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return password_hash.verify(password, hashed)
+    _argon2_slot()
+    try:
+        return password_hash.verify(password, hashed)
+    finally:
+        _ARGON2_SLOTS.release()
 
 
 def create_access_token(user_id: int, roles: list[str], *, session_id: str | None = None) -> str:

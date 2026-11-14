@@ -81,6 +81,8 @@ class MonitoredVlan(Base):
     name: Mapped[str | None] = mapped_column(String(255))
     tag: Mapped[int] = mapped_column(Integer)
     enabled: Mapped[bool | None] = mapped_column(Boolean)
+    # Solo se fija en la transición activo -> inactivo: algo que nunca estuvo activo no es inesperado.
+    disabled_since: Mapped[datetime | None] = mapped_column(UtcDateTime)
     last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime)
     missing_since: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
@@ -96,6 +98,7 @@ class MonitoredSsid(Base):
     enabled: Mapped[bool] = mapped_column(Boolean)
     security: Mapped[str | None] = mapped_column(String(40))
     vlan_tag: Mapped[int | None] = mapped_column(Integer)
+    disabled_since: Mapped[datetime | None] = mapped_column(UtcDateTime)
     last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime)
     missing_since: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
@@ -133,6 +136,25 @@ class MonitoringAlert(Base):
     detected_at: Mapped[datetime] = mapped_column(UtcDateTime)
     last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime)
     resolved_at: Mapped[datetime | None] = mapped_column(UtcDateTime, index=True)
+
+
+class MaintenanceWindow(Base):
+    """Mantenimiento declarado por un trabajo de Netbot (p. ej. un reinicio confirmado).
+
+    Mientras está vigente, la caída esperada de ese equipo no genera alertas. No oculta
+    fallas de la fuente ni de otros equipos.
+    """
+
+    __tablename__ = "monitoring_maintenance"
+    __table_args__ = (Index("ix_monitoring_maintenance_target", "source", "external_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(32))
+    external_id: Mapped[str] = mapped_column(String(160))
+    reason: Mapped[str] = mapped_column(String(160))
+    starts_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    ends_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
 
 class CoveragePlan(Base):

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.errors import NotFound
 
-from .alerts import AlertCondition, device_conditions, sync_alerts
+from .alerts import AlertCondition, device_conditions, inactive_conditions, sync_alerts
 from .models import (
     DeviceAvailability,
     MonitoredDevice,
@@ -114,6 +114,13 @@ def _record_availability(db: Session, previous: dict[str, datetime], rows: list[
             entry.online_seconds += seconds
 
 
+def _disabled_since(row: Any, enabled: bool | None, now: datetime) -> datetime | None:
+    """Fecha de la transición activo -> inactivo; lo que nunca estuvo activo no la tiene."""
+    if enabled is not False:
+        return None
+    return now if row.enabled is True else row.disabled_since
+
+
 def persist_snapshot(db: Session, source: str, snapshot: InventorySnapshot, now: datetime, interval: float) -> None:
     if snapshot.devices is not None:
         previous = dict(db.execute(select(MonitoredDevice.external_id, MonitoredDevice.last_seen_at)
@@ -134,11 +141,13 @@ def persist_snapshot(db: Session, source: str, snapshot: InventorySnapshot, now:
         _record_availability(db, previous, rows, now, interval)
     if snapshot.vlans is not None:
         def apply_vlan(row: MonitoredVlan, item: Any) -> None:
+            row.disabled_since = _disabled_since(row, item.enabled, now)
             row.name, row.tag, row.enabled = _clip(item.name, 255), item.tag, item.enabled
 
         _sync(db, MonitoredVlan, source, snapshot.vlans, apply_vlan, now)
     if snapshot.ssids is not None:
         def apply_ssid(row: MonitoredSsid, item: Any) -> None:
+            row.disabled_since = _disabled_since(row, item.enabled, now)
             row.name, row.enabled = _clip(item.name, 255), item.enabled
             row.security, row.vlan_tag = _clip(item.security, 40), item.vlan_tag
 
@@ -229,7 +238,12 @@ class InventoryCollector:
         conditions: list[AlertCondition] = []
         if snapshot.devices is not None:
             categories.add("device")
-            conditions += device_conditions(db, state.source)
+            conditions += device_conditions(db, state.source, now)
+        window = timedelta(hours=self._settings.monitoring_inactive_alert_hours)
+        for category, section in (("ssid", snapshot.ssids), ("vlan", snapshot.vlans)):
+            if section is not None:
+                categories.add(category)
+                conditions += inactive_conditions(db, state.source, category, now, window)
         if problems:
             parts = ", ".join(sorted({issue.component for issue in problems}))
             conditions.append(AlertCondition(f"source:{state.source}:degraded", "source", AlertSeverity.WARNING,
@@ -273,6 +287,20 @@ def get_device(db: Session, settings: Settings, device_id: int) -> DeviceDetail:
         .order_by(MonitoringAlert.severity_rank, MonitoringAlert.detected_at.desc()))
     base = _fresh(DeviceRead, row, _utcnow(), settings).model_dump()
     return DeviceDetail(**base, alerts=[AlertRead.model_validate(alert) for alert in alerts])
+
+
+def access_point_overview(db: Session, settings: Settings, *, limit: int = 100) -> dict[str, Any]:
+    """Resumen mínimo de AP para consultas conversacionales: sin IP ni MAC."""
+    page = list_devices(db, settings, device_type=DeviceType.ACCESS_POINT, limit=limit)
+    health = source_health(db, settings)
+    updates = [s.last_success_at for s in health if s.last_success_at]
+    return {
+        "source": "netbot_inventory", "total": page.total, "truncated": page.total > len(page.items),
+        "collected_at": max(updates).isoformat() if updates else None,
+        "stale": any(s.stale for s in health),
+        "data": [{"name": d.name, "state": d.state.value if hasattr(d.state, "value") else d.state, "stale": d.stale,
+                  "last_online_at": d.last_online_at.isoformat() if d.last_online_at else None} for d in page.items],
+    }
 
 
 def list_vlans(db: Session, settings: Settings, *, limit: int = 100, offset: int = 0) -> Page[VlanRead]:

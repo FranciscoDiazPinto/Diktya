@@ -8,7 +8,7 @@ os.environ["MONITORING_PROVIDER"] = "mock"
 os.environ["MONITORING_COLLECTOR_ENABLED"] = "false"
 os.environ["UNIFI_ENABLED"] = "false"
 os.environ["TICKET_AGENT_ENABLED"] = "false"
-os.environ["JWT_SECRET_KEY"] = "test-only-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+os.environ["JWT_SECRET_KEY"] = "test-only-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 os.environ["SECURITY_RATE_LIMIT_PATH"] = os.path.join(tempfile.mkdtemp(prefix="netbot-rates-"), "rates.db")
 os.environ["ADMIN_EMAIL"] = ""
 os.environ["ADMIN_PASSWORD"] = ""

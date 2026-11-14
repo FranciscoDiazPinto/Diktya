@@ -41,6 +41,17 @@ def list_entries(db: Session, actor: User, filters: AuditFilters, *, limit=50, o
     return AuditPage(items=items, total=total, limit=limit, offset=offset)
 
 
+def list_own_entries(db: Session, actor: User, filters: AuditFilters, *, limit=50, offset=0) -> AuditPage:
+    """El técnico solo ve sus propias acciones: el actor no se acepta desde la solicitud."""
+    require_user_permission(db, actor, Permission.CHANGES_REQUEST)
+    if not 1 <= limit <= 100 or offset < 0:
+        raise InvalidInput("Paginación inválida.")
+    query = _query(filters.model_copy(update={"actor_id": actor.id}))
+    total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
+    items = [AuditEntry.model_validate(dict(row)) for row in db.execute(query.limit(limit).offset(offset)).mappings()]
+    return AuditPage(items=items, total=total, limit=limit, offset=offset)
+
+
 def _safe_cell(value):
     text = "" if value is None else str(value)
     # Neutraliza fórmulas incluso si comienzan después de espacios o controles.

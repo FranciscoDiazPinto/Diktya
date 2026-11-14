@@ -110,3 +110,17 @@ class SsidVlanChangeConfirm(Strict):
         max_length=64,
         pattern=r"^[0-9a-f]{64}$",
     )
+
+
+class DeviceRestartProposal(Strict):
+    """Solicitud de reinicio de un equipo identificado; no ejecuta nada."""
+
+    scope_id: int = Field(gt=0)
+    device_id: str = Field(min_length=1, max_length=160)
+    purpose: str = Field(min_length=1, max_length=500)
+
+
+class PlanRevision(Strict):
+    """Confirmación explícita vinculada a la revisión exacta mostrada al usuario."""
+
+    revision: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")

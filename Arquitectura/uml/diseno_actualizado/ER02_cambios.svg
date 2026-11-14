@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1470" viewBox="0 0 1280 1470">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<g transform="translate(40 40)">
+<polyline points="175.0,160 175.0,220.0 175.0,220.0 175.0,280" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="195.0" y="187" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="195.0" y="267" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="320,92.5 380.0,92.5 380.0,107.5 440,107.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="346" y="80.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="414" y="95.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="175.0,445 175.0,552.5 175.0,552.5 175.0,660" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="195.0" y="472" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="195.0" y="647" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="1020.0,160 1020.0,235.0 1020.0,235.0 1020.0,310" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="1040.0" y="187" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="1040.0" y="297" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="875,92.5 800,92.5 800,260 610.0,260 610.0,315" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="849" y="80.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="630.0" y="302" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="320,362.5 380.0,362.5 380.0,427.5 440,427.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="346" y="350.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="414" y="415.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="590.0,190 590.0,252.5 610.0,252.5 610.0,315" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="610.0" y="217" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="630.0" y="302" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="610.0,540 610.0,645.0 610.0,645.0 610.0,750" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="630.0" y="567" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="630.0" y="737" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<polyline points="780,427.5 827.5,427.5 827.5,757.5 875,757.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="806" y="415.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="849" y="745.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="1020.0,475 1020.0,567.5 1020.0,567.5 1020.0,660" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="1040.0" y="502" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="1040.0" y="647" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="780,862.5 827.5,862.5 827.5,1212.5 875,1212.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="806" y="850.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="849" y="1200.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="1165,92.5 1185,92.5 1185,1212.5 1165,1212.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="1191" y="80.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="1191" y="1200.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="30,92.5 30.0,92.5 30.0,757.5 30,757.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="4" y="80.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="4" y="745.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<rect x="30" y="25" width="290" height="135" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="175.0" y="57" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">red</text>
+<polyline points="30,74 320,74" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="42" y="105" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_red</text>
+<text x="42" y="134" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">nombre</text>
+<rect x="875" y="25" width="290" height="135" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1020.0" y="57" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">usuario</text>
+<polyline points="875,74 1165,74" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="887" y="105" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_usuario</text>
+<text x="887" y="134" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">correo</text>
+<rect x="30" y="280" width="290" height="165" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="175.0" y="312" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">vlan</text>
+<polyline points="30,329 320,329" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="42" y="360" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_vlan</text>
+<text x="42" y="389" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_red</text>
+<text x="42" y="418" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">tag</text>
+<rect x="440" y="25" width="300" height="165" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="590.0" y="57" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">dispositivo</text>
+<polyline points="440,74 740,74" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="452" y="105" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_dispositivo</text>
+<text x="452" y="134" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_red</text>
+<text x="452" y="163" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado</text>
+<rect x="440" y="315" width="340" height="225" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="610.0" y="347" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">reserva_cambio</text>
+<polyline points="440,364 780,364" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="452" y="395" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_reserva</text>
+<text x="452" y="424" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_usuario</text>
+<text x="452" y="453" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_vlan?</text>
+<text x="452" y="482" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_dispositivo?</text>
+<text x="452" y="511" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado y vencimiento</text>
+<rect x="875" y="310" width="290" height="165" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1020.0" y="342" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">carga_csv</text>
+<polyline points="875,359 1165,359" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="887" y="390" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_carga</text>
+<text x="887" y="419" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_usuario</text>
+<text x="887" y="448" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado</text>
+<rect x="30" y="660" width="290" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="175.0" y="692" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">ssid</text>
+<polyline points="30,709 320,709" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="42" y="740" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_ssid</text>
+<text x="42" y="769" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_red</text>
+<text x="42" y="798" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_vlan?</text>
+<rect x="440" y="750" width="340" height="225" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="610.0" y="782" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">cambio_ejecucion</text>
+<polyline points="440,799 780,799" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="452" y="830" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_cambio</text>
+<text x="452" y="859" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_reserva</text>
+<text x="452" y="888" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado_previo_protegido</text>
+<text x="452" y="917" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">confirmacion y version</text>
+<text x="452" y="946" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">resultado</text>
+<rect x="875" y="660" width="290" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1020.0" y="692" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">carga_csv_fila</text>
+<polyline points="875,709 1165,709" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="887" y="740" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_fila</text>
+<text x="887" y="769" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_carga</text>
+<text x="887" y="798" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_reserva?</text>
+<text x="887" y="827" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado sin secretos</text>
+<rect x="875" y="1100" width="290" height="225" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1020.0" y="1132" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">auditoria</text>
+<polyline points="875,1149 1165,1149" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="887" y="1180" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_evento</text>
+<text x="887" y="1209" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_usuario?</text>
+<text x="887" y="1238" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_cambio?</text>
+<text x="887" y="1267" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">agente y correlacion</text>
+<text x="887" y="1296" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">accion resultado fecha</text>
+<text x="600" y="1370" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">Reserva: VLAN o dispositivo según operación; exclusividad solo entre reservas activas del</text>
+<text x="600" y="1396" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">mismo ámbito.</text>
+</g>
+</svg>

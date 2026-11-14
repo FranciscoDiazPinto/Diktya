@@ -90,6 +90,7 @@ async def test_provider_sends_chat_completion_request():
         "tool_choice": "auto",
         "parallel_tool_calls": False,
         "max_tokens": 600,
+        "provider": {"data_collection": "deny"},
     }
     assert result.content == "estado normal"
     assert result.tool_calls == ()

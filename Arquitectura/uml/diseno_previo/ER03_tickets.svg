@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1420" viewBox="0 0 1280 1420">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#20333f"/></marker></defs>
+<g transform="translate(40 40)">
+<polyline points="195.0,200 195.0,270.0 195.0,270.0 195.0,340" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="215.0" y="227" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="215.0" y="327" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="355,117.5 607.5,117.5 607.5,422.5 860,422.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="381" y="105.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="834" y="410.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<polyline points="1010.0,175 1010.0,257.5 1010.0,257.5 1010.0,340" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="1030.0" y="202" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="1030.0" y="327" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="355,437.5 610.0,437.5 610.0,650" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="381" y="425.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="630.0" y="637" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="610.0,845 375,845 375,1137.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="630.0" y="872" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="401" y="1125.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="780,747.5 1010.0,747.5 1010.0,1040" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="806" y="735.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="1030.0" y="1027" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="185.0,830 185.0,935.0 205.0,935.0 205.0,1040" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="205.0" y="857" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..1</text>
+<text x="225.0" y="1027" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<polyline points="335,760.0 335,900 1185,900 1185,1137.5 1160,1137.5" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="361" y="748.0" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">1</text>
+<text x="1186" y="1125.5" font-family="Arial,DejaVu Sans,sans-serif" font-size="22" text-anchor="middle" fill="#20333f">0..*</text>
+<rect x="35" y="35" width="320" height="165" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="195.0" y="67" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">dispositivo</text>
+<polyline points="35,84 355,84" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="47" y="115" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_dispositivo</text>
+<text x="47" y="144" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_red</text>
+<text x="47" y="173" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado</text>
+<rect x="860" y="35" width="300" height="140" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1010.0" y="67" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">plano_cobertura</text>
+<polyline points="860,84 1160,84" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="872" y="115" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_plano</text>
+<text x="872" y="144" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">nombre e imagen</text>
+<rect x="35" y="340" width="320" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="195.0" y="372" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">alerta</text>
+<polyline points="35,389 355,389" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="47" y="420" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_alerta</text>
+<text x="47" y="449" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_dispositivo?</text>
+<text x="47" y="478" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">clave_incidente</text>
+<text x="47" y="507" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado y severidad</text>
+<rect x="860" y="340" width="300" height="165" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1010.0" y="372" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">ubicacion_dispositivo</text>
+<polyline points="860,389 1160,389" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="872" y="420" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK/FK id_dispositivo</text>
+<text x="872" y="449" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_plano</text>
+<text x="872" y="478" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">coordenadas</text>
+<rect x="440" y="650" width="340" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="610.0" y="682" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">ticket</text>
+<polyline points="440,699 780,699" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="452" y="730" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_ticket</text>
+<text x="452" y="759" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_alerta?</text>
+<text x="452" y="788" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">clave_incidente</text>
+<text x="452" y="817" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado y criticidad</text>
+<rect x="35" y="690" width="300" height="140" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="185.0" y="722" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">usuario</text>
+<polyline points="35,739 335,739" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="47" y="770" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_usuario</text>
+<text x="47" y="799" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">correo y activo</text>
+<rect x="35" y="1040" width="340" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="205.0" y="1072" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">ticket_seguimiento</text>
+<polyline points="35,1089 375,1089" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="47" y="1120" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_evento</text>
+<text x="47" y="1149" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_ticket</text>
+<text x="47" y="1178" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_usuario?</text>
+<text x="47" y="1207" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">estado motivo fecha</text>
+<rect x="860" y="1040" width="300" height="195" rx="0" fill="#f3f6f8" stroke="#20333f" stroke-width="2"/>
+<text x="1010.0" y="1072" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" text-anchor="middle" fill="#20333f" font-weight="bold">notificacion</text>
+<polyline points="860,1089 1160,1089" fill="none" stroke="#20333f" stroke-width="2"/>
+<text x="872" y="1120" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">PK id_notificacion</text>
+<text x="872" y="1149" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_ticket</text>
+<text x="872" y="1178" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">FK id_usuario</text>
+<text x="872" y="1207" font-family="Arial,DejaVu Sans,sans-serif" font-size="26" text-anchor="start" fill="#20333f">canal estado intentos</text>
+<text x="600" y="1305" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">Máximo un ticket abierto por clave de incidente; cada dispositivo tiene como máximo una</text>
+<text x="600" y="1331" font-family="Arial,DejaVu Sans,sans-serif" font-size="20" text-anchor="middle" fill="#20333f">ubicación.</text>
+</g>
+</svg>

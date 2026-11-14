@@ -20,5 +20,6 @@
 *.sqlite3-shm
 *.dump
 backups/
+.*.change-locks/
 secrets/
 .DS_Store

@@ -8,11 +8,19 @@ El sistema implementado es un monolito modular FastAPI con PostgreSQL/SQLite y f
 
 El punto de entrada HTTP, el ciclo de vida, la preparación de la base y el registro de modelos están separados. Producción exige migraciones aplicadas antes del arranque; solo development/test admiten create_all. El frontend separa sesión/API, chat, monitoreo, soporte, tickets y reservas.
 
-El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. La lectura UniFi y los planes de creación SSID tienen implementación; su operación física continúa pendiente de validación. React, WebSocket y el flujo integral de ejecución durable, compensación y modificación en lote no están implementados.
+El flujo de cambios (propuesta, confirmación, worker durable, verificación, restauración o escalamiento) está implementado para creación de SSID, cambio de VLAN y reinicio, coordinado por el módulo agents; su operación física continúa pendiente de validación y no modifica OPNsense. React, WebSocket y la modificación de SSID en lote no están implementados.
 
-## Diagramas UML vigentes
+## Documento de diseño previo al desarrollo
+
+El `Documento_05_Documento_de_Diseño.docx`, revisión 05, especifica la solución propuesta antes de programar. Contiene arquitectura, clases conceptuales, 19 casos de uso con actividades, secuencias integrales S01–S04, modelos E-R, despliegue y trazabilidad al DoD. No se utiliza como informe del código, de commits, de pruebas ejecutadas ni de avance. Se contempla React conforme al DoD; esto no modifica el frontend implementado ni resuelve por sí solo su diferencia con el criterio académico. El estado real del desarrollo se conserva en las guías técnicas y documentos de seguimiento.
+
+Las figuras corregidas de esta versión están en `uml/diseno_previo/`. Generarlas con `python Arquitectura/uml/corregir_diseno.py --previo` y convertirlas a PNG con `node Arquitectura/uml/renderizar_diseno.cjs Arquitectura/uml/diseno_previo carpeta-png` (requiere Sharp). Para reproducir la transformación sobre una copia de revisión 04: `python Arquitectura/uml/actualizar_diseno.py --previo --png-dir carpeta-png --docx copia-revision-04.docx`. El script protege revisiones posteriores. Los casos de uso y actividades conservan los diagramas del documento; las fuentes históricas siguientes no sustituyen a esta versión.
+
+## Antecedentes de los diagramas UML
 
 El Documento de Diseño se corrigió el 10-11-2026 con 19 secuencias, una por HU, y vistas UML de casos de uso, datos, contratos, componentes y despliegue. Las fuentes editables están en [uml](uml): `historias.json` contiene estados, participantes y mensajes; `generar_uml.py` regenera los SVG sin servicios externos con `python Arquitectura/uml/generar_uml.py` desde la raíz. Los SVG pueden exportarse a PNG para incorporarlos a Word, conservando la relación de aspecto y texto legible. Los archivos `image3.png` a `image10.png` de esta carpeta son antecedentes históricos, no los diagramas de la revisión actual.
+
+La revisión 04 del 12/11 del `Documento_05_Documento_de_Diseño.docx` actualiza HU010 y corrige ER01–ER03, S01–S03, ACT011 y añade S04 de reinicio objetivo. Las fuentes de las figuras corregidas están en `uml/diseno_actualizado/`; `uml/secuencias_corregidas.json` conserva participantes y mensajes. Generar SVG con `python Arquitectura/uml/corregir_diseno.py`; renderizar a PNG con `node Arquitectura/uml/renderizar_diseno.cjs carpeta-svg carpeta-png` (Sharp en el entorno). `actualizar_diseno.py --png-dir carpeta-png --docx archivo-revision-03.docx` incorpora las correcciones a una copia de revisión 03 y preserva su formato; rechaza reaplicar sobre revisión 04. El generador histórico se mantiene como antecedente y no reemplaza estas figuras nuevas. El corte distingue servicios internos probados de flujos operativos pendientes y de objetivos aún sin implementar.
 
 ## Diseño de referencia histórico
 

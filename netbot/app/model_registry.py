@@ -1,5 +1,6 @@
 """Composición de metadata: único lugar autorizado a registrar modelos de todos los módulos."""
 def register_models() -> None:
+    from app.agents import models as agents
     from app.auth import models
     from app.changes import models as changes
     from app.chat import models as chat
