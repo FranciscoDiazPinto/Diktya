@@ -62,6 +62,8 @@ async def test_registry_contains_only_read_only_monitoring_tools():
         "get_available_vlans",
         "prepare_vlan_reservation",
         "get_wifi_scopes", "get_wifi_scope_options", "prepare_ssid_creation",
+        # Solo consultan o validan propuestas: ninguna confirma, ejecuta ni concilia.
+        "get_scope_ssids", "prepare_vlan_change", "prepare_device_restart", "get_access_points",
     }
 
     assert set(TOOL_REGISTRY) == expected

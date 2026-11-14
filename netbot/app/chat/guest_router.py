@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core.request_security import client_peer
 from app.networks.guest_access import GuestNetwork, GuestWifiQr, list_guest_networks, guest_wifi_qr
 from .guest import sessions, TTL
-from .provider import OpenRouterProvider, ChatProviderError, ChatProviderNotConfigured
+from .provider import build_provider, ChatProviderError, ChatProviderNotConfigured
 from .schemas import ChatInputError
 
 
@@ -43,7 +43,7 @@ def guest_token(x_guest_session: str = Header(min_length=40, max_length=64)) -> 
 
 
 def get_guest_provider(settings: Settings = Depends(get_settings)):
-    return OpenRouterProvider(settings)
+    return build_provider(settings)
 
 
 @router.post("/sessions", response_model=GuestSessionCreated, status_code=201)

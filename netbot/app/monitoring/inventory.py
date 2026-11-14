@@ -289,6 +289,20 @@ def get_device(db: Session, settings: Settings, device_id: int) -> DeviceDetail:
     return DeviceDetail(**base, alerts=[AlertRead.model_validate(alert) for alert in alerts])
 
 
+def access_point_overview(db: Session, settings: Settings, *, limit: int = 100) -> dict[str, Any]:
+    """Resumen mínimo de AP para consultas conversacionales: sin IP ni MAC."""
+    page = list_devices(db, settings, device_type=DeviceType.ACCESS_POINT, limit=limit)
+    health = source_health(db, settings)
+    updates = [s.last_success_at for s in health if s.last_success_at]
+    return {
+        "source": "netbot_inventory", "total": page.total, "truncated": page.total > len(page.items),
+        "collected_at": max(updates).isoformat() if updates else None,
+        "stale": any(s.stale for s in health),
+        "data": [{"name": d.name, "state": d.state.value if hasattr(d.state, "value") else d.state, "stale": d.stale,
+                  "last_online_at": d.last_online_at.isoformat() if d.last_online_at else None} for d in page.items],
+    }
+
+
 def list_vlans(db: Session, settings: Settings, *, limit: int = 100, offset: int = 0) -> Page[VlanRead]:
     stmt = select(MonitoredVlan).where(MonitoredVlan.source.in_(configured_sources(settings)),
                                        MonitoredVlan.missing_since.is_(None)) \

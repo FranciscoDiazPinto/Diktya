@@ -138,12 +138,8 @@ class SsidPlanService:
         if any(b['ssid'].casefold()==proposal.ssid.casefold() for b in existing):
             raise Conflict('El SSID ya existe. No se sobrescribe mediante una creación.')
 
-    async def propose_vlan_change(
-        self,
-        actor: User,
-        proposal: SsidVlanChangeProposal,
-    ):
-        """Valida y guarda una vista previa H10; nunca escribe en UniFi."""
+    async def _vlan_change_context(self, actor: User, proposal: SsidVlanChangeProposal):
+        """Validación común de H10 contra el inventario vigente. Solo lectura."""
         options, existing, fingerprint = await self.options(actor, proposal.scope_id)
 
         if options["simulated"]:
@@ -178,6 +174,22 @@ class SsidPlanService:
             raise Conflict("La información del SSID cambió durante la consulta.")
         if current["network_id"] == proposal.network_id:
             raise Conflict("El SSID ya utiliza la red solicitada.")
+        return options, fingerprint, target_network, current, site_id
+
+    async def check_vlan_change(self, actor: User, proposal: SsidVlanChangeProposal):
+        """Para el chat: valida la propuesta sin guardarla ni confirmarla."""
+        _, _, target_network, current, _ = await self._vlan_change_context(actor, proposal)
+        return {"proposal": proposal.model_dump(), "ssid": current["ssid"], "target_vlan": target_network["tag"],
+                "status": "awaiting_confirmation",
+                "message": "Propuesta de cambio de VLAN. Revísala y confírmala en el panel; todavía no se modificó nada."}
+
+    async def propose_vlan_change(
+        self,
+        actor: User,
+        proposal: SsidVlanChangeProposal,
+    ):
+        """Valida y guarda una vista previa H10; nunca escribe en UniFi."""
+        options, fingerprint, target_network, current, site_id = await self._vlan_change_context(actor, proposal)
 
         revision = digest([
             proposal.model_dump(), fingerprint, site_id,

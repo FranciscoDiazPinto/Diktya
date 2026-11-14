@@ -15,7 +15,7 @@ from app.monitoring.schemas import FirewallAction, MonitoringResponse
 from app.changes.schemas import VlanReservationCreate
 from app.changes.service import InventoryUnavailable, VlanConflict, VlanReservationService
 from app.tickets.schemas import TicketProposal
-from app.changes.ssid_schemas import SsidProposal
+from app.changes.ssid_schemas import DeviceRestartProposal, SsidProposal, SsidVlanChangeProposal
 
 if TYPE_CHECKING:
     from app.monitoring.service import MonitoringService
@@ -117,7 +117,14 @@ async def _get_available_vlans(service, _: BaseModel):
     return {"status": inventory.status.value, "data": [item.model_dump() for item in inventory.data]}
 
 
+SSID_TOOLS = {"get_wifi_scopes", "get_wifi_scope_options", "prepare_ssid_creation", "get_scope_ssids",
+              "prepare_vlan_change", "prepare_device_restart"}
+
 _tools = {
+    "get_scope_ssids": MonitoringTool("get_scope_ssids", "Lista los SSID existentes (identificador y nombre) del sitio de un ámbito autorizado. Úsala antes de proponer un cambio de VLAN.", ScopeArguments, Permission.CHANGES_REQUEST, None),
+    "prepare_vlan_change": MonitoringTool("prepare_vlan_change", "Valida una propuesta para reasociar un SSID existente a otra red/VLAN existente del ámbito. No guarda, confirma ni ejecuta: el usuario la revisa y confirma en el panel.", SsidVlanChangeProposal, Permission.CHANGES_REQUEST, None),
+    "prepare_device_restart": MonitoringTool("prepare_device_restart", "Valida una propuesta de reinicio de un AP autorizado del ámbito. No reinicia nada: el panel muestra el impacto y exige confirmación. Gateway y firewall solo los reinicia un administrador.", DeviceRestartProposal, Permission.CHANGES_REQUEST, None),
+    "get_access_points": MonitoringTool("get_access_points", "Consulta los puntos de acceso del inventario con su estado (en línea, fuera de línea, degradado) y la hora del dato. Si stale es true son datos anteriores.", EmptyToolArguments, Permission.MONITORING_READ, None),
     "get_wifi_scopes": MonitoringTool("get_wifi_scopes", "Lista ámbitos de aprovisionamiento explícitamente autorizados; no inventes IDs.", EmptyToolArguments, Permission.CHANGES_REQUEST, None),
     "get_wifi_scope_options": MonitoringTool("get_wifi_scope_options", "Consulta AP, redes/VLAN existentes y perfiles de seguridad permitidos para un ámbito. Indica si son simulados.", ScopeArguments, Permission.CHANGES_REQUEST, None),
     "prepare_ssid_creation": MonitoringTool("prepare_ssid_creation", "Valida una propuesta de SSID nuevo con AP explícitos y VLAN existente. No guarda, confirma ni ejecuta. Usa el panel para revisión y aprobación. Nunca pidas contraseñas.", SsidProposal, Permission.CHANGES_REQUEST, None),
@@ -221,26 +228,42 @@ async def invoke_tool(
     networks: list[dict] | None = None,
     customer_support: CustomerSupport | None = None,
     ssid_context=None,
+    restart_service=None,
+    access_points: Callable[[], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    if name in {"get_wifi_scopes", "get_wifi_scope_options", "prepare_ssid_creation"}:
+    if name == "get_access_points":
+        if Permission.MONITORING_READ not in permissions:
+            raise ChatToolPermissionError("Permiso insuficiente para consultar puntos de acceso.")
+        if arguments:
+            raise ChatToolError("Argumentos de herramienta inválidos.")
+        if access_points is None:
+            raise ChatToolError("Inventario de puntos de acceso no disponible.")
+        result = access_points()
+        if len(json.dumps(result, ensure_ascii=False, default=str)) > MAX_TOOL_RESULT_CHARS:
+            raise ChatToolError("El inventario de puntos de acceso es demasiado grande para el chat.")
+        return result
+    if name in SSID_TOOLS:
         if Permission.CHANGES_REQUEST not in permissions:
-            raise ChatToolPermissionError("Permiso insuficiente para proponer SSID.")
-        if ssid_context is None:
-            raise ChatToolError("Servicio de planes SSID no disponible.")
+            raise ChatToolPermissionError("Permiso insuficiente para proponer cambios.")
+        if ssid_context is None or (name == "prepare_device_restart" and restart_service is None):
+            raise ChatToolError("Servicio de planes de cambio no disponible.")
         from app.core.errors import ApplicationError
         try:
             args = TOOL_REGISTRY[name].arguments_model.model_validate(arguments)
             service, actor = ssid_context
             if name == "get_wifi_scopes": result = {"data":service.scopes(actor)}
             elif name == "get_wifi_scope_options": result = (await service.options(actor,args.scope_id))[0]
+            elif name == "get_scope_ssids": result = {"data": await service.scope_ssids(actor, args.scope_id)}
+            elif name == "prepare_vlan_change": result = await service.check_vlan_change(actor, args)
+            elif name == "prepare_device_restart": result = restart_service.check(actor, args)
             else: result = await service.propose(actor,args)
         except ValidationError:
-            raise ChatToolError("Argumentos SSID inválidos.") from None
+            raise ChatToolError("Argumentos de cambio inválidos.") from None
         except ApplicationError as exc:
             # Un fallo no concede datos ni persiste una propuesta en el bucle LLM.
             return {"status":"unavailable", "message":exc.detail}
         if len(json.dumps(result,ensure_ascii=False)) > MAX_TOOL_RESULT_CHARS:
-            raise ChatToolError("Reduce el ámbito de consulta SSID.")
+            raise ChatToolError("Reduce el ámbito de consulta.")
         return result
     if name == "prepare_vlan_reservation":
         if Permission.VLAN_RESERVE not in permissions:

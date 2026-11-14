@@ -80,6 +80,16 @@ class Settings(BaseSettings):
     guest_email_recovery_public_url: str = ""
 
     # --- Chatbot ---
+    # Proveedor LLM seleccionable sin cambiar código (HU019).
+    llm_provider: Literal["openrouter", "anthropic"] = "openrouter"
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str | None = "claude-opus-5-5"
+    anthropic_timeout_seconds: float = Field(60.0, gt=0)
+    # El razonamiento del modelo también consume este tope: no lo reduzcas al de OpenRouter.
+    anthropic_max_tokens: int = Field(8000, ge=1024, le=64000)
+    anthropic_effort: Literal["low", "medium", "high"] = "medium"
+    # Reintento del lado del servidor en un modelo de respaldo si el principal rechaza.
+    anthropic_refusal_fallback: bool = True
     openrouter_api_key: SecretStr | None = None
     openrouter_model: str | None = None
     openrouter_timeout_seconds: float = Field(20.0, gt=0)
@@ -180,6 +190,8 @@ class Settings(BaseSettings):
         "smtp_from",
         "openrouter_api_key",
         "openrouter_model",
+        "anthropic_api_key",
+        "anthropic_model",
         "wifi_access_credentials_json",
         "monitoring_site_id",
         mode="before",

@@ -252,3 +252,56 @@ def test_technician_reads_only_own_audit_trail(client, db_session, ssid_setup):
     # El filtro de actor no puede ampliarse desde el navegador.
     other = client.get('/api/v1/audit/mine?actor_id=1', headers=x.headers)
     assert {item['actor_id'] for item in other.json()['items']} == {x.tech.id}
+
+
+# ------------------------------------------------------------- chat: solo propuestas
+
+
+def test_chat_tools_propose_changes_without_persisting_or_executing(client, db_session, ssid_setup):
+    from app.auth.roles import effective_permissions
+    from app.changes.models import DeviceRestartPlan, SsidVlanChangePlan
+    from app.changes.restart_service import DeviceRestartService
+    from app.chat.tools import ChatToolPermissionError, invoke_tool, openrouter_tool_definitions
+    x = ssid_setup
+    service = _service(db_session, x)
+    service.scope_ssids = AsyncMock(return_value=[{'id': 'ssid-123', 'ssid': 'WiFi-Invitados'}])
+    restarts = DeviceRestartService(db_session, x.settings, writer=SimpleNamespace())
+    permissions = effective_permissions(x.tech)
+    names = {tool['function']['name'] for tool in openrouter_tool_definitions(permissions)}
+    assert {'get_scope_ssids', 'prepare_vlan_change', 'prepare_device_restart'} <= names
+    assert 'get_access_points' not in names  # el técnico no tiene monitoreo global
+    assert not any('execute' in name or 'confirm' in name or 'reconcile' in name for name in names)
+
+    def call(name, arguments, **extra):
+        return asyncio.run(invoke_tool(name, arguments, None, permissions, ssid_context=(service, x.tech),
+                                       restart_service=restarts, **extra))
+
+    assert call('get_scope_ssids', {'scope_id': x.scope}) == {'data': [{'id': 'ssid-123', 'ssid': 'WiFi-Invitados'}]}
+    vlan = call('prepare_vlan_change', {'scope_id': x.scope, 'broadcast_id': 'ssid-123', 'network_id': 'network-30',
+                                        'purpose': 'Migración'})
+    assert vlan['status'] == 'awaiting_confirmation' and vlan['target_vlan'] == 30
+    restart = call('prepare_device_restart', {'scope_id': x.scope, 'device_id': 'demo-ap-1', 'purpose': 'Sin respuesta'})
+    assert restart['proposal']['device_id'] == 'demo-ap-1'
+    # Un equipo fuera del ámbito no se propone ni se revela.
+    foreign = call('prepare_device_restart', {'scope_id': x.scope, 'device_id': 'gateway-1', 'purpose': 'x'})
+    assert foreign['status'] == 'unavailable'
+    assert count(db_session, SsidVlanChangePlan) == 0 and count(db_session, DeviceRestartPlan) == 0
+    with pytest.raises(ChatToolPermissionError):
+        call('get_access_points', {}, access_points=lambda: {'data': []})
+
+
+def test_access_point_overview_reports_state_without_addresses(db_session):
+    from datetime import datetime, timezone
+    from app.monitoring.inventory import access_point_overview
+    from app.monitoring.models import MonitoredDevice, SourceState
+    now = datetime.now(timezone.utc)
+    db_session.add_all([
+        SourceState(source='mock', status='ok', last_success_at=now, consecutive_failures=0),
+        MonitoredDevice(source='mock', external_id='ap1', name='AP Hall', device_type='ap', state='offline',
+                        mac_address='aa:bb:cc:dd:ee:ff', ip_address='10.0.0.5', last_seen_at=now),
+        MonitoredDevice(source='mock', external_id='sw1', name='Switch', device_type='switch', state='online',
+                        last_seen_at=now)])
+    db_session.commit()
+    overview = access_point_overview(db_session, Settings(_env_file=None, monitoring_provider='mock', unifi_enabled=False))
+    assert overview['total'] == 1 and overview['data'][0]['name'] == 'AP Hall' and overview['data'][0]['state'] == 'offline'
+    assert '10.0.0.5' not in str(overview) and 'aa:bb' not in str(overview)

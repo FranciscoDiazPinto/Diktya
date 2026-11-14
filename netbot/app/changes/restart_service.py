@@ -74,6 +74,13 @@ class DeviceRestartService:
         return self.db.scalar(statement) is not None
 
     # ------------------------------------------------------ propuesta y confirmación
+    def check(self, actor: User, proposal: DeviceRestartProposal):
+        """Para el chat: autoriza el equipo solicitado sin consultar la red ni guardar nada."""
+        self._authorize(actor, proposal.scope_id, proposal.device_id, None, Permission.CHANGES_REQUEST)
+        return {'proposal': proposal.model_dump(), 'status': 'awaiting_confirmation',
+                'message': 'Propuesta de reinicio. El panel mostrará el impacto y pedirá confirmación; '
+                           'todavía no se reinició nada.'}
+
     async def propose(self, actor: User, proposal: DeviceRestartProposal):
         scope = self._authorize(actor, proposal.scope_id, proposal.device_id, None, Permission.CHANGES_REQUEST)
         if self.settings.unifi_inventory_mode != 'api':

@@ -13,9 +13,11 @@ from app.core.config import Settings, get_settings
 from app.monitoring.dependencies import MonitoringServiceDep
 from app.core.database import get_db
 from app.changes.service import VlanReservationService
+from app.changes.restart_service import DeviceRestartService
 from app.changes.ssid_service import SsidPlanService
+from app.monitoring.inventory import access_point_overview
 
-from .provider import ChatProviderError, ChatProviderNotConfigured, OpenRouterProvider
+from .provider import ChatProviderError, ChatProviderNotConfigured, build_provider
 from .schemas import ChatInputError, ChatSendRequest, ConversationCreate, ConversationRead, ConversationDetail, ChatMessageResponse
 from .service import ChatService
 from .tools import ChatToolPermissionError
@@ -38,12 +40,14 @@ def get_chat_service(
     settings = get_chat_settings()
     return ChatService(
         settings=settings,
-        provider=OpenRouterProvider(settings),
+        provider=build_provider(settings),
         monitoring_service=monitoring_service,
         reservation_service=VlanReservationService(monitoring_service, db, settings.vlan_reservation_ttl_hours),
         customer_support=CustomerSupport(db, user, monitoring_service, settings),
         ssid_context=(SsidPlanService(db, settings, monitoring_service), user),
         release_connection=db.rollback,
+        restart_service=DeviceRestartService(db, settings),
+        access_points=lambda: access_point_overview(db, settings),
     )
 
 
@@ -99,8 +103,14 @@ async def send_message(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="El chatbot no está configurado.",
         ) from None
-    except ChatProviderError:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="El chatbot no pudo completar la consulta. Inténtalo nuevamente.",
-        ) from None
+    except ChatProviderError as exc:
+        # Mensaje claro por motivo (credencial, límite, tiempo); nunca el cuerpo del proveedor.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.public_message) from None
+
+
+@router.get("/health")
+async def provider_health(_user: User = Depends(require_permission(Permission.MONITORING_READ.value)),
+                          settings: Settings = Depends(get_chat_settings)):
+    """Verificación de conexión con el proveedor LLM configurado. No genera tokens."""
+    health = await build_provider(settings).health()
+    return {"provider": health.provider, "model": health.model, "status": health.status, "detail": health.detail}
