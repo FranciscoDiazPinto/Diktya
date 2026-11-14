@@ -103,8 +103,10 @@ def test_online_without_evidence_of_restart_is_reported_as_unconfirmed(db_sessio
     svc, _ = service(db_session, [device(uptime=None)] * 12)
     plan = approve(svc, x.tech, x.scope)
     result = asyncio.run(svc.execute(plan['id']))
-    assert result['status'] == 'completed'
+    assert result['status'] == 'uncertain' and result['needs_reconciliation'] is True
     assert result['execution_results'][0]['status'] == 'online_restart_unconfirmed'
+    assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 1
+    assert db_session.scalar(select(Ticket.incident_type)) == 'restart_failed'
 
 
 def test_ambiguous_restart_keeps_the_device_locked_until_reconciled(db_session, ssid_setup):
@@ -119,9 +121,43 @@ def test_ambiguous_restart_keeps_the_device_locked_until_reconciled(db_session, 
         asyncio.run(svc.propose(x.tech, DeviceRestartProposal(scope_id=x.scope, device_id='demo-ap-1', purpose='Otro')))
     with pytest.raises(Conflict):
         asyncio.run(svc.reconcile(plan['id']))  # sigue fuera de línea
-    assert asyncio.run(svc.reconcile(plan['id']))['status'] == 'completed'
+    assert asyncio.run(svc.reconcile(plan['id']))['status'] == 'unverified'
     assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 0
     assert writer.restart.await_count == 1
+
+
+def test_a_read_error_is_not_evidence_that_the_device_restarted(db_session, ssid_setup):
+    svc, _ = service(db_session, [device(), device(), OSError('consulta fallida')] + [device()] * 10)
+    plan = approve(svc, ssid_setup.tech, ssid_setup.scope)
+    result = asyncio.run(svc.execute(plan['id']))
+    assert result['status'] == 'uncertain'
+    assert result['execution_results'][0]['status'] == 'online_restart_unconfirmed'
+
+
+def test_an_unknown_state_is_not_evidence_that_the_device_went_offline(db_session, ssid_setup):
+    svc, _ = service(db_session, [device(), device(), device('UNKNOWN')] + [device()] * 10)
+    plan = approve(svc, ssid_setup.tech, ssid_setup.scope)
+    assert asyncio.run(svc.execute(plan['id']))['status'] == 'uncertain'
+
+
+def test_offline_followed_by_unknown_never_counts_as_returned_online(db_session, ssid_setup):
+    svc, _ = service(db_session, [device(), device(), device('OFFLINE', None)] + [device('UNKNOWN', None)] * 10)
+    plan = approve(svc, ssid_setup.tech, ssid_setup.scope)
+    result = asyncio.run(svc.execute(plan['id']))
+    assert result['status'] == 'failed'
+    assert result['execution_results'][0]['status'] == 'did_not_return'
+
+
+def test_reconciliation_verifies_restart_only_with_uptime_evidence(db_session, ssid_setup):
+    svc, writer = service(db_session, [device(), device(), device(uptime=12)], restart=WriteUncertain())
+    plan = approve(svc, ssid_setup.tech, ssid_setup.scope)
+    assert asyncio.run(svc.execute(plan['id']))['status'] == 'uncertain'
+    assert db_session.get(DeviceRestartPlan, plan['id']).uptime_before == 5000
+    result = asyncio.run(svc.reconcile(plan['id']))
+    assert result['status'] == 'completed'
+    assert result['execution_results'][0]['status'] == 'reconciled_restart_verified'
+    assert writer.restart.await_count == 1
+    assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 0
 
 
 def test_technician_cannot_restart_critical_or_foreign_devices(db_session, ssid_setup):

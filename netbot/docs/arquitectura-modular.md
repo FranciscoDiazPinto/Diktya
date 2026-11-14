@@ -88,7 +88,7 @@ Los schemas de respuesta conservan los contratos públicos. La refactorización 
 
 Con `ENVIRONMENT=development` o `test`, el bootstrap permite create_all como ayuda local. Los demás entornos exigen que las revisiones en alembic_version coincidan con las cabezas de las migraciones, antes de preparar roles/admin. No se ejecutan migraciones automáticamente en el arranque.
 
-Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las bases antiguas creadas con create_all requieren conciliar su esquema y registro de Alembic antes de aplicar migraciones; no ocultar discrepancias con stamp ni borrar datos como solución automática.
+Para un despliegue: detener API y todos los workers → `alembic upgrade head` → arrancar los procesos con la misma versión. Las bases antiguas creadas con create_all requieren conciliar su esquema y registro de Alembic antes de aplicar migraciones; no ocultar discrepancias con stamp ni borrar datos como solución automática.
 
 ## Frontend modular
 
@@ -175,6 +175,9 @@ flowchart LR
 ```
 
 - **Dos procesos.** El web propone y registra aprobaciones; nunca escribe en la red ni recibe la clave de escritura. El worker (`python -m app.agents.cli --loop`) ejecuta. La cola es la base: un reinicio no pierde aprobaciones y un trabajo interrumpido queda `executing` hasta conciliarse.
+- **Propietario activo.** `changes.execution` excluye ejecución y conciliación por tipo/ID de plan. PostgreSQL usa un advisory lock de sesión en una conexión dedicada; requiere conexión directa o pooling de sesión, no pooling de transacción. SQLite local usa `flock` junto al archivo de la base en Unix; todos los procesos deben acceder a la misma base y directorio. La exclusión no vence por tiempo y sobrevive a los commits del servicio. La muerte del proceso libera esa exclusión, pero no el `WifiWriteLease` durable del recurso: primero debe conciliarse. `execution_started_at` determina la antigüedad de la ejecución; `confirmed_at` solo ordena aprobaciones. Estas son dos protecciones distintas y necesarias.
+- **Cola.** Las aprobaciones vencidas pasan de `confirmed` a `expired` con auditoría antes de seleccionar el lote. Los rechazos definitivos previos a ejecutar pasan a `rejected`. `PlanBusy` conserva la aprobación y no genera un rechazo; errores transitorios conservan el trabajo vigente. Ninguna transición de rechazo o caducidad modifica un plan ya tomado.
+- **Evidencia de reinicio.** Solo `ONLINE` después de un `OFFLINE` observado o un uptime menor acredita retorno. Un error de consulta o estado desconocido no prueba una caída. Sin evidencia, `uncertain` conserva el lease y abre incidente; la conciliación puede terminar como `unverified` si acredita disponibilidad, pero no el reinicio. El resultado y la auditoría conservan esa distinción.
 - **Puerto de incidentes.** `changes` no importa `tickets`. Sus servicios reciben un puerto `(db, tipo, clave, mensaje)` que `agents.incidents` implementa sobre `tickets.agent.open_incident`. El ticket, la traza y el resultado del trabajo se confirman en la misma transacción.
 - **Mantenimiento.** `monitoring.maintenance` es el contrato para declarar la caída esperada de un equipo; `alerts.device_conditions` la respeta. Lo usa el reinicio.
 - **Orquestador.** `agents.orchestrator.Orchestrator` registra un ciclo por agente y lo ejecuta aislado: una excepción se registra, se reintenta en el ciclo siguiente y no detiene a los demás. Tres fallos seguidos abren un ticket `agent_failed`. El estado se persiste con un máximo de una escritura cada 10 s por agente sano.
@@ -190,6 +193,8 @@ flowchart LR
 | `GET /api/v1/audit/mine` | `changes:request` | Acciones propias. |
 | `POST /api/v1/changes/reconcile/{tipo}/{id}` | `networks:manage` | Conciliación de solo lectura. |
 
-Migraciones: `018_monitoring_maintenance`, `019_change_recovery`, `020_agent_events`. No se agregaron permisos: los existentes (`changes:request/approve/execute`, `networks:manage`) más el ámbito por recurso cubren estas operaciones sin cambiar la huella de autorización de las conversaciones.
+Migraciones: `018_monitoring_maintenance`, `019_change_recovery`, `020_agent_events`, `021_execution_ownership`. La última agrega el inicio real de ejecución de los tres tipos de plan y el uptime previo del reinicio. Los `executing` heredados reciben la fecha de migración como inicio de gracia; el downgrade se rechaza si hay trabajos pendientes de conciliación. No se agregaron permisos: los existentes (`changes:request/approve/execute`, `networks:manage`) más el ámbito por recurso cubren estas operaciones sin cambiar la huella de autorización de las conversaciones.
+
+Pruebas de exclusión con SQLite y PostgreSQL: `tests/test_change_execution_lock.py` usa sesiones, procesos separados y muerte del propietario. Para incluir PostgreSQL fuera de CI, definir `NETBOT_TEST_POSTGRES_URL` hacia una instancia desechable; las pruebas de migración crean y eliminan una base nueva de nombre aleatorio, por lo que ese usuario de pruebas requiere `CREATEDB`. No usar la conexión de producción. Sin esa variable los casos PostgreSQL se omiten; CI proporciona un PostgreSQL 16 aislado.
 
 Límites conocidos: el orquestador vive en cada proceso (no hay bus entre procesos; se comunican por la base); las sesiones de invitados siguen exigiendo un solo worker web; no hay retención automática de trazas ni de auditoría.

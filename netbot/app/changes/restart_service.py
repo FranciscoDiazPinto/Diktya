@@ -26,6 +26,7 @@ from app.monitoring import maintenance
 
 from .csv_service import as_utc, utc_now
 from .models import DeviceRestartPlan, WifiWriteLease
+from .execution import PlanBusy, exclusive_plan
 from .ssid_executor import UniFiSsidWriter, WriteUncertain
 from .ssid_schemas import DeviceRestartProposal, PlanRevision
 from .ssid_service import authorized_scope, digest
@@ -181,9 +182,10 @@ class DeviceRestartService:
         return data
 
     # ------------------------------------------------------------------ ejecución
+    @exclusive_plan('restart')
     async def execute(self, plan_id: str):
         """Worker interno. No se expone por HTTP ni al LLM."""
-        plan = self.db.get(DeviceRestartPlan, plan_id)
+        plan = self.db.get(DeviceRestartPlan, plan_id, populate_existing=True)
         if plan is None:
             raise NotFound('Plan de reinicio no encontrado.')
         actor = execution_actor(self.db, plan.owner_id)
@@ -209,10 +211,11 @@ class DeviceRestartService:
             self.db.flush()
         except IntegrityError:
             self.db.rollback()
-            raise Conflict('El dispositivo tiene un reinicio en curso o pendiente de conciliación.') from None
+            raise PlanBusy('El dispositivo tiene un reinicio en curso o pendiente de conciliación.') from None
         claim = self.db.execute(update(DeviceRestartPlan).where(
             DeviceRestartPlan.id == plan.id, DeviceRestartPlan.status == 'confirmed',
-            DeviceRestartPlan.expires_at > utc_now()).values(status='executing'),
+            DeviceRestartPlan.expires_at > utc_now()).values(status='executing', execution_started_at=utc_now(),
+                                                          uptime_before=before.get('uptime_seconds')),
             execution_options={'synchronize_session': False})
         if claim.rowcount != 1:
             self.db.rollback()
@@ -225,6 +228,7 @@ class DeviceRestartService:
         record_event(self.db, 'device.restart.started', actor_id=actor.id, target_id=actor.id, source='worker',
                      details={'plan_id': plan.id, 'device_id': device_id})
         self.db.commit()
+        self.db.refresh(plan)
 
         try:
             await self.writer.restart(site_id, device_id, authorize=reauthorize)
@@ -246,16 +250,17 @@ class DeviceRestartService:
             try:
                 device = await self.writer.device(site_id, device_id)
             except Exception:
-                seen_down, state = True, None  # sin respuesta: no se asume que volvió
+                state = None  # un error de consulta no demuestra que el equipo cayó
                 continue
             state, uptime = device['state'], device.get('uptime_seconds')
-            if state != 'ONLINE':
+            if state == 'OFFLINE':
                 seen_down = True
-            elif seen_down or (uptime is not None and uptime_before is not None and uptime < uptime_before):
+            elif state == 'ONLINE' and (seen_down or (
+                    uptime is not None and uptime_before is not None and uptime < uptime_before)):
                 return 'completed', 'returned_online'
         if state == 'ONLINE':
             # Sigue en línea pero no se pudo acreditar el reinicio: se informa tal cual.
-            return 'completed', 'online_restart_unconfirmed'
+            return 'uncertain', 'online_restart_unconfirmed'
         return 'failed', 'did_not_return'
 
     def _finish(self, plan_id, actor_id, resource_key, outcome, detail):
@@ -269,16 +274,17 @@ class DeviceRestartService:
         record_event(self.db, f'device.restart.{outcome}', actor_id=actor_id, target_id=actor_id, source='worker',
                      outcome={'completed': 'success', 'uncertain': 'uncertain'}.get(outcome, 'failure'),
                      details={'plan_id': plan.id, 'device_id': plan.device_id, 'result': detail})
-        if self.incidents is not None and detail in ('did_not_return', 'restart_unconfirmed'):
+        if self.incidents is not None and detail in ('did_not_return', 'restart_unconfirmed', 'online_restart_unconfirmed'):
             message = (f'{plan.device_name} no volvió en línea tras el reinicio solicitado.' if detail == 'did_not_return'
                        else f'El reinicio de {plan.device_name} quedó en estado incierto. Requiere conciliación.')
             self.incidents(self.db, 'restart_failed', f'change:restart:{plan.id}', message)
         self.db.commit()
         return self.read(plan)
 
+    @exclusive_plan('restart')
     async def reconcile(self, plan_id: str):
         """Resuelve un reinicio detenido consultando el equipo. No envía órdenes."""
-        plan = self.db.get(DeviceRestartPlan, plan_id)
+        plan = self.db.get(DeviceRestartPlan, plan_id, populate_existing=True)
         if plan is None:
             raise NotFound('Plan de reinicio no encontrado.')
         if plan.status not in ('executing', 'uncertain'):
@@ -288,12 +294,16 @@ class DeviceRestartService:
             raise Conflict('El dispositivo todavía no está en línea. Revísalo antes de conciliar.')
         resource_key = digest([plan.site_id, 'device', plan.device_id])
         plan = self.db.get(DeviceRestartPlan, plan_id)
-        plan.status = 'completed'
-        plan.execution_results = [{'status': 'reconciled_online', 'device_id': plan.device_id}]
+        uptime = device.get('uptime_seconds')
+        verified = uptime is not None and plan.uptime_before is not None and uptime < plan.uptime_before
+        plan.status = 'completed' if verified else 'unverified'
+        result = 'reconciled_restart_verified' if verified else 'reconciled_online_restart_unconfirmed'
+        plan.execution_results = [{'status': result, 'device_id': plan.device_id}]
         maintenance.close_window(self.db, source=UNIFI_SOURCE, external_id=plan.device_id, now=utc_now())
         self.db.execute(delete(WifiWriteLease).where(
             WifiWriteLease.resource_key == resource_key, WifiWriteLease.restart_plan_id == plan.id))
         record_event(self.db, 'device.restart.reconciled', actor_id=plan.owner_id, target_id=plan.owner_id,
-                     source='worker', details={'plan_id': plan.id, 'device_id': plan.device_id})
+                     source='worker', outcome='success' if verified else 'uncertain',
+                     details={'plan_id': plan.id, 'device_id': plan.device_id, 'result': result})
         self.db.commit()
         return self.read(plan)

@@ -70,18 +70,21 @@ Vigente desde el 14-11-2026 para los tres trabajos que ejecuta el worker (`pytho
 |---|---|---|---|
 | Creación SSID | `ssid-plans` (+`/csv`, `/confirm`, `/cancel`) | Relectura de nombre, red, AP exactos, bandas y tipo de seguridad | Se elimina el SSID creado por ese trabajo. El lote se detiene en la primera falla y conserva las filas ya verificadas (`partial`). |
 | Cambio de VLAN | `ssid-vlan-change-plans` (+`/{id}`, `/confirm`, `/cancel`) | Relectura de identidad y red destino | Se restaura la red anterior (`rolled_back`). Si no se aplicó, `failed` sin tocar nada. |
-| Reinicio | `device-restart-plans` (+`/{id}`, `/confirm`, `/cancel`) | Espera acotada hasta ver el equipo en línea tras una caída o un uptime menor | No se deshace: `failed` y ticket si no vuelve. |
+| Reinicio | `device-restart-plans` (+`/{id}`, `/confirm`, `/cancel`) | Espera acotada hasta ver el equipo en línea tras una caída observada o un uptime menor | No se deshace: `failed` y ticket si no vuelve; `uncertain` y bloqueo si sigue en línea sin evidencia de reinicio. |
 
 Reglas comunes:
 
 - **Confirmación**: vinculada al actor y a la `revision` exacta mostrada. Repetirla devuelve el mismo plan; un plan vencido, cancelado o alterado no se ejecuta.
 - **Autorización**: se revalida al preparar, confirmar, tomar el trabajo e inmediatamente antes de escribir. Revocar el ámbito bloquea un trabajo aún no ejecutado. El técnico solo reinicia AP de su ámbito; gateway, firewall o equipos que no se acreditan como AP exigen administrador.
-- **Exclusión**: bloqueo durable por sitio y SSID, o por equipo. Dos trabajos sobre el mismo recurso no avanzan a la vez.
+- **Exclusión**: bloqueo durable por sitio y SSID, o por equipo. Ejecución y conciliación del mismo plan comparten además una exclusión entre procesos, independiente de sus commits: un trabajo activo no se recupera aunque lleve mucho tiempo. PostgreSQL requiere conexión directa o pooling de sesión; SQLite usa `flock` local en Unix junto a la base.
 - **Cambio de VLAN**: el contrato 10.6.106 solo ofrece `PUT`. Se reenvía el detalle leído sin `id` ni `metadata`, cambiando únicamente la red. Si el controlador entrega la clave censurada o sin seguridad, no se escribe.
 - **Estados inciertos**: una escritura ambigua nunca se repite. Primero se lee el controlador: si el cambio quedó aplicado y verifica, se da por completado; si no se aplicó, `failed`; si otro actor cambió el recurso, `uncertain` sin sobrescribirlo. `uncertain` y `rollback_failed` conservan el bloqueo.
-- **Conciliación**: `POST /api/v1/changes/reconcile/{ssid|vlan|restart}/{id}` (solo `networks:manage`) o `python -m app.agents.cli reconcile …`. Solo lee. El worker concilia por sí mismo los trabajos que quedaron `executing` tras una caída.
+- **Conciliación**: `POST /api/v1/changes/reconcile/{ssid|vlan|restart}/{id}` (solo `networks:manage`) o `python -m app.agents.cli reconcile …`. Solo lee. El worker concilia los `executing` antiguos desde `execution_started_at` y únicamente si consigue su exclusión; la API también rechaza conciliar un plan activo. En un reinicio, un uptime menor que el previo acredita el resultado; estar en línea sin esa evidencia permite liberar el recurso como `unverified`, nunca como reinicio verificado, y no repite la orden.
+- **Aprobaciones**: las vencidas salen de la cola como `expired` con auditoría; un rechazo definitivo previo a ejecutar pasa a `rejected` y exige preparar otra propuesta. Un plan ocupado por otro ejecutor conserva su aprobación hasta que pueda tomarse o venza.
 - **Escalamiento**: verificación fallida o resultado incierto abren un ticket de criticidad Alta; un rollback fallido, Crítica; un equipo que no vuelve, Alta.
 - **Mantenimiento**: durante un reinicio confirmado no se alerta la caída esperada de ese equipo. La ventana vence sola.
 - **Reservas**: una reserva vence a las `VLAN_RESERVATION_TTL_HOURS` si no se usa y pasa a `assigned` cuando el SSID que usa esa VLAN se verifica. El conflicto informa el evento que la reservó y alternativas libres.
 
 `completed` significa configuración coincidente en el controlador. No demuestra difusión efectiva, conectividad Wi-Fi ni Internet. Antes de habilitar `UNIFI_WRITE_ENABLED` hay que validar en laboratorio la versión del controlador, el `PUT` de actualización, la acción `RESTART` y qué devuelve el detalle de seguridad.
+
+Para actualizar a `021_execution_ownership`, detener la API y todos los workers, respaldar y ejecutar `alembic upgrade head`; después iniciar ambos procesos con la misma versión. El downgrade se impide mientras haya trabajos en ejecución o pendientes de conciliación. No retirar manualmente archivos de exclusión ni leases para desbloquear una operación.

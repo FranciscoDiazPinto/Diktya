@@ -36,6 +36,7 @@ from .wifi_inventory import WifiInventory
 from .csv_parser import parse_csv
 from .csv_service import as_utc, utc_now
 from .service import mark_assigned
+from .execution import PlanBusy, exclusive_plan
 
 
 def digest(value):
@@ -383,13 +384,14 @@ class SsidPlanService:
             "execution_results": plan.execution_results or [],
         }
 
+    @exclusive_plan('vlan')
     async def execute_vlan_change(self, plan_id: str):
         """Worker interno H10. No se expone por HTTP ni al LLM.
 
         El estado executing/uncertain y su lease son durables: no hay reintento
         automático tras una interrupción o respuesta ambigua del controlador.
         """
-        plan = self.db.get(SsidVlanChangePlan, plan_id)
+        plan = self.db.get(SsidVlanChangePlan, plan_id, populate_existing=True)
         if plan is None:
             raise NotFound('Plan H10 no encontrado.')
         actor = execution_actor(self.db, plan.owner_id)
@@ -428,13 +430,13 @@ class SsidPlanService:
             self.db.flush()
         except IntegrityError:
             self.db.rollback()
-            raise Conflict('El SSID está bloqueado por otra operación o conciliación pendiente.') from None
+            raise PlanBusy('El SSID está bloqueado por otra operación o conciliación pendiente.') from None
         claim = self.db.execute(
             update(SsidVlanChangePlan).where(
                 SsidVlanChangePlan.id == plan.id,
                 SsidVlanChangePlan.status == 'confirmed',
                 SsidVlanChangePlan.expires_at > utc_now(),
-            ).values(status='executing'),
+            ).values(status='executing', execution_started_at=utc_now()),
             execution_options={'synchronize_session': False},
         )
         if claim.rowcount != 1:
@@ -525,9 +527,10 @@ class SsidPlanService:
         self.db.commit()
         return self.read_vlan_change_plan(plan)
 
+    @exclusive_plan('vlan')
     async def reconcile_vlan_change(self, plan_id: str):
         """Resuelve un plan detenido leyendo el controlador. No escribe en la red."""
-        plan = self.db.get(SsidVlanChangePlan, plan_id)
+        plan = self.db.get(SsidVlanChangePlan, plan_id, populate_existing=True)
         if plan is None:
             raise NotFound('Plan H10 no encontrado.')
         if plan.status not in ('executing', 'uncertain', 'rollback_failed'):
@@ -667,12 +670,13 @@ class SsidPlanService:
         return self.read(plan)
 
 
+    @exclusive_plan('ssid')
     async def execute(self, plan_id):
         """Entrada exclusiva del worker. Nunca expuesta como herramienta del LLM.
         Running/uncertain no se reintentan automáticamente después de un crash.
         """
         from .ssid_executor import WriteUncertain
-        plan=self.db.get(SsidPlan,plan_id)
+        plan=self.db.get(SsidPlan,plan_id,populate_existing=True)
         if plan is None: raise NotFound('Plan no encontrado.')
         actor=execution_actor(self.db,plan.owner_id)
         scope=self.scope(actor,plan.scope_id,Permission.CHANGES_EXECUTE)
@@ -696,8 +700,8 @@ class SsidPlanService:
             self.db.flush()
         except IntegrityError:
             self.db.rollback()
-            raise Conflict('Otro trabajo posee el SSID o requiere conciliación manual.') from None
-        claimed=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan_id,SsidPlan.status=='confirmed',SsidPlan.expires_at>utc_now()).values(status='executing'),execution_options={'synchronize_session':False})
+            raise PlanBusy('Otro trabajo posee el SSID o requiere conciliación manual.') from None
+        claimed=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan_id,SsidPlan.status=='confirmed',SsidPlan.expires_at>utc_now()).values(status='executing',execution_started_at=utc_now()),execution_options={'synchronize_session':False})
         if claimed.rowcount!=1:
             self.db.rollback(); raise Conflict('El plan fue tomado por otro ejecutor.')
         record_event(self.db, 'ssid.plan.claimed', actor_id=actor.id, source='worker', details={'plan_id': plan_id})
@@ -778,9 +782,10 @@ class SsidPlanService:
         self.db.commit()
         return self.read(plan)
 
+    @exclusive_plan('ssid')
     async def reconcile(self, plan_id):
         """Resuelve un lote detenido comparando con el inventario. No escribe en la red."""
-        plan=self.db.get(SsidPlan,plan_id)
+        plan=self.db.get(SsidPlan,plan_id,populate_existing=True)
         if plan is None: raise NotFound('Plan no encontrado.')
         if plan.status not in ('executing','uncertain'): raise Conflict('El plan no requiere conciliación.')
         scope=self.db.get(WifiScope,plan.scope_id)

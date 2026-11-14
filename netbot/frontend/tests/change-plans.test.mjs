@@ -38,6 +38,19 @@ function setup(routes={}) {
 const tech={permissions:['changes:request','changes:approve']};
 const admin={permissions:['changes:request','changes:approve','networks:manage']};
 
+test('an online but unverified restart is never displayed as verified or retried',async()=>{
+  const ui=setup({'/device-restart-plans':[restartPlan({status:'unverified',
+    execution_results:[{status:'reconciled_online_restart_unconfirmed'}]})]});
+  ui.plans.reset();await ui.plans.configureUser(admin);
+  const card=ui.$('changes-plan-list').children[0];
+  assert.match(card.text,/reinicio no acreditado/);
+  assert.match(card.text,/sin repetir la orden/);
+  assert.doesNotMatch(card.text,/Verificada/);
+  assert.equal(card.button('Confirmar reinicio'),undefined);
+  assert.equal(card.button('Conciliar leyendo el controlador'),undefined);
+  assert.equal(ui.calls.filter(c=>c.method==='POST').length,0);
+});
+
 test('panel stays hidden and silent without the change permission',async()=>{
   const ui=setup();ui.plans.reset();await ui.plans.configureUser({permissions:['chat:use']});
   assert.equal(ui.$('changes-panel').hidden,true);assert.equal(ui.calls.length,0);

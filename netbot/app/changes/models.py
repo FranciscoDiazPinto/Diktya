@@ -79,6 +79,7 @@ class SsidPlan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    execution_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WifiWriteLease(Base):
@@ -139,6 +140,7 @@ class SsidVlanChangePlan(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    execution_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 class DeviceRestartPlan(Base):
     """Reinicio confirmado de un equipo (HU011). Un reinicio no se deshace: se recupera o escala."""
@@ -161,3 +163,5 @@ class DeviceRestartPlan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    execution_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    uptime_before: Mapped[int | None] = mapped_column(Integer)

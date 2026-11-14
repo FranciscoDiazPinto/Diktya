@@ -10,12 +10,13 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.changes.queue import KINDS, confirmed_ids, interrupted_ids
+from app.changes.queue import KINDS, confirmed_ids, expire_approvals, interrupted_ids, reject_approval
+from app.changes.execution import PlanBusy
 from app.changes.restart_service import DeviceRestartService
 from app.changes.service import expire_due
 from app.changes.ssid_service import SsidPlanService
 from app.core.config import Settings
-from app.core.errors import ApplicationError
+from app.core.errors import AccessDenied, ApplicationError, Conflict, NotFound, Unauthenticated
 
 from .events import Event, record
 from .incidents import incident_reporter
@@ -57,9 +58,14 @@ class ChangeWorker:
         action = "reconciled" if reconcile else "executed"
         try:
             status = self._status(await self._runner(kind, plans, restarts, reconcile=reconcile)(plan_id))
+        except PlanBusy:
+            db.rollback()
+            return None  # el propietario sigue activo; no rechazar ni liberar su recurso
         except ApplicationError as exc:
             # Rechazo previo a cualquier escritura (permiso revocado, inventario cambiado, vencido).
             db.rollback()
+            if not reconcile and isinstance(exc, (AccessDenied, Conflict, NotFound, Unauthenticated)):
+                reject_approval(db, kind, plan_id, type(exc).__name__)
             self._trace(db, kind, plan_id, "rejected", "failure", exc.detail)
             logger.info("Trabajo %s %s rechazado: %s", kind, plan_id, exc.detail)
             return None
@@ -75,6 +81,8 @@ class ChangeWorker:
                 db.commit()
             if not self._settings.unifi_write_enabled:
                 return  # sin habilitación explícita las aprobaciones esperan; nada se descarta
+            if expire_approvals(db, now):
+                db.commit()
             # Recuperación tras una caída: solo lectura sobre la red.
             stale = now - timedelta(seconds=self._settings.device_restart_timeout_seconds * 2)
             for kind in KINDS:

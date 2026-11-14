@@ -101,7 +101,7 @@ configurado en OpenRouter.
 
 Admin puede validar la [plantilla y contrato CSV](docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
 
-Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado están integrados. Aplicar `alembic upgrade head` (hasta `020_agent_events`); consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
+Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado están integrados. Aplicar `alembic upgrade head` (hasta `021_execution_ownership`), con API y workers detenidos; consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
 
 ## Seguridad de despliegue y remediación de auditoría
 
@@ -152,6 +152,8 @@ Flujo común de creación de SSID, cambio de VLAN y reinicio: **propuesta → co
 - El cambio de VLAN usa el `PUT` del contrato público UniFi Network 10.6.106 (no existe `PATCH`): reenvía la configuración leída cambiando solo la red, y no escribe si el controlador entrega la clave censurada.
 - Si la verificación falla se restaura la red anterior; un SSID recién creado que no verifica se elimina solo si lo creó ese trabajo. Un reinicio no se deshace: si el equipo no vuelve dentro de `DEVICE_RESTART_TIMEOUT_SECONDS` se abre un ticket. Gateway, firewall y equipos no clasificados solo los reinicia un administrador.
 - Un resultado que no se puede acreditar queda `uncertain` con el recurso bloqueado. No se reintenta: un administrador lo concilia (solo lectura) desde Aprovisionamiento o con el CLI.
+- La ejecución y la conciliación del mismo plan se excluyen entre procesos. Una aprobación antigua no hace que una ejecución recién iniciada se considere interrumpida. Las aprobaciones vencidas salen de la cola y se auditan; un recurso ocupado espera y un rechazo definitivo anterior a la ejecución exige otra propuesta.
+- Un reinicio sin evidencia queda `uncertain`, incluso si el equipo está en línea. Al conciliar, un uptime menor permite verificarlo; si solo se acredita que está en línea, el estado final es `unverified` y se libera el bloqueo sin repetir la orden ni registrar éxito de reinicio.
 - El orquestador registra el estado de cada agente (`GET /api/v1/agents/status`) y sus trazas (`/api/v1/agents/events`); tres ciclos fallidos seguidos abren un ticket. Los fallos de verificación o rollback abren tickets de criticidad Alta o Crítica.
 - Auditoría: solicitud, confirmación, ejecución y resultado quedan en la tabla inmutable. El técnico consulta sus propias acciones en `GET /api/v1/audit/mine`.
 

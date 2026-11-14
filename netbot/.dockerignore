@@ -1,5 +1,6 @@
 # Nada local entra a la imagen: ni secretos, ni bases, ni entornos virtuales.
 .env
+.*.change-locks/
 .env.*
 **/.env
 **/.env.*

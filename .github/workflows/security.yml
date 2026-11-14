@@ -12,6 +12,20 @@ permissions:
 jobs:
   pruebas:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: netbot_test
+          POSTGRES_USER: netbot_test
+          POSTGRES_PASSWORD: ci-only-isolated-db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U netbot_test -d netbot_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NETBOT_TEST_POSTGRES_URL: postgresql+psycopg://netbot_test:ci-only-isolated-db@127.0.0.1:5432/netbot_test
     defaults:
       run:
         working-directory: netbot

@@ -1,8 +1,10 @@
 // Cambio de VLAN y reinicio de equipos: propuesta, confirmación explícita y seguimiento.
 // Confirmar registra la aprobación; la ejecución, verificación y recuperación son del worker.
 const STATUS = {
-  preview: 'Pendiente de tu confirmación', expired: 'Vencida sin confirmar', confirmed: 'Aprobada · esperando al ejecutor',
-  executing: 'En ejecución', completed: 'Verificada', failed: 'Fallida · sin cambios aplicados',
+  preview: 'Pendiente de tu confirmación', expired: 'Vencida · prepara otra propuesta', confirmed: 'Aprobada · esperando al ejecutor',
+  rejected: 'Rechazada antes de ejecutar · prepara otra propuesta',
+  executing: 'En ejecución', completed: 'Verificada', failed: 'Fallida · revisa el resultado',
+  unverified: 'Equipo en línea · reinicio no acreditado',
   rolled_back: 'No verificada · se restauró el estado anterior', rollback_failed: 'No se pudo restaurar · requiere conciliación',
   uncertain: 'Resultado incierto · requiere conciliación', cancelled: 'Cancelada',
 };
@@ -10,6 +12,8 @@ const RESULT = {
   verified_configuration: 'Configuración releída y verificada en el controlador. No equivale a una prueba de conexión.',
   returned_online: 'El equipo volvió en línea después del reinicio.',
   online_restart_unconfirmed: 'El equipo está en línea, pero no se pudo acreditar que se reinició.',
+  reconciled_online_restart_unconfirmed: 'Conciliación: equipo en línea. No se pudo acreditar el reinicio; se liberó el bloqueo sin repetir la orden.',
+  reconciled_restart_verified: 'Conciliación: reinicio acreditado por un uptime menor y equipo en línea.',
   did_not_return: 'El equipo no volvió en línea dentro del tiempo máximo. Se abrió un ticket.',
   not_sent: 'La orden no se envió: el equipo no fue reiniciado.',
   restart_unconfirmed: 'No se pudo confirmar si el equipo recibió la orden.',

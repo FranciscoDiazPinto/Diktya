@@ -33,6 +33,16 @@ function setup(hash='#overview') {
 }
 const admin={permissions:['monitoring:read','chat:use','networks:read:details','networks:read:own','changes:request','vlan:reserve','tickets:read','networks:manage']};
 
+test('the supervisor can reach read-only tickets through navigation and a direct URL',()=>{
+  const supervisor={permissions:['monitoring:read','chat:use','changes:read']};
+  const ui=setup('#tickets-panel');ui.navigation.configureUser(supervisor);
+  assert.equal(ui.$('tickets-nav').hidden,false);
+  assert.equal(ui.navigation.currentView,'tickets-panel');
+  ui.navigation.navigate('overview');assert.equal(ui.navigation.navigate('tickets-panel'),true);
+  assert.equal(ui.navigation.navigate('provisioning'),false);
+  assert.equal(ui.navigation.navigate('users'),false);
+});
+
 test('only the chosen view is visible; sidebar changes route, heading and browser history',()=>{
   const ui=setup();ui.navigation.configureUser(admin);
   assert.deepEqual(ui.visible(),['#view-overview']);
