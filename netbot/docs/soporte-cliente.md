@@ -107,7 +107,7 @@ Son tickets internos de Netbot; no se conecta una mesa de ayuda externa.
 
 `tickets/agent.py` corre en el lifespan cada `TICKET_AGENT_INTERVAL_SECONDS`. Es una tarea en memoria de una instancia, no una cola durable. Convierte alertas activas en tickets, resuelve los que se normalizaron, escala los desatendidos y envía correos. Una alerta genera su ticket en un ciclo; sumado al colector de monitoreo queda dentro de los 2 minutos pedidos.
 
-**Un incidente, un ticket.** Un índice único impide dos tickets sin cerrar con la misma clave. Un nuevo evento se anota en el ticket existente; si estaba resuelto, se reabre. Después de cerrado, una repetición abre otro ticket. `tickets.agent.open_incident()` es la entrada común: la Épica 004 puede usarla para verificación o rollback fallidos, aún sin conectar porque esa épica no existe.
+**Un incidente, un ticket.** Un índice único impide dos tickets sin cerrar con la misma clave. Un nuevo evento se anota en el ticket existente; si estaba resuelto, se reabre. Después de cerrado, una repetición abre otro ticket. `tickets.agent.open_incident()` es la entrada común: el worker de cambios la usa, mediante el puente `agents.incidents`, para verificación fallida, rollback fallido, reinicio sin retorno y agentes caídos. Esos tickets no nacen de una alerta de monitoreo, por lo que no se resuelven solos: los cierra un técnico.
 
 **Criticidad.** Se clasifica por reglas, no con el LLM: son deterministas y comprobables.
 
@@ -115,7 +115,8 @@ Son tickets internos de Netbot; no se conecta una mesa de ayuda externa.
 |---|---|
 | `source_unavailable`, `rollback_failed` | Crítica |
 | `device_offline`, `verification_failed` | Alta |
-| `device_degraded`, `device_missing`, `source_degraded` | Media |
+| `restart_failed`, `agent_failed` | Alta |
+| `device_degraded`, `device_missing`, `source_degraded`, `ssid_missing`, `ssid_disabled`, `vlan_missing`, `vlan_disabled` | Media |
 
 Un gateway o firewall fuera de línea es Crítica. Con `TICKET_MASS_INCIDENT_DEVICES` (3) o más incidentes del mismo tipo a la vez se sube un nivel. Un tipo sin regla queda en Media con `needs_review`. `TICKET_CRITICALITY_RULES_JSON` sustituye reglas: `{"device_offline":"critica"}`. La cantidad de usuarios afectados no entra en el cálculo: el inventario no la registra.
 

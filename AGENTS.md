@@ -26,7 +26,7 @@
 
 ## Próximo bloque: SSID, AP y VLAN existentes
 
-- Alcance confirmado por el usuario: técnico/operador y admin podrán solicitar creación/modificación de SSID, elegir AP concretos y asociar **VLAN existentes** después del CSV. No crear VLAN nuevas, DHCP, NAT o reglas OPNsense en este bloque. Creación mediante planes e inventario implementada; edición, compensación y laboratorio pendientes; ver `netbot/docs/contexto-desarrollo.md#ssid`.
+- Alcance confirmado por el usuario: técnico/operador y admin podrán solicitar creación/modificación de SSID, elegir AP concretos y asociar **VLAN existentes** después del CSV. No crear VLAN nuevas, DHCP, NAT o reglas OPNsense en este bloque. Creación, cambio de VLAN y reinicio implementados con verificación y recuperación; laboratorio pendiente; ver `netbot/docs/carga-csv.md#ejecución-verificación-y-recuperación`.
 - El sitio, evento, AP, WLAN y Network/VLAN son recursos distintos. Una asignación a una red existente no concede implícitamente aprovisionamiento de todo el sitio. Diseñar autorización por recurso y revalidarla al preparar, confirmar y ejecutar, también tras esperas externas y cambios de rol.
 - Herramientas LLM de consulta/propuesta; confirmación humana por API vinculada al actor y plan exacto; después trabajo durable, idempotente, con control de concurrencia, relectura y compensación por operación. No exponer al modelo herramientas que puedan encadenar por sí solas reserva/aplicación ni presentar «encolado» como «desplegado».
 - La referencia usa Integration API de UniFi OS; su escritura real revisada solo reasocia WLAN y Network existentes. Crear SSID y elegir AP para el despliegue son desarrollo nuevo. No asumir versión exacta de Network, soporte de creación ni permisos por conocer el tipo histórico de consola.
@@ -43,6 +43,7 @@
 - Excepción actual: `auth.models.User` es el contrato de identidad de la sesión. No extender esta excepción a otras tablas.
 - Errores de aplicación en `core/errors.py`; traducción HTTP en `http_errors.py`. FastAPI pertenece a routers/dependencias/composición.
 - La auditoría agregada por un colaborador no hace commit: confirma el caso de uso que posee la operación.
+- `agents` coordina; ningún otro dominio lo importa (salvo el alias de entrada `changes/cli.py`). `changes` escala incidentes mediante el puerto inyectado, no importando `tickets`. El worker (`app/agents/cli.py`) es el único proceso que escribe en la red.
 - Registrar nuevos modelos en `model_registry.py`; Alembic y el arranque usan ese registro. No modificar migraciones ya aplicadas: agregar otra.
 - Producción requiere `alembic upgrade head` antes de arrancar. Solo development/test pueden usar create_all; no agregar creación automática de tablas a otros entornos.
 
@@ -78,6 +79,6 @@ node --test frontend/tests/*.test.mjs
 
 Actualizar README y guías afectadas al cambiar contratos, permisos, módulos o arranque. Mantener rutas y comandos ejecutables. Los documentos de `docs/superpowers/specs` y `plans` son antecedentes históricos, no instrucciones vigentes para implementar sin revisar el estado actual.
 
-Pendientes reales: validar el monitoreo contra equipos reales, escrituras UniFi, creación/modificación de SSID y selección aplicada de AP con VLAN existentes, trabajos durables, verificación/compensación, administración por chat y aprovisionamiento CSV en UniFi. La validación CSV, reserva local y atención temporal/QR/recuperación por contactos están implementadas; consultar `netbot/docs/carga-csv.md` y `netbot/docs/atencion-invitados.md`. La síntesis de Atlas es documentación, no una integración implementada.
+Pendientes reales: validar contra equipos reales el monitoreo y todas las escrituras UniFi (creación de SSID, `PUT` de cambio de VLAN, reinicio) antes de habilitarlas; MFA; edición de SSID en lote; retención de datos; administración de usuarios por chat. Están implementados y probados con simulaciones: planes y worker durable, verificación, restauración/compensación, conciliación, orquestador de agentes, proveedor LLM seleccionable y despliegue en contenedores; consultar `netbot/docs/carga-csv.md`, `netbot/docs/arquitectura-modular.md#cambios-controlados-y-agentes` y `netbot/docs/atencion-invitados.md`. No declarar una escritura como validada por pasar pruebas con controladores simulados. La síntesis de Atlas es documentación, no una integración implementada.
 
 Integración vigente: conservar el paquete `monitoring/providers/unifi/` y el inventario/alertas/planos de Itamar. No reintroducir el archivo homónimo `unifi.py` ni las variables retiradas `UNIFI_MONITORING_*`. El detalle por red adapta inventario compartido. Migración 010 une historias publicadas sin modificarlas. Ver decisiones de integración del 02-11-2026 en `netbot/docs/contexto-desarrollo.md`.

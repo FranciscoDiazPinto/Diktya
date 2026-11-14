@@ -29,7 +29,7 @@ Sin PostgreSQL se puede omitir `DATABASE_URL`: la API usa SQLite (`netbot.db`).
 ### Crear un usuario
 
 `python -m app.auth.cli correo@dominio.cl --role admin --name "Nombre"`
-(roles: `admin`, `tecnico`, `operador`, `cliente`, `visor`). La contraseña se solicita sin mostrarla o se lee con `--password-stdin`; nunca como argumento. Si el correo existe, actualiza su contraseña y rol.
+(roles: `admin`, `tecnico`, `operador`, `cliente`, `visor`). La contraseña se solicita sin mostrarla o se lee con `--password-stdin`; nunca como argumento. Si el correo existe, actualiza su contraseña y rol. Con sesión de administrador, la vista **Usuarios** permite crear, editar, desactivar y desbloquear cuentas; cada persona cambia su contraseña en **Mi cuenta**.
 
 ### Dashboard
 
@@ -45,11 +45,11 @@ Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-mod
 - `app/core`: configuración, seguridad, base de datos y logging.
 - `app/auth`: usuarios, roles y permisos (Épica 001).
 - `app/monitoring`: proveedores OPNsense/UniFi/mock, inventario, alertas y planos (Épica 002). Ver `docs/epica-002-monitoreo.md`.
-- `app/chat`: asistente mediante OpenRouter, conversaciones privadas persistentes y políticas por rol.
+- `app/chat`: asistente con proveedor seleccionable (OpenRouter o Claude), conversaciones privadas persistentes y políticas por rol.
 - `app/networks`: registro local y asignación de acceso por red.
-- `app/changes`: reservas VLAN locales, planes SSID y servicio de modificación VLAN con confirmación, ejecución UniFi optativa y verificación de configuración. Integración operativa completa y rollback pendientes.
+- `app/changes`: reservas VLAN, planes de creación SSID, cambio de VLAN y reinicio de equipos con confirmación; ejecución UniFi optativa, verificación, restauración/compensación y conciliación. Pendiente de validación física.
 - `app/tickets`: tickets internos y de incidentes, criticidad, notificaciones y seguimiento (Épica 005). Ver `docs/soporte-cliente.md`.
-- `app/agents`: espacio reservado; workers durables pendientes.
+- `app/agents`: orquestador, contrato de eventos y trazas, puente de incidentes hacia tickets y worker de cambios (`python -m app.agents.cli`).
 - `migrations`: historial de migraciones de Alembic.
 - `docs`: ERS, diagramas PlantUML y decisiones de arquitectura.
 - `tests`: pruebas automatizadas.
@@ -73,9 +73,9 @@ migración `007_monitoring_inventory` crea las tablas de inventario, alertas y p
 
 El endpoint `POST /api/v1/chat/messages` requiere autenticación y `chat:use`. El servidor carga el historial persistente de la conversación y comprueba propietario, rol y ámbito antes de enviar contexto al proveedor. No acepta historial desde el navegador. Las herramientas se filtran por permisos y vuelven a autorizarlos antes de ejecutarse.
 
-Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. La creación SSID dispone de un ejecutor CLI optativo; HU010 incorpora servicio de reasociación de un SSID a una VLAN existente y API de propuesta/confirmación, pero aún no está conectada al chat, al panel ni a ese CLI. Las escrituras no están validadas en equipos reales y el rollback sigue pendiente. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
+Clientes y técnicos solo pueden consultar su inventario asignado. El monitoreo global queda para visor/admin, y las reservas VLAN globales para admin. El soporte incluye acceso Wi-Fi protegido, diagnóstico parcial por interfaz y tickets persistentes. Técnico y administrador pueden proponer por chat o desde el panel la creación de un SSID, el cambio de VLAN de un SSID existente y el reinicio de un equipo de su ámbito; el chat nunca confirma ni ejecuta. Las escrituras no están validadas en equipos reales. Ver [configuración y límites del soporte](docs/soporte-cliente.md). Ver [roles, asignaciones, migración y contrato HTTP](docs/chat-roles-y-persistencia.md).
 
-Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en OpenRouter para generar respuestas.
+Las preguntas, el historial acotado y los resultados de monitoreo necesarios se procesan en el proveedor configurado (`LLM_PROVIDER=openrouter|anthropic`) para generar respuestas. `GET /api/v1/chat/health` verifica credencial y modelo sin consumir tokens; la vista **Estado del sistema** lo muestra junto a los agentes. Con Claude directo el adaptador usa el SDK oficial, solicita el reintento en el modelo de respaldo ante un rechazo (`ANTHROPIC_REFUSAL_FALLBACK`) y devuelve mensajes distintos para credencial inválida, límite de uso y tiempo de espera.
 
 ## Pruebas
 
@@ -101,7 +101,7 @@ configurado en OpenRouter.
 
 Admin puede validar la [plantilla y contrato CSV](docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
 
-Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado están integrados. Aplicar `alembic upgrade head` (incluidas 013 y 014 para HU010); consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
+Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado están integrados. Aplicar `alembic upgrade head` (hasta `020_agent_events`); consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
 
 ## Seguridad de despliegue y remediación de auditoría
 
@@ -141,3 +141,30 @@ El objetivo se mantiene: autenticar usuarios, consultar UniFi/OPNsense, asistir 
 El frontend usa módulos ES, mientras el DoD académico de HU005 exige React. El monitoreo técnico se limita a recursos asignados; el CSV separa validación/reserva de despliegue y evita contraseñas. Estas diferencias requieren acordar el alcance o completar los criterios; no se dan por resueltas por actualizar esta guía. El backend es un monolito modular, con tareas periódicas y un CLI; HU018 no está cerrada como arquitectura multi-agente completa.
 
 El backlog académico conserva 19 HU y 121 puntos: 5 en revisión funcional, 13 parciales y 1 pendiente (HU011), sin cierres integrales acreditados. Ver [Product Backlog](../Fase%202/Evidencias%20Proyecto/Documento_02-_Product_Backlog.docx) y [Netbot2 actualizado](../Netbot2_actualizado.pptx). La Gantt conserva nueve sprints de dos semanas como línea base y muestra por separado el estado del corte; las fechas de reprogramación quedan por acordar. Priorizar aceptación de funciones candidatas y un flujo completo de cambio con verificación y rollback antes de ampliar canales.
+
+## Cambios controlados, worker y agentes (14 de noviembre de 2026)
+
+Flujo común de creación de SSID, cambio de VLAN y reinicio: **propuesta → confirmación explícita por API → worker → verificación → restauración o escalamiento**. Detalle en [carga CSV y planes](docs/carga-csv.md#ejecución-verificación-y-recuperación) y en la [arquitectura modular](docs/arquitectura-modular.md#cambios-controlados-y-agentes).
+
+- El proceso web nunca escribe en la red. El worker es un proceso propio: `python -m app.agents.cli` (una pasada), `--loop` (servicio) o `reconcile <ssid|vlan|restart> <id>`. Sin `UNIFI_WRITE_ENABLED=true` no arranca y las aprobaciones quedan en espera.
+- El cambio de VLAN usa el `PUT` del contrato público UniFi Network 10.6.106 (no existe `PATCH`): reenvía la configuración leída cambiando solo la red, y no escribe si el controlador entrega la clave censurada.
+- Si la verificación falla se restaura la red anterior; un SSID recién creado que no verifica se elimina solo si lo creó ese trabajo. Un reinicio no se deshace: si el equipo no vuelve dentro de `DEVICE_RESTART_TIMEOUT_SECONDS` se abre un ticket. Gateway, firewall y equipos no clasificados solo los reinicia un administrador.
+- Un resultado que no se puede acreditar queda `uncertain` con el recurso bloqueado. No se reintenta: un administrador lo concilia (solo lectura) desde Aprovisionamiento o con el CLI.
+- El orquestador registra el estado de cada agente (`GET /api/v1/agents/status`) y sus trazas (`/api/v1/agents/events`); tres ciclos fallidos seguidos abren un ticket. Los fallos de verificación o rollback abren tickets de criticidad Alta o Crítica.
+- Auditoría: solicitud, confirmación, ejecución y resultado quedan en la tabla inmutable. El técnico consulta sus propias acciones en `GET /api/v1/audit/mine`.
+
+## Despliegue en contenedores
+
+```sh
+cp deploy/production.env.example .env        # completar y proteger (chmod 600)
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml run --rm migrate
+docker compose -f docker-compose.prod.yml up -d
+```
+
+- `proxy` (nginx) es el único servicio con puertos publicados; requiere `deploy/tls/fullchain.pem` y `privkey.pem`. La API solo acepta cabeceras de proxy desde su IP fija.
+- `migrate` usa el propietario del esquema; `api` y `worker` usan el rol limitado `netbot_app`. Detener la API, respaldar y ejecutar `migrate` antes de cada versión.
+- El worker es opcional: `docker compose -f docker-compose.prod.yml --profile worker up -d`, con `UNIFI_WRITE_API_KEY` definida únicamente en `.env.worker`.
+- Requiere Docker Compose 2.24 o superior. La imagen, el Compose y la plantilla nginx se validan en CI; **no se ejecutaron en un equipo real**: comprobar `nginx -t`, certificados y `/health` en la instalación.
+
+Verificación de este corte: 649 pruebas backend y 104 frontend aprobadas, más una prueba de humo con el servidor real en modo simulado. No hubo revisión visual en navegador ni contacto con UniFi, OPNsense, SMTP o el proveedor LLM.

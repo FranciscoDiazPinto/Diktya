@@ -1,4 +1,4 @@
-# Generado desde requirements.txt; versiones sin vulnerabilidades conocidas según pip-audit (2026-11-02; SDK de Anthropic añadido el 2026-11-14).
+# Generado desde requirements.txt; sin vulnerabilidades conocidas según pip-audit al 2026-11-14 (SDK de Anthropic añadido; dnspython 2.9.2 por CVE-2026-128089).
 # Actualizar con: pip install -r requirements.txt && pip freeze, y revisar pip-audit antes de confirmar.
 alembic==1.20.1
 annotated-doc==0.0.5
@@ -10,7 +10,7 @@ argon2-cffi-bindings==26.1.0
 certifi==2026.10.23
 cffi==2.1.1
 click==8.5.0
-dnspython==2.9.1
+dnspython==2.9.2
 docstring_parser==0.18.0
 email-validator==2.3.0
 fastapi==0.162.0

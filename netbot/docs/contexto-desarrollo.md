@@ -627,3 +627,25 @@ El usuario solicita actualizar el backlog Word y la presentación Netbot2 a part
 `Netbot2_actualizado.pptx` conserva las doce diapositivas y modifica únicamente las láminas 8 y 9 y sus notas: resumen editable de las seis épicas y Gantt editable por HU/sprint, conforme a la tabla de planificación del backlog. Se preservan exactamente las otras diez diapositivas, imágenes, tema y diseños del original `Netbot2.pptx`. La Gantt mantiene nueve sprints de dos semanas y distingue planificación de estado técnico. La continuidad FD/IC conserva la nota de ratificación académica pendiente y no sustituye la autoría original. README enlaza al nombre real del Word y a la presentación actualizada. El diseño previo, DoD y Product Vision no se modifican.
 
 Verificación del corte local e311e57: frontend 81/81; backend inicialmente 494 aprobadas y una falla en `test_production_starts_on_migrated_schema_without_changing_tables`, porque el subproceso Alembic productivo hereda recuperación por correo desde `.env` y rechaza su URL local sin HTTPS. La prueba aislada y la suite completa pasan con `GUEST_EMAIL_RECOVERY_ENABLED=false` solo en el proceso de pruebas: 495/495. No se modifica `.env`, código operativo ni pruebas; no se contacta SMTP ni infraestructura. Queda registrado el aislamiento incompleto del entorno de esa prueba como pendiente de calidad. Render y revisión de Word y presentación se realizan localmente; sin commit, push ni merge.
+
+
+## Cierre técnico FinalSprint (14-11-2026)
+
+Rama `FinalSprint`, desde `dev` 33b98c4. Objetivo pedido por el usuario: dejar el código listo para producción. Sin push ni merge; sin contacto con UniFi, OPNsense, SMTP ni proveedores LLM.
+
+**Qué se integró.** Los once parches de la auditoría de seguridad del 02-11 (migraciones renumeradas a 015–017 para continuar después de HU010). Cambio de VLAN, reinicio confirmado, verificación, restauración/compensación y conciliación; reservas con vencimiento y asignación; alertas de SSID/VLAN inactivos y ventana de mantenimiento; orquestador, trazas y worker durable; proveedor LLM seleccionable con adaptador directo de Claude y health check; pantallas de cambios, usuarios, cuenta y estado del sistema; imagen, Compose de producción y validación en CI. Migraciones 018–020.
+
+**Hallazgo que cambió la implementación.** El servicio de HU010 enviaba `PATCH` al Wi-Fi Broadcast. El OpenAPI público de UniFi Network 10.6.106 solo declara `GET`, `PUT` y `DELETE` para ese recurso: contra un controlador real la escritura habría fallado y dejado cada plan en estado incierto. Ahora se usa `PUT` con el detalle leído, sin `id` ni `metadata`, cambiando solo la red. El mismo documento confirma `POST …/devices/{id}/actions` con `{"action":"RESTART"}` y `DELETE` del broadcast, usados por el reinicio y la compensación. Queda por comprobar en laboratorio qué devuelve el detalle de seguridad (clave en claro o censurada) y si el `PUT` admite todos los campos que entrega el `GET`.
+
+**Decisiones tomadas y por qué.**
+
+- Rollback: se revierte solo lo que el trabajo aplicó. Si la red observada no es la original ni la solicitada, otro actor la cambió: no se sobrescribe y queda `uncertain`.
+- Lote CSV: se detiene en la primera falla, compensa la fila afectada y conserva las verificadas. Es la política propuesta en S02 del diseño; revertir todo el lote requeriría acuerdo explícito (D02).
+- Reinicio: no agregó un permiso para no alterar la huella de autorización de las conversaciones. Lo que no se acredita como AP se trata como crítico y exige administrador.
+- «En línea» tras un reinicio solo acredita el reinicio si se observó la caída o un uptime menor; si no, se informa `online_restart_unconfirmed`.
+- El worker es un proceso separado y opcional; el web no recibe la clave de escritura. Sin `UNIFI_WRITE_ENABLED` las aprobaciones esperan, no se descartan.
+- Claude directo usa el SDK oficial (`anthropic`), `claude-opus-5-5` por defecto, esfuerzo `medium` y el reintento del lado del servidor ante rechazos, configurable. Los bloques de razonamiento se devuelven intactos entre rondas de herramientas.
+
+**Verificación.** 649 pruebas backend y 104 frontend aprobadas; `alembic upgrade head`, `alembic check` (sin diferencias atribuibles a estas migraciones) y `downgrade` en SQLite; prueba de humo del servidor real en modo simulado (agentes, auditoría propia, rechazo de cambios con inventario simulado). No verificado: Docker, nginx y GitHub Actions (no disponibles en este equipo), PostgreSQL para las migraciones 018–020, revisión visual en navegador y todo lo que requiere hardware o credenciales reales.
+
+**Pendiente para operar.** Laboratorio de UniFi/OPNsense con la versión objetivo; primera corrida de CI; certificados y `nginx -t` en el equipo; MFA (TOTP u OIDC); plazos de retención; acuerdo sobre datos que pueden salir al LLM; React frente a módulos ES (HU005); edición de SSID en lote. Las condiciones D01–D08 del backlog siguen requiriendo acuerdo del equipo: este trabajo implementa una interpretación razonable, no las da por ratificadas. Los documentos académicos no se modificaron.

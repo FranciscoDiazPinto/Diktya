@@ -30,6 +30,28 @@ def test_domains_do_not_import_http_composition():
                     assert path.name == "cli.py", str(path)
 
 
+def test_only_entry_adapters_depend_on_the_agents_module():
+    """agents coordina a los demás dominios; depender de él en sentido inverso los acoplaría."""
+    for owner, path, tree in domain_sources():
+        if owner == "agents" or path.name == "cli.py":
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert not node.module.startswith("app.agents"), str(path)
+            if isinstance(node, ast.Import):
+                assert all(not alias.name.startswith("app.agents") for alias in node.names), str(path)
+
+
+def test_changes_never_imports_tickets():
+    """Los incidentes de cambios viajan por el puerto inyectado, no por una dependencia directa."""
+    for owner, path, tree in domain_sources():
+        if owner != "changes":
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                assert not node.module.startswith("app.tickets"), str(path)
+
+
 def test_http_and_database_logic_stay_on_their_respective_layers():
     for _, path, tree in domain_sources():
         http_boundary = path.name in {"routes.py", "router.py", "support_router.py", "guest_router.py", "dependencies.py"}

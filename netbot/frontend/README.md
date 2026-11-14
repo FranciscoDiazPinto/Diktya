@@ -86,3 +86,14 @@ Las notificaciones del equipo permanecen accesibles desde la barra superior en c
 ## Auditoría
 
 Administradores con `audit:read` disponen de la vista Auditoría: filtros exactos por actor, origen, acción y resultado, rango de fechas en hora local, paginación y descarga CSV con los filtros aplicados (máximo 5000 registros). Los cambios escritos en el formulario se aplican con «Aplicar filtros». Al cerrar sesión se limpian registros y filtros; las respuestas tardías no pueden restaurarlos. Las filas «Estado actual» son instantáneas, con fecha de creación del plan; no son eventos de ejecución. Ver [contrato y límites](../docs/arquitectura-modular.md#auditoría-unificada--hu013).
+
+## Cambios controlados, usuarios, cuenta y estado del sistema
+
+- **Aprovisionamiento** incorpora `change-plans.mjs`: cambio de VLAN de un SSID y reinicio de un equipo. Preparar muestra el impacto; confirmar es una solicitud aparte vinculada a la revisión; el resultado lo informa el worker. Los estados inciertos no se reintentan desde el navegador: solo un administrador puede conciliarlos.
+- **Usuarios** (`users.mjs`, permiso `users:manage`): alta, edición, roles, desactivación y desbloqueo. No hay eliminación de cuentas.
+- **Mi cuenta** (`account.mjs`): cambio de contraseña propia; al terminar se cierra la sesión.
+- **Estado del sistema** (`system-status.mjs`, permiso `monitoring:read`): agentes en segundo plano y salud del proveedor de IA; avisa si el ejecutor de cambios no está activo.
+- **Auditoría**: sin `audit:read`, un técnico ve únicamente sus propias acciones y no puede exportar.
+- El chat puede mostrar propuestas de cambio de VLAN y reinicio; el plan solo se crea cuando el usuario pulsa «Preparar revisión en el panel».
+
+`tests/markup.test.mjs` comprueba que cada elemento que estos módulos buscan por id exista en `index.html`. Estas vistas no tuvieron revisión visual en navegador.

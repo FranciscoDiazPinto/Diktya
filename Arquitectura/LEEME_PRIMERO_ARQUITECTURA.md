@@ -8,7 +8,7 @@ El sistema implementado es un monolito modular FastAPI con PostgreSQL/SQLite y f
 
 El punto de entrada HTTP, el ciclo de vida, la preparación de la base y el registro de modelos están separados. Producción exige migraciones aplicadas antes del arranque; solo development/test admiten create_all. El frontend separa sesión/API, chat, monitoreo, soporte, tickets y reservas.
 
-El flujo completo de cambios de infraestructura sigue pendiente. El directorio agents no contiene workers operativos; la tarea de muestreo actual corre en memoria. La lectura UniFi y los planes de creación SSID tienen implementación; su operación física continúa pendiente de validación. React, WebSocket y el flujo integral de ejecución durable, compensación y modificación en lote no están implementados.
+El flujo de cambios (propuesta, confirmación, worker durable, verificación, restauración o escalamiento) está implementado para creación de SSID, cambio de VLAN y reinicio, coordinado por el módulo agents; su operación física continúa pendiente de validación y no modifica OPNsense. React, WebSocket y la modificación de SSID en lote no están implementados.
 
 ## Documento de diseño previo al desarrollo
 

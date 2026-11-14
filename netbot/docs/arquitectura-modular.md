@@ -4,7 +4,7 @@ La entrada pública incluye [autoatención de invitados y QR Wi-Fi](atencion-inv
 
 Esta guía describe el código implementado. Es el punto de entrada técnico junto con [AGENTS.md](../../AGENTS.md). El [documento de referencia](../../Arquitectura/LEEME_PRIMERO_ARQUITECTURA.md) conserva el diseño objetivo, separado del estado real.
 
-Para continuar las integraciones se dispone de una [síntesis técnica de Atlas](contexto-desarrollo.md#contexto), con [contratos observados](contexto-desarrollo.md#integraciones), [decisiones propias](contexto-desarrollo.md#continuidad) y [evidencia](contexto-desarrollo.md#evidencias). No introduce dependencias hacia el producto del cliente ni cambia el stack. El bloque SSID/AP trabaja con **VLAN existentes**. Hay ejecutor optativo de creación y servicio de cambio de VLAN (HU010), ambos pendientes de validación física. HU010 aún no está conectado al chat/panel ni al CLI; no existe rollback completo.
+Para continuar las integraciones se dispone de una [síntesis técnica de Atlas](contexto-desarrollo.md#contexto), con [contratos observados](contexto-desarrollo.md#integraciones), [decisiones propias](contexto-desarrollo.md#continuidad) y [evidencia](contexto-desarrollo.md#evidencias). No introduce dependencias hacia el producto del cliente ni cambia el stack. El bloque SSID/AP trabaja con **VLAN existentes**. La creación de SSID, el cambio de VLAN (HU010) y el reinicio de equipos (HU011) tienen propuesta, confirmación, worker, verificación y recuperación; todos están pendientes de validación física. Ver [cambios controlados y agentes](#cambios-controlados-y-agentes).
 
 ## Organización
 
@@ -43,8 +43,8 @@ flowchart TD
 | tickets | Tablas Ticket/Event/Notification y ciclo de vida. `service.py` expone creación, actualización, detalle, listados y resúmenes del chat con autorización; `criticality.py` las reglas; `notifications.py` las entregas; `agent.py` el agente en memoria de incidentes, escalamiento y correo. |
 | monitoring | Contratos `InfrastructureSource` y `NetworkMonitoringProvider`, normalización, servicio/cache/historial, fábrica de adaptadores mock/OPNsense/UniFi, inventario persistido y colector (`inventory.py`), alertas (`alerts.py`) y planos (`plans.py`). Tablas `monitoring_*`, migración 007. |
 | chat | `application.py` coordina el mensaje; `service.py` orquesta herramientas/LLM; `storage.py` posee conversaciones e historial; `support.py` adapta servicios públicos a herramientas. |
-| changes | Reservas VLAN locales confirmadas, liberación y cargas CSV privadas (`csv_parser.py`, `csv_service.py`). Incluye un ejecutor optativo de creación SSID y servicio de reasociación VLAN UniFi; no modifica OPNsense. HU010 necesita conexión al flujo operativo; rollback y validación física pendientes. |
-| agents | Reservado para trabajos futuros; no tiene workers operativos. |
+| changes | Reservas VLAN (vencimiento y asignación), cargas CSV privadas, planes de creación SSID y cambio de VLAN (`ssid_service.py`), reinicios (`restart_service.py`), escritor UniFi (`ssid_executor.py`), conciliación (`reconciliation.py`) y cola de trabajos (`queue.py`). No modifica OPNsense. Validación física pendiente. |
+| agents | Orquestador y estado de agentes (`orchestrator.py`), contrato de eventos y trazas (`events.py`), puente de incidentes hacia tickets (`incidents.py`) y worker de cambios (`worker.py`, `cli.py`). Tablas `agent_events` y `agent_states`. |
 | core | Configuración, conexión SQL y errores de aplicación. No coordina dominios. |
 
 Los routers del propio módulo pueden tipar User como identidad de sesión y delegar en su servicio. Entre dominios se intercambian IDs, schemas o diccionarios de contrato. `auth.models.User` es una excepción explícita a la regla de no importar modelos ajenos; no debe ampliarse.
@@ -59,6 +59,7 @@ El chat consulta `tickets.service.list_ticket_summaries()`; no importa Ticket ni
 - tickets → auth/core y APIs públicas de networks y monitoring.
 - changes → auth/core/monitoring.
 - chat → contratos y servicios públicos de auth/networks/tickets/changes/monitoring.
+- agents → auth/core y servicios públicos de changes, tickets y monitoring. Ningún otro dominio importa agents (salvo el alias de entrada `changes/cli.py`): changes recibe el puerto de incidentes por inyección. `tests/test_architecture.py` lo comprueba.
 - Composición → todos los módulos. Ningún dominio depende del punto de entrada HTTP.
 
 La CLI de auth usa `bootstrap`, como adaptador de entrada independiente. Las importaciones de modelos para registrar metadata están centralizadas en `model_registry.py`, fuera de los dominios.
@@ -81,7 +82,7 @@ Los schemas de respuesta conservan los contratos públicos. La refactorización 
 
 - `main.create_app()` construye HTTP y registra adaptadores; no consulta la base ni crea tablas al importar.
 - `routes.py` registra routers; `http_errors.py` registra la traducción de errores.
-- `lifecycle.py` inicia/cierra monitoreo y sus tareas en memoria de muestreo y recolección de inventario, y el agente de tickets.
+- `lifecycle.py` construye el orquestador y le registra los agentes del proceso web (monitoreo, tickets y limpieza periódica); inicia y cierra además el muestreo de tráfico y la expiración de invitados.
 - `bootstrap.initialize_database()` registra metadata y prepara roles/admin; la CLI lo usa sin cargar FastAPI.
 - `model_registry.register_models()` registra modelos para bootstrap y Alembic.
 
@@ -105,6 +106,9 @@ Para un despliegue: detener backend → `alembic upgrade head` → arrancar. Las
 | notifications.mjs | Bandeja de notificaciones del equipo técnico. |
 | reservations.mjs | Propuestas, confirmación y liberación de reservas locales. |
 | csv-imports.mjs | Archivo, vista previa, selección, recuperación y confirmación explícita de reservas por CSV. |
+| change-plans.mjs | Cambio de VLAN y reinicio: propuesta, impacto, confirmación, seguimiento y conciliación administrativa. |
+| users.mjs / account.mjs | Administración de usuarios y roles; cambio de la contraseña propia. |
+| system-status.mjs | Estado de los agentes y del proveedor de IA. |
 | dom.mjs / format.mjs | Utilidades de vista y formato, sin reglas de permisos. |
 
 Solo identidad y época de sesión se comparten. Cada controlador conserva su estado; callbacks explícitos conectan acciones del chat con soporte, tickets o reservas. No importar dashboard desde una funcionalidad ni agregar variables globales para comunicar módulos.
@@ -121,7 +125,7 @@ Las decisiones visuales no sustituyen autorización del backend. Los resultados 
 6. Agregar ruta/herramienta/vista como adaptadores. Una herramienta nueva debe declarar permiso y validar argumentos.
 7. Ejecutar pruebas pertinentes, actualizar estas guías y los contratos funcionales afectados.
 
-La lectura de UniFi ya tiene adaptador propio en `monitoring/providers/unifi`. Las operaciones de escritura AP/SSID/VLAN deben pasar por plan confirmado, trabajo durable, autorización al ejecutar, verificación y auditoría. Un proceso de muestreo en memoria no cumple ese contrato. Los roles delimitan capacidades; no es necesario crear un proceso/worker por cada rol.
+La lectura de UniFi ya tiene adaptador propio en `monitoring/providers/unifi`. Las operaciones de escritura AP/SSID/VLAN pasan por plan confirmado, trabajo durable, autorización al ejecutar, verificación, recuperación y auditoría; una operación nueva debe seguir ese mismo camino. Un proceso de muestreo en memoria no cumple ese contrato. Los roles delimitan capacidades; no es necesario crear un proceso/worker por cada rol.
 
 ## Verificación y alcance real
 
@@ -131,7 +135,7 @@ Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.t
 
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
-Implementado: autenticación, aislamiento y persistencia de chat, reservas locales, monitoreo OPNsense/UniFi/mock de solo lectura con inventario, alertas y planos, acceso Wi-Fi protegido, tickets internos, tickets automáticos por incidente y notificaciones. Falta validar el monitoreo contra equipos reales. Pendiente: escrituras UniFi, cambios reales de AP/SSID/VLAN, cola durable, verificación/compensación, administración por chat, y aprovisionamiento CSV en UniFi. La validación CSV y reserva local están implementadas. Frontend React/WebSocket y contenedores API/frontend pertenecen al diseño objetivo; el Compose actual levanta PostgreSQL.
+Implementado: autenticación, aislamiento y persistencia de chat, reservas, monitoreo OPNsense/UniFi/mock de solo lectura con inventario, alertas y planos, acceso Wi-Fi protegido, tickets internos y por incidente, notificaciones, cambios controlados (creación SSID, cambio de VLAN, reinicio) con worker durable, verificación y recuperación, orquestador de agentes, proveedor LLM seleccionable y despliegue en contenedores. **Nada de lo que toca la red está validado contra equipos reales.** Pendiente: validación de laboratorio, MFA, edición de SSID en lote, retención de datos y administración de usuarios por chat. Frontend React y WebSocket pertenecen al diseño objetivo; `docker-compose.prod.yml` levanta proxy, API, worker y PostgreSQL.
 
 
 ## Integración vigente de monitoreo y tickets (02-11-2026)
@@ -150,6 +154,42 @@ El inventario, alertas, disponibilidad y planos se implementan en `monitoring.in
 
 Cada módulo ofrece `audit_queries.py` con su proyección de metadatos. Se excluyen deliberadamente JSON de detalles, notas/evidencias de tickets, filas/resultados de CSV, secretos, contactos y conversaciones. `actor_id=null` significa sistema o identidad no determinada; no permite distinguir ambos sin datos históricos adicionales. El permiso `audit:read` pertenece solo a admin y también se comprueba desde el servicio sin HTTP. No requiere migración.
 
-Reservas muestran creación/liberación; planes y cargas muestran creación/confirmación y una fila `snapshot=true` con su estado actual. La fecha de esa instantánea es la creación del plan: **no** acredita cuándo se ejecutó ni quién ejecutó cada paso. No se presenta esta consulta como registro inmutable completo de infraestructura: auditoría append-only transversal, historial de ejecución/verificación/rollback y aceptación de HU013 siguen pendientes. H010 y H011 no cambian.
+Reservas muestran creación/liberación; planes y cargas muestran creación/confirmación y una fila `snapshot=true` con su estado actual. La fecha de esa instantánea es la creación del plan: **no** acredita cuándo se ejecutó. La ejecución sí queda como evento inmutable en la proyección `auth` (ver la sección siguiente). `GET /api/v1/audit/mine` entrega a quien tiene `changes:request` únicamente sus propias acciones; el actor no se acepta desde la solicitud y la exportación sigue reservada a `audit:read`.
 
 El chat de invitados devuelve un estado conversacional validado por el backend (`needs_information`, `answered`, `closed`). El modelo no puede emitir cierre; una intención explícita del usuario activa la confirmación de limpieza en la interfaz. Los estados y el historial permanecen en memoria y caducan juntos. Ver el [flujo de atención](atencion-invitados.md).
+
+## Cambios controlados y agentes
+
+Vigente desde el 14-11-2026. Contrato funcional en [carga CSV y planes](carga-csv.md#ejecución-verificación-y-recuperación).
+
+```mermaid
+flowchart LR
+    U[Chat o panel] -->|propone| API[API changes]
+    API -->|confirma revisión| DB[(Planes confirmados)]
+    DB --> W[Worker · agente changes]
+    W -->|autoriza, bloquea, escribe| UNIFI[UniFi]
+    W -->|relee y verifica| UNIFI
+    W -->|restaura o concilia| UNIFI
+    W -->|incidente| T[Tickets]
+    W -->|eventos| AUD[(Auditoría y trazas)]
+```
+
+- **Dos procesos.** El web propone y registra aprobaciones; nunca escribe en la red ni recibe la clave de escritura. El worker (`python -m app.agents.cli --loop`) ejecuta. La cola es la base: un reinicio no pierde aprobaciones y un trabajo interrumpido queda `executing` hasta conciliarse.
+- **Puerto de incidentes.** `changes` no importa `tickets`. Sus servicios reciben un puerto `(db, tipo, clave, mensaje)` que `agents.incidents` implementa sobre `tickets.agent.open_incident`. El ticket, la traza y el resultado del trabajo se confirman en la misma transacción.
+- **Mantenimiento.** `monitoring.maintenance` es el contrato para declarar la caída esperada de un equipo; `alerts.device_conditions` la respeta. Lo usa el reinicio.
+- **Orquestador.** `agents.orchestrator.Orchestrator` registra un ciclo por agente y lo ejecuta aislado: una excepción se registra, se reintenta en el ciclo siguiente y no detiene a los demás. Tres fallos seguidos abren un ticket `agent_failed`. El estado se persiste con un máximo de una escritura cada 10 s por agente sano.
+- **Eventos.** `agents.events.Event` (versión 1): `event_id`, `correlation_id`, `agent_id`, `event_type`, `occurred_at`, recurso, resultado y detalle breve; sin secretos. Se deduplica por `event_id`. La correlación de un trabajo es `change:<tipo>:<id>`.
+- **Herramientas del chat.** `get_scope_ssids`, `prepare_vlan_change`, `prepare_device_restart` y `get_access_points` consultan o validan; ninguna persiste, confirma ni ejecuta.
+- **Proveedor LLM.** `chat.provider.ChatProvider` es el contrato; `build_provider()` elige `OpenRouterProvider` o `AnthropicProvider` según `LLM_PROVIDER`. Un adaptador nuevo implementa `complete()` y `health()`.
+
+| Endpoint | Permiso | Uso |
+|---|---|---|
+| `GET /api/v1/agents/status` | `monitoring:read` | Última ejecución, errores y estado (`ok`, `failed`, `stalled`, `stopped`) de cada agente. |
+| `GET /api/v1/agents/events` | `audit:read` | Trazas por agente o por correlación. |
+| `GET /api/v1/chat/health` | `monitoring:read` | Conexión con el proveedor LLM configurado. |
+| `GET /api/v1/audit/mine` | `changes:request` | Acciones propias. |
+| `POST /api/v1/changes/reconcile/{tipo}/{id}` | `networks:manage` | Conciliación de solo lectura. |
+
+Migraciones: `018_monitoring_maintenance`, `019_change_recovery`, `020_agent_events`. No se agregaron permisos: los existentes (`changes:request/approve/execute`, `networks:manage`) más el ámbito por recurso cubren estas operaciones sin cambiar la huella de autorización de las conversaciones.
+
+Límites conocidos: el orquestador vive en cada proceso (no hay bus entre procesos; se comunican por la base); las sesiones de invitados siguen exigiendo un solo worker web; no hay retención automática de trazas ni de auditoría.

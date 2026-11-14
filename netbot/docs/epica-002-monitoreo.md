@@ -157,3 +157,10 @@ desplegar, y registrar versiones y resultado. Tampoco se probó el transporte `c
 El inventario persistido, alertas, disponibilidad y planos de esta épica son la base de la integración. Se conserva retención acotada de lecturas del firewall (`MONITORING_STALE_RETENTION_SECONDS`, por defecto 300 s) con timestamp original y marca `stale`; esas lecturas no habilitan cambios. `GET /access-points` usa el proveedor normalizado UniFi compartido y devuelve DTO mínimos paginados; CPU/RAM/heartbeat quedan desconocidos cuando no se recolectan. No se mantiene un segundo adaptador de estadísticas.
 
 `GET /api/v1/networks/{id}/telemetry` requiere `networks:read:details`, asignación y vinculación explícita de sitio/AP/interfaz. No concede monitoreo global al técnico. Su configuración requiere la migración 009; la revisión 010 une esta historia con monitoreo/tickets. Dashboard y chat se mantienen juntos, con vistas separadas de dispositivos, alertas, SSID/VLAN y planos. Hardware real sigue pendiente de validación.
+
+
+## Mantenimiento declarado y recursos inactivos (14-11-2026)
+
+- `maintenance.open_window()` declara la caída esperada de un equipo (lo usa el reinicio confirmado). Mientras la ventana está vigente ese equipo no genera alertas; no oculta fallas de la fuente ni de otros equipos, y vence sola. Tabla `monitoring_maintenance`, migración 018.
+- Un SSID o VLAN que desaparece del inventario, o que pasa de habilitado a deshabilitado, genera una alerta de severidad media (`ssid_missing`, `ssid_disabled`, `vlan_missing`, `vlan_disabled`) que se resuelve al normalizarse. Se alerta la transición, durante `MONITORING_INACTIVE_ALERT_HOURS` (24 por defecto): un recurso que nunca estuvo activo o una baja deliberada no quedan como alerta permanente.
+- El colector y el agente de tickets corren bajo el orquestador; su último ciclo y sus errores se consultan en `GET /api/v1/agents/status` y en la vista Estado del sistema.
