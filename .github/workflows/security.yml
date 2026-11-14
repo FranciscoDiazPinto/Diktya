@@ -30,7 +30,7 @@ jobs:
       run:
         working-directory: netbot
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -53,7 +53,7 @@ jobs:
       NETBOT_APP_PASSWORD: ci-only-app
       NETBOT_SERVER_NAME: netbot.example.internal
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t netbot:ci .
       - name: Validar Compose de producción
         run: |
@@ -71,7 +71,7 @@ jobs:
   analisis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
