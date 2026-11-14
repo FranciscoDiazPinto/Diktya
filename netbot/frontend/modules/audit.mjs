@@ -3,16 +3,17 @@ const PAGE_SIZE = 50;
 export function createAudit({document, window, state, api}) {
   const $ = id => document.querySelector('#audit-' + id);
   const fields = ['actor', 'source', 'action', 'outcome', 'since', 'until'];
-  let allowed = false, generation = 0, offset = 0, total = 0, applied = '', exporting = false;
+  let allowed = false, own = false, generation = 0, offset = 0, total = 0, applied = '', exporting = false;
   const current = (session, version) => allowed && state.session === session && generation === version;
   function paging() {
     $('prev').disabled = !allowed || offset === 0;
     $('next').disabled = !allowed || offset + PAGE_SIZE >= total;
-    $('export').disabled = !allowed || exporting;
+    $('export').disabled = !allowed || own || exporting;
   }
   function reset() {
-    generation++; allowed = false; offset = total = 0; applied = ''; exporting = false;
+    generation++; allowed = false; own = false; offset = total = 0; applied = ''; exporting = false;
     fields.forEach(id => { $(id).value = ''; });
+    $('actor').disabled = false; $('scope-note').textContent = '';
     $('body').replaceChildren(); $('page').textContent = ''; $('status').textContent = ''; paging();
   }
   function filters() {
@@ -35,7 +36,7 @@ export function createAudit({document, window, state, api}) {
     $('body').replaceChildren(); $('page').textContent = ''; $('status').textContent = 'Consultando auditoría…';
     $('prev').disabled = $('next').disabled = true;
     try {
-      const page = await api.authedRequest(`/api/v1/audit?${applied}&limit=${PAGE_SIZE}&offset=${offset}`);
+      const page = await api.authedRequest(`/api/v1/audit${own ? '/mine' : ''}?${applied}&limit=${PAGE_SIZE}&offset=${offset}`);
       if (!current(session, version)) return;
       total = page.total;
       const rows = page.items.map(entry => {
@@ -60,7 +61,7 @@ export function createAudit({document, window, state, api}) {
     catch (error) { $('status').textContent = error.message; }
   }
   async function exportCsv() {
-    if (!allowed || exporting) return;
+    if (!allowed || own || exporting) return;
     const session = state.session, version = generation;
     exporting = true; paging(); $('status').textContent = 'Preparando exportación…';
     try {
@@ -79,5 +80,14 @@ export function createAudit({document, window, state, api}) {
   $('prev').addEventListener('click', () => { if (allowed && offset > 0) { offset -= PAGE_SIZE; return refresh(); } });
   $('next').addEventListener('click', () => { if (allowed && offset + PAGE_SIZE < total) { offset += PAGE_SIZE; return refresh(); } });
   $('export').addEventListener('click', exportCsv);
-  return {reset, refresh, configureUser(user) { reset(); allowed = Boolean(user.permissions?.includes('audit:read')); paging(); if (allowed) return refresh(); }};
+  return {reset, refresh, configureUser(user) {
+    reset();
+    const permissions = user.permissions || [];
+    // Sin audit:read, el técnico consulta únicamente sus propias acciones (HU013).
+    own = !permissions.includes('audit:read') && permissions.includes('changes:request');
+    allowed = permissions.includes('audit:read') || own;
+    $('actor').disabled = own;
+    $('scope-note').textContent = own ? 'Se muestran únicamente tus propias acciones. La exportación es exclusiva de administración.' : '';
+    paging(); if (allowed) return refresh();
+  }};
 }

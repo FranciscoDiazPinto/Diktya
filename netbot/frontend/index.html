@@ -88,6 +88,9 @@
           <a class="nav-item" id="support-nav" href="#support-panel" hidden><span class="nav-icon">⌁</span> Mi red</a>
           <a class="nav-item" id="provisioning-nav" href="#provisioning" hidden><span class="nav-icon">⚙</span> Aprovisionamiento</a>
           <a class="nav-item" id="audit-nav" href="#audit" hidden><span class="nav-icon">≡</span> Auditoría</a>
+          <a class="nav-item" id="users-nav" href="#users" hidden><span class="nav-icon">☺</span> Usuarios</a>
+          <a class="nav-item" id="system-nav" href="#system" hidden><span class="nav-icon">◎</span> Estado del sistema</a>
+          <a class="nav-item" id="account-nav" href="#account" hidden><span class="nav-icon">✎</span> Mi cuenta</a>
         </nav>
 
         <div class="sidebar-footer">
@@ -260,6 +263,27 @@
             <p id="ssid-status" role="status"></p>
             <div id="ssid-plan-list" class="reservation-list"></div>
           </section>
+<section class="panel support-panel" id="changes-panel" hidden aria-labelledby="changes-heading">
+            <div class="panel-heading"><div><p class="panel-kicker">CAMBIOS CONTROLADOS · PROPUESTAS</p><h2 id="changes-heading">Cambio de VLAN y reinicio de equipos</h2></div><button id="changes-refresh" type="button">Actualizar estado</button></div>
+            <p class="chat-intro">Prepara la propuesta, revisa su impacto y confírmala. Sin confirmación no se ejecuta nada. Un ejecutor separado aplica el cambio, lo verifica y, si falla, restaura el estado anterior o abre un ticket. Un reinicio no se puede deshacer.</p>
+            <div class="support-form"><label for="changes-scope">Ámbito autorizado</label><select id="changes-scope"><option value="">Selecciona un ámbito</option></select><p id="changes-source" role="status"></p></div>
+            <form id="vlan-change-form" class="support-form">
+              <h3>Cambiar la VLAN de un SSID existente</h3>
+              <label for="vlan-change-ssid">SSID</label><select id="vlan-change-ssid"><option value="">Selecciona un SSID</option></select>
+              <label for="vlan-change-network">Red / VLAN destino (existente)</label><select id="vlan-change-network"><option value="">Selecciona la red destino</option></select>
+              <label for="vlan-change-purpose">Motivo</label><input id="vlan-change-purpose" maxlength="500" placeholder="Mover a los expositores a su VLAN" />
+              <button id="vlan-change-prepare" type="submit" disabled>Preparar cambio de VLAN</button>
+            </form>
+            <form id="restart-form" class="support-form">
+              <h3>Reiniciar un equipo</h3>
+              <label for="restart-device">Punto de acceso del ámbito</label><select id="restart-device"><option value="">Selecciona un AP</option></select>
+              <div id="restart-device-id-field" hidden><label for="restart-device-id">O identificador de otro equipo del sitio (solo administración; gateway y firewall interrumpen toda la red)</label><input id="restart-device-id" maxlength="160" autocomplete="off" /></div>
+              <label for="restart-purpose">Motivo</label><input id="restart-purpose" maxlength="500" placeholder="El AP dejó de responder" />
+              <button id="restart-prepare" type="submit" disabled>Preparar reinicio</button>
+            </form>
+            <p id="changes-status" role="status" aria-live="polite"></p>
+            <div id="changes-plan-list" class="reservation-list"></div>
+          </section>
 <section id="csv-panel" class="csv-panel" hidden aria-labelledby="csv-heading">
               <h3 id="csv-heading">Carga de SSIDs y reservas por CSV</h3>
               <p>Valida el archivo y confirma las filas que deseas reservar. Esta acción guarda reservas locales; no crea SSIDs ni modifica la red.</p>
@@ -296,9 +320,44 @@
     <button type="submit">Aplicar filtros</button><button id="audit-clear" type="button">Limpiar</button>
   </form>
   <div class="chat-controls"><button id="audit-export" type="button">Exportar CSV filtrado</button><span>Máximo 5000 registros por exportación.</span></div>
+  <p id="audit-scope-note" class="chat-intro"></p>
   <p id="audit-status" role="status" aria-live="polite"></p>
   <div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Registro unificado de auditoría</caption><thead><tr><th>Fecha local</th><th>Origen</th><th>Actor (ID)</th><th>Acción</th><th>Resultado / estado</th><th>Recurso</th><th>Tipo de registro</th></tr></thead><tbody id="audit-body"></tbody></table></div>
   <div class="chat-controls"><button id="audit-prev" type="button" disabled>Anterior</button><span id="audit-page"></span><button id="audit-next" type="button" disabled>Siguiente</button></div>
+</section>
+<section class="panel support-panel" id="view-users" hidden aria-labelledby="users-heading">
+  <div class="panel-heading"><div><p class="panel-kicker">ADMINISTRACIÓN</p><h2 id="users-heading">Usuarios y roles</h2></div><button id="users-refresh" type="button">Actualizar</button></div>
+  <p class="chat-intro">Un usuario desactivado no puede iniciar sesión y conserva su historial. No se eliminan cuentas. Siempre debe quedar al menos un administrador activo.</p>
+  <form id="user-form" class="support-form" autocomplete="off">
+    <h3 id="user-form-title">Nuevo usuario</h3>
+    <label for="user-email">Correo</label><input id="user-email" type="email" maxlength="254" required />
+    <label for="user-full-name">Nombre</label><input id="user-full-name" maxlength="160" />
+    <label for="user-password">Contraseña</label><input id="user-password" type="password" maxlength="128" autocomplete="new-password" />
+    <p id="user-password-hint" class="chat-intro"></p>
+    <fieldset><legend>Roles</legend><div id="user-roles"></div></fieldset>
+    <label><input id="user-active" type="checkbox" checked /> Cuenta activa</label>
+    <div class="chat-controls"><button id="user-save" type="submit">Guardar</button><button id="user-cancel" type="button" hidden>Cancelar edición</button></div>
+  </form>
+  <p id="users-status" role="status" aria-live="polite"></p>
+  <div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Usuarios del sistema</caption><thead><tr><th>Correo</th><th>Nombre</th><th>Roles</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="users-body"></tbody></table></div>
+</section>
+<section class="panel support-panel" id="view-system" hidden aria-labelledby="system-heading">
+  <div class="panel-heading"><div><p class="panel-kicker">OPERACIÓN</p><h2 id="system-heading">Agentes y servicios</h2></div><button id="system-refresh" type="button">Actualizar</button></div>
+  <p id="system-status" role="status" aria-live="polite"></p>
+  <div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Estado de los agentes en segundo plano</caption><thead><tr><th>Agente</th><th>Estado</th><th>Último ciclo correcto</th><th>Errores</th></tr></thead><tbody id="agents-body"></tbody></table></div>
+  <h3>Proveedor de IA</h3>
+  <p id="llm-health" role="status"></p>
+</section>
+<section class="panel support-panel" id="view-account" hidden aria-labelledby="account-heading">
+  <div class="panel-heading"><div><p class="panel-kicker">CUENTA</p><h2 id="account-heading">Mi cuenta</h2></div></div>
+  <p class="chat-intro">Sesión de <strong id="account-email"></strong>. Al cambiar la contraseña se cierran todas tus sesiones y deberás ingresar de nuevo.</p>
+  <form id="account-form" class="support-form">
+    <label for="account-current">Contraseña actual</label><input id="account-current" type="password" maxlength="128" autocomplete="current-password" required />
+    <label for="account-new">Nueva contraseña (mínimo 12 caracteres)</label><input id="account-new" type="password" minlength="12" maxlength="128" autocomplete="new-password" required />
+    <label for="account-repeat">Repite la nueva contraseña</label><input id="account-repeat" type="password" minlength="12" maxlength="128" autocomplete="new-password" required />
+    <button id="account-save" type="submit">Cambiar contraseña</button>
+  </form>
+  <p id="account-status" role="status" aria-live="polite"></p>
 </section>
           <footer class="page-footer"><span>Netbot v0.1.0</span><span id="footer-status">Conectando con la API…</span></footer>
         </div>

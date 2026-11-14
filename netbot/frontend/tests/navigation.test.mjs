@@ -58,7 +58,7 @@ test('customer overview offers only permitted sections and never provisioning or
   const ui=setup();ui.navigation.configureUser({permissions:['chat:use','networks:read:own','tickets:read:own']});
   assert.equal(ui.$('personal-overview').hidden,false);
   assert.equal(ui.$('ap-nav').hidden,true);assert.equal(ui.$('provisioning-nav').hidden,true);
-  assert.equal(ui.$('personal-overview').children.length,2);
+  assert.equal(ui.$('personal-overview').children.length,3); // Mi red, Tickets y Mi cuenta
   ui.$('personal-overview').children[0].events.click({preventDefault(){}});
   assert.equal(ui.navigation.currentView,'support-panel');
 });
@@ -107,6 +107,17 @@ test('integrated inventory modules each open a separate view and reject unprivil
 });
 
  test('audit deep links require audit permission',()=>{
-  const denied=setup('#audit');denied.navigation.configureUser(admin);assert.equal(denied.navigation.currentView,'overview');assert.equal(denied.$('audit-nav').hidden,true);assert.equal(denied.navigation.navigate('audit'),false);
+  const denied=setup('#audit');denied.navigation.configureUser({permissions:['chat:use','monitoring:read','tickets:read:own']});assert.equal(denied.navigation.currentView,'overview');assert.equal(denied.$('audit-nav').hidden,true);assert.equal(denied.navigation.navigate('audit'),false);
   const allowed=setup('#audit');allowed.navigation.configureUser({permissions:['audit:read']});assert.equal(allowed.navigation.currentView,'audit');assert.equal(allowed.$('audit-nav').hidden,false);
+});
+
+
+test('technician opens only the own-audit view; users and system pages stay administrative',()=>{
+  const ui=setup('#audit');ui.navigation.configureUser({permissions:['chat:use','changes:request']});
+  assert.equal(ui.navigation.currentView,'audit');
+  assert.equal(ui.navigation.navigate('users'),false);assert.equal(ui.$('users-nav').hidden,true);
+  assert.equal(ui.navigation.navigate('system'),false);assert.equal(ui.$('system-nav').hidden,true);
+  assert.equal(ui.navigation.navigate('account'),true);assert.deepEqual(ui.visible(),['#view-account']);
+  const admin=setup('#users');admin.navigation.configureUser({permissions:['users:manage','monitoring:read']});
+  assert.equal(admin.navigation.currentView,'users');assert.equal(admin.navigation.navigate('system'),true);
 });
