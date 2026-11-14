@@ -80,6 +80,6 @@ jobs:
       - run: pip install pip-audit bandit
       - run: pip-audit -r netbot/requirements.lock --no-deps --disable-pip
       - run: bandit -q -r netbot/app --severity-level medium
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
