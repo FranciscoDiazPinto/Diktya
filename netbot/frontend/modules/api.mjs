@@ -1,9 +1,9 @@
 
-export function createApi({ fetch, localStorage, state, onSessionExpired = () => {} }) {
+export function createApi({ fetch, localStorage, state, onSessionExpired = () => {}, baseUrl }) {
   // Producción: API del mismo origen; desarrollo local conserva el puerto 8000.
   const location = globalThis.location;
-  const API_BASE = location && !['localhost', '127.0.0.1'].includes(location.hostname)
-    ? location.origin : 'http://localhost:8000';
+  const API_BASE = baseUrl ?? (location && !['localhost', '127.0.0.1'].includes(location.hostname)
+    ? location.origin : 'http://localhost:8000');
   // Migración: no reutilizar ni conservar sesiones persistidas por versiones previas.
   localStorage.removeItem('netbot_tokens');
   localStorage.removeItem('netbot_api_url');

@@ -31,11 +31,11 @@ server {
     add_header Referrer-Policy "no-referrer" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
 
-    root /opt/netbot/frontend;
+    root /opt/netbot/frontend/dist;
     index index.html;
 
     # Solo la aplicación: ni pruebas ni documentación del directorio.
-    location ~ ^/(tests|examples)/ { return 404; }
+    location ~ ^/(tests|src|modules)/ { return 404; }
     location ~ \.md$ { return 404; }
 
     location ~ ^/(auth|admin|api)/ {

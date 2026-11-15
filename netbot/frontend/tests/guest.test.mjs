@@ -11,7 +11,7 @@ class Element {
   focus() {}
 }
 function setup(handler = async () => ({answer: 'Prueba reiniciar la conexión.', state: 'answered'})) {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('./fixtures/controller-layout.html', import.meta.url), 'utf8');
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(m => [`#${m[1]}`, new Element()]));
   let time = 100000, timerId = 0;
   const timers = new Map(), calls = [], events = {};

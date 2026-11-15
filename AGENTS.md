@@ -59,8 +59,8 @@
 
 ## Frontend
 
-- `frontend/app.js` solo arranca el compositor `modules/dashboard.mjs`.
-- Cambiar la funcionalidad en su módulo: api, session, chat, monitoring, support, tickets, reservations o csv-imports.
+- `frontend/src/main.jsx` monta React; `App.jsx` y `components/Workspace.jsx` componen pantallas y vistas. Los hooks de sesión, navegación y métricas pertenecen a `src/hooks/`.
+- Cambiar la funcionalidad en su componente/hook o controlador propio: API, chat, soporte, tickets, reservas, CSV o planes. Los controladores ES existentes se montan desde `src/runtime/features.mjs`; sus formularios JSX estables no deben recibir estado React que compita por los mismos nodos.
 - Cada controlador conserva su estado privado; solo identidad y época de sesión se comparten. Comunicar módulos mediante APIs/callbacks inyectados por el compositor.
 - No crear un objeto global de negocio ni importar el compositor desde una funcionalidad.
 - Usar el cliente de API compartido para autenticación/renovación. Ignorar resultados tardíos de otra sesión o selección.
@@ -72,7 +72,9 @@ Desde `netbot/`:
 
 ```sh
 .venv/bin/python -m pytest -q
-node --test frontend/tests/*.test.mjs
+npm ci --prefix frontend
+npm test --prefix frontend
+npm run build --prefix frontend
 ```
 
 `tests/test_architecture.py` comprueba límites, CLI independiente y arranque de producción. Las pruebas de interfaz importan módulos ES reales y cubren aislamiento de sesión y claves. Para cambios visuales, revisar también la interfaz en navegador.

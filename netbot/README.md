@@ -20,7 +20,7 @@ Para usar el chatbot, definir `OPENROUTER_API_KEY` y `OPENROUTER_MODEL` en el `.
 
 La entrada abre un chat de invitados sin cuenta. «Iniciar sesión · Equipo» lleva al login y, tras autenticarse, al dashboard. La atención temporal se limpia con confirmación o tras 60 segundos sin respuesta. La recuperación de expositores requiere confirmar un enlace enviado al correo registrado; conocer un contacto por sí solo no habilita credenciales. El portal de invitados solo publica redes abiertas de `GUEST_WIFI_NETWORK_IDS`; ver [autoatención y configuración QR](docs/atencion-invitados.md).
 
-El dashboard estático puede servirse en otra terminal con `python3 -m http.server 5173 --directory frontend`. Iniciar sesión con un usuario `cliente`, `tecnico`, `operador`, `visor` o `admin`. Las conversaciones autenticadas se guardan en la base por usuario y se recuperan al iniciar sesión. Cliente y técnico acceden únicamente a redes asignadas; visor es un rol interno de monitoreo global.
+El frontend React se inicia en otra terminal con `npm ci --prefix frontend` y `npm run dev --prefix frontend`. Iniciar sesión con un usuario `cliente`, `tecnico`, `operador`, `visor` o `admin`. Las conversaciones autenticadas se guardan en la base por usuario y se recuperan al iniciar sesión. Cliente y técnico acceden únicamente a redes asignadas; visor es un rol interno de monitoreo global.
 
 La documentación interactiva de la API está en `/docs` fuera de producción. En producción `/docs`, `/redoc` y `/openapi.json` no se publican.
 
@@ -33,12 +33,13 @@ Sin PostgreSQL se puede omitir `DATABASE_URL`: la API usa SQLite (`netbot.db`).
 
 ### Dashboard
 
-Servir la carpeta `frontend` en el puerto 5173 (origen permitido por CORS):
-`python -m http.server 5173 --directory frontend` y abrir `http://localhost:5173`.
+Con Node 24 LTS: `npm ci --prefix frontend` y `npm run dev --prefix frontend`. Abrir `http://127.0.0.1:5173`. Vite envía `/auth`, `/admin`, `/api` y `/health` a `127.0.0.1:8000`; si la API usa otro puerto, arrancar con `NETBOT_DEV_API_TARGET=http://127.0.0.1:8001 npm run dev --prefix frontend`.
+
+Para producción: `npm run build --prefix frontend`. Servir únicamente `frontend/dist`, o construir el servicio `proxy` de Compose, que compila React y copia el resultado a nginx. `python -m http.server` sobre las fuentes ya no ejecuta la aplicación.
 
 ## Guía para contribuir
 
-Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-modular.md) antes de editar. Los routers delegan en servicios propios; el chat consume contratos públicos. `main.py` compone HTTP, `lifecycle.py` gestiona recursos, `bootstrap.py` prepara roles/base y `model_registry.py` registra metadata. El frontend se divide en `frontend/modules/`; `app.js` solo lo arranca.
+Leer [AGENTS.md](../AGENTS.md) y la [arquitectura modular](docs/arquitectura-modular.md) antes de editar. Los routers delegan en servicios propios; el chat consume contratos públicos. `main.py` compone HTTP, `lifecycle.py` gestiona recursos, `bootstrap.py` prepara roles/base y `model_registry.py` registra metadata. La entrada del frontend es `frontend/src/main.jsx`. React compone las vistas; `src/runtime/features.mjs` adapta los controladores ES existentes al ciclo de vida del montaje.
 
 ## Estructura
 
@@ -79,7 +80,7 @@ Las preguntas, el historial acotado y los resultados de monitoreo necesarios se 
 
 ## Pruebas
 
-`pip install -r requirements-dev.txt`, después `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`. Las pruebas incluyen límites modulares, contratos HTTP, aislamiento, arranque y controladores ES reales.
+`pip install -r requirements-dev.txt`, después `.venv/bin/python -m pytest -q` y `npm test --prefix frontend`. Las pruebas incluyen límites modulares, contratos HTTP, aislamiento, arranque y controladores ES reales.
 # Reservas VLAN desde el chatbot
 
 El chatbot puede preparar propuestas para reservar VLAN ya existentes para un administrador. En
@@ -138,7 +139,7 @@ El objetivo se mantiene: autenticar usuarios, consultar UniFi/OPNsense, asistir 
 - Parciales: despliegue CSV, ciclo de reserva/asignación y cambio VLAN de extremo a extremo, trazabilidad completa de ejecución, monitoreo con garantías de tiempo y orquestación multi-agente. HU010 tiene servicio y pruebas, pero falta conectar la operación al flujo del usuario y al ejecutor.
 - Pendientes: reinicio confirmado de dispositivos, compensación/rollback y conciliación completa, segundo adaptador LLM y validación de laboratorio.
 
-El frontend usa módulos ES, mientras el DoD académico de HU005 exige React. El monitoreo técnico se limita a recursos asignados; el CSV separa validación/reserva de despliegue y evita contraseñas. Estas diferencias requieren acordar el alcance o completar los criterios; no se dan por resueltas por actualizar esta guía. El backend es un monolito modular, con tareas periódicas y un CLI; HU018 no está cerrada como arquitectura multi-agente completa.
+Antecedente del corte del 10/11: el frontend usaba módulos ES, mientras el DoD académico de HU005 exige React. La rama `feat/frontend-react` introduce React y pruebas de componentes; esto no acredita automáticamente las demás condiciones de HU005. El monitoreo técnico se limita a recursos asignados; el CSV separa validación/reserva de despliegue y evita contraseñas. Estas diferencias requieren acordar el alcance o completar los criterios; no se dan por resueltas por actualizar esta guía. El backend es un monolito modular, con tareas periódicas y un CLI; HU018 no está cerrada como arquitectura multi-agente completa.
 
 El backlog académico conserva 19 HU y 121 puntos. Su corte del 12/11 registra 5 HU en revisión funcional, 13 parciales y 1 pendiente (HU011), sin cierres integrales acreditados; ese corte precede a los cambios técnicos del 14/11 descritos más abajo. Ver [Product Backlog, revisión 06](../Fase%202/Evidencias%20Proyecto/Documento_02-_Product_Backlog.docx) y [Netbot2: plan, avance y continuidad](../Netbot2_plan_y_avance.pptx). La presentación separa el resumen del corte (lámina 8), el burndown de aceptación (9), qué funciona y qué falta por HU en ese corte (10 a 13), el reparto propuesto (14) y el calendario tentativo (15). El burndown inicia en S14 con 121 puntos sin aceptación formal, según el corte del 12/11. La guía ideal hasta S18 es teórica y las semanas futuras quedan sin valores reales hasta medirlas. Cada corte semanal conserva los puntos de las HU que aún no cumplen el DoD. Los sprints originales permanecen en el Word y en las presentaciones anteriores.
 
