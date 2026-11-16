@@ -5,6 +5,7 @@ Asistente para consultar y gestionar soporte de redes de eventos, con permisos p
 ## Estado implementado
 
 - Autenticación y roles cliente, tecnico/operador, visor interno y admin.
+- Acceso Google Workspace opcional para personal previamente autorizado, con dominio verificado y roles locales. Desactivado hasta configurar el cliente OAuth y aplicar la migración 022.
 - Conversaciones privadas persistentes; admin no obtiene acceso a chats ajenos.
 - Monitoreo de solo lectura mediante OPNsense y UniFi Network o datos mock: inventario persistido, disponibilidad, alertas, planos de cobertura y dashboard. Falta validarlo contra equipos reales.
 - Entrega protegida de acceso Wi-Fi fuera del modelo y del historial.

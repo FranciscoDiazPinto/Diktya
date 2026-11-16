@@ -195,3 +195,5 @@ button { cursor: pointer; }
 .system-row dd { margin-left: auto; text-align: right; }
 @media (max-width: 1200px) { .overview-with-chat > .chat-host { position: static; } }
 @media (max-width: 700px) { .sidebar { top: 0; left: 0; overflow-y: auto; } }
+.google-sign-in { margin-top: 18px; min-height: 0; }
+.google-sign-in > div { min-height: 0; }

@@ -63,6 +63,8 @@ export default function App({ fetcher, storage }) {
       ) : (
         <Login
           login={session.login}
+          loginGoogle={session.loginGoogle}
+          api={session.api}
           onBack={guestScreen}
           message={session.message}
         />

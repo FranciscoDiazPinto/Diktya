@@ -86,17 +86,17 @@ export function useSession({
       window.removeEventListener("pageshow", check);
     };
   }, [user, api]);
-  const login = useCallback(
-    async (email, password) => {
+  const authenticate = useCallback(
+    async (path, body) => {
       const currentAttempt = ++attempt.current,
         epoch = state.session;
       const current = () =>
         mounted.current &&
         currentAttempt === attempt.current &&
         epoch === state.session;
-      const tokens = await api.apiRequest("/auth/login", {
+      const tokens = await api.apiRequest(path, {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(body),
       });
       if (!current()) return;
       const person = await api.apiRequest("/auth/me", {}, tokens.access_token);
@@ -109,10 +109,32 @@ export function useSession({
     },
     [api, state],
   );
+  const login = useCallback(
+    (email, password) => authenticate("/auth/login", { email, password }),
+    [authenticate],
+  );
+  const loginGoogle = useCallback(
+    (credential, challengeToken) =>
+      authenticate("/auth/google", {
+        credential,
+        challenge_token: challengeToken,
+      }),
+    [authenticate],
+  );
   const openScreen = useCallback((next) => {
     attempt.current++;
     setMessage("");
     setScreen(next);
   }, []);
-  return { api, state, user, screen, message, login, signOut, openScreen };
+  return {
+    api,
+    state,
+    user,
+    screen,
+    message,
+    login,
+    loginGoogle,
+    signOut,
+    openScreen,
+  };
 }

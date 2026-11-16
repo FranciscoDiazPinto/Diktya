@@ -4,6 +4,7 @@ import sqlite3
 
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["ENVIRONMENT"] = "test"
+os.environ["GOOGLE_LOGIN_ENABLED"] = "false"
 os.environ["MONITORING_PROVIDER"] = "mock"
 os.environ["MONITORING_COLLECTOR_ENABLED"] = "false"
 os.environ["UNIFI_ENABLED"] = "false"

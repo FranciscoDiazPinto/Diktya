@@ -83,3 +83,18 @@ event.listen(AuthAuditEvent.__table__, "after_create", DDL(
     "WHEN EXISTS (SELECT 1 FROM auth_audit_events WHERE actor_id=OLD.id OR target_id=OLD.id) "
     "BEGIN SELECT RAISE(ABORT, 'audited users cannot be deleted'); END"
 ).execute_if(dialect="sqlite"))
+
+
+class GoogleIdentity(Base):
+    """Binding to Google's stable subject. No Google credentials are stored."""
+    __tablename__ = "google_identities"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    subject: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class GoogleLoginChallenge(Base):
+    __tablename__ = "google_login_challenges"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    nonce_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)

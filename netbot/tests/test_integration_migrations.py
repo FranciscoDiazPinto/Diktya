@@ -163,3 +163,34 @@ def test_sqlite_migration_refuses_existing_orphans_before_schema_changes(tmp_pat
     with sqlite3.connect(file) as db:
         assert db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == '008_auth_audit'
         assert 'failed_login_attempts' not in {row[1] for row in db.execute('PRAGMA table_info(users)')}
+
+
+def test_google_migration_preserves_users_and_protects_subject_bindings(execution_migration_url, tmp_path):
+    url = execution_migration_url
+    env = dict(os.environ, DATABASE_URL=url, ENVIRONMENT='test', GOOGLE_LOGIN_ENABLED='false',
+               ADMIN_EMAIL='', ADMIN_PASSWORD='', UNIFI_ENABLED='false', GUEST_EMAIL_RECOVERY_ENABLED='false')
+    def migrate(command, target, success=True):
+        result = subprocess.run([sys.executable, '-m', 'alembic', '-c', str(ROOT/'alembic.ini'), command, target],
+                                cwd=tmp_path, env=env, capture_output=True, text=True)
+        assert (result.returncode == 0) == success, result.stderr
+        return result
+    migrate('upgrade', '021_execution_ownership')
+    engine = create_engine(url)
+    try:
+        with engine.begin() as db:
+            db.execute(text("INSERT INTO users (id,email,hashed_password,is_active) VALUES (81,'staff@example.com','synthetic-preserved',true)"))
+        migrate('upgrade', 'head')
+        assert {'google_identities', 'google_login_challenges'} <= set(inspect(engine).get_table_names())
+        with engine.begin() as db:
+            assert db.scalar(text('SELECT hashed_password FROM users WHERE id=81')) == 'synthetic-preserved'
+            db.execute(text("INSERT INTO google_identities (user_id,subject) VALUES (81,'stable-subject')"))
+        result = migrate('downgrade', '021_execution_ownership', success=False)
+        assert 'identidades Google vinculadas' in result.stderr
+        with engine.begin() as db:
+            assert db.scalar(text('SELECT subject FROM google_identities WHERE user_id=81')) == 'stable-subject'
+            db.execute(text('DELETE FROM google_identities'))
+        migrate('downgrade', '021_execution_ownership')
+        assert 'google_identities' not in inspect(engine).get_table_names()
+        migrate('upgrade', 'head')
+    finally:
+        engine.dispose()

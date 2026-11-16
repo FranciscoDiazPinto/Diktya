@@ -173,3 +173,8 @@ docker compose -f docker-compose.prod.yml up -d
 - Requiere Docker Compose 2.24 o superior. La imagen, el Compose y la plantilla nginx se validan en CI; **no se ejecutaron en un equipo real**: comprobar `nginx -t`, certificados y `/health` en la instalación.
 
 Verificación de este corte: 649 pruebas backend y 104 frontend aprobadas, más una prueba de humo con el servidor real en modo simulado. No hubo revisión visual en navegador ni contacto con UniFi, OPNsense, SMTP o el proveedor LLM.
+
+
+### Google Workspace opcional
+
+La rama del frontend React incorpora acceso corporativo Google para personal previamente autorizado. Antes de habilitarlo, aplicar la migración `022_google_login`, configurar el cliente OAuth web y los dominios exactos del backend. No modifica la asignación de roles ni crea cuentas automáticamente. El login local sigue disponible. Ver [pasos, controles y límites](docs/epica-001-autenticacion-roles.md#acceso-con-google-workspace-rama-frontend-react).

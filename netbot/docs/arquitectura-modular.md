@@ -200,3 +200,8 @@ Migraciones: `018_monitoring_maintenance`, `019_change_recovery`, `020_agent_eve
 Pruebas de exclusión con SQLite y PostgreSQL: `tests/test_change_execution_lock.py` usa sesiones, procesos separados y muerte del propietario. Para incluir PostgreSQL fuera de CI, definir `NETBOT_TEST_POSTGRES_URL` hacia una instancia desechable; las pruebas de migración crean y eliminan una base nueva de nombre aleatorio, por lo que ese usuario de pruebas requiere `CREATEDB`. No usar la conexión de producción. Sin esa variable los casos PostgreSQL se omiten; CI proporciona un PostgreSQL 16 aislado.
 
 Límites conocidos: el orquestador vive en cada proceso (no hay bus entre procesos; se comunican por la base); las sesiones de invitados siguen exigiendo un solo worker web; no hay retención automática de trazas ni de auditoría.
+
+
+## Identidad Google Workspace
+
+`auth/google_login.py` verifica ID tokens mediante `google-auth` y un transporte HTTP acotado para certificados. El login Google exige dominio Workspace exacto, correo verificado y usuario de personal existente/activo. La identidad se vincula por `sub` sin alta automática ni cambios de roles. La migración `022_google_login` agrega identidades y desafíos temporales de un solo uso dentro del dominio auth, cuyo modelo ya registra `model_registry`. Los routers solo adaptan HTTP y delegan. React configura el botón oficial a partir de la configuración pública y un nonce del servidor; `useSession` instala la sesión propia de NetBot únicamente si el intento sigue vigente. Ver [contrato completo y configuración](epica-001-autenticacion-roles.md#acceso-con-google-workspace-rama-frontend-react). Desactivado por defecto.

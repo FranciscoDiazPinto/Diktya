@@ -109,3 +109,10 @@ Administradores con `audit:read` disponen de la vista Auditoría: filtros exacto
 - El chat puede mostrar propuestas de cambio de VLAN y reinicio; el plan solo se crea cuando el usuario pulsa «Preparar revisión en el panel».
 
 Las pruebas de marcado verifican los IDs de las vistas JSX. Las pruebas de React montan los paneles reales, incluyendo permisos y navegación. El recorrido local en Chromium se hizo con datos ficticios y fuentes simuladas, sin escrituras sobre equipos reales.
+
+
+## Inicio de sesión con Google Workspace
+
+El login muestra el botón oficial de Google cuando la API responde `enabled=true` en `/auth/google/config`. La configuración reside exclusivamente en el backend (`GOOGLE_LOGIN_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAINS`), sin client secret ni credenciales en Vite. Seguir la [configuración y política de acceso](../docs/epica-001-autenticacion-roles.md#acceso-con-google-workspace-rama-frontend-react).
+
+`GoogleSignIn.jsx` obtiene un desafío de cinco minutos, configura el nonce de Google Identity Services y entrega su credencial a `useSession.loginGoogle`. Un callback cancelado, duplicado o vencido no se acepta. Volver a invitados o iniciar otra sesión invalida las respuestas anteriores. Ante un fallo se necesita un desafío nuevo, y el acceso con contraseña permanece disponible. El SDK solo se carga cuando la API habilita Google.
