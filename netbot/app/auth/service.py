@@ -6,7 +6,7 @@ from sqlalchemy import delete, select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.errors import Unauthenticated, NotFound, Conflict, InvalidInput
-from .models import RefreshToken, Role, User, AuthAuditEvent, user_roles
+from .models import RefreshToken, Role, User, AuthAuditEvent, GoogleLoginChallenge, user_roles
 from .audit import current_peer, record_event, bind_request
 from app.core.config import settings
 from app.core.keys import derive_key
@@ -133,6 +133,8 @@ def refresh(data: RefreshRequest, db: Session) -> TokenResponse:
 def purge_expired_sessions(db: Session, now: datetime) -> int:
     """Conserva un día los tokens vencidos para distinguir reutilización de token inválido."""
     result = db.execute(delete(RefreshToken).where(RefreshToken.expires_at < now - timedelta(days=1)))
+    db.execute(delete(GoogleLoginChallenge).where(GoogleLoginChallenge.expires_at <= now),
+               execution_options={'synchronize_session': False})
     return result.rowcount or 0
 
 

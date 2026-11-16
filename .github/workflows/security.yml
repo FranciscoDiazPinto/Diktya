@@ -39,7 +39,10 @@ jobs:
           node-version: '24'
       - run: pip install -r requirements.lock pytest pytest-asyncio
       - run: python -m pytest -q
-      - run: node --test frontend/tests/*.test.mjs
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: npm audit --prefix frontend --audit-level=high
 
   despliegue:
     # Los artefactos de despliegue no se ejecutan en las pruebas: aquí se construyen y validan.
@@ -55,6 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t netbot:ci .
+      - run: docker build -t netbot-frontend:ci frontend
       - name: Validar Compose de producción
         run: |
           touch .env

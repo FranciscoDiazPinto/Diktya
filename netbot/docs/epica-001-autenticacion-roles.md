@@ -154,3 +154,32 @@ Se conserva la respuesta genérica HTTP 401 de credenciales inválidas para cuen
 - Sesiones: reutilizar un refresh ya rotado cierra todas las sesiones de la cuenta (`auth.refresh.reuse_detected`) y `SESSION_ABSOLUTE_DAYS` limita su vida total. Migración 016.
 - El reinicio no agregó un permiso: usa `changes:request/approve/execute` más el ámbito por recurso, y los equipos críticos o no clasificados exigen `networks:manage`. Agregar un permiso cambiaría la huella de autorización y ocultaría conversaciones existentes.
 - MFA sigue pendiente de decisión (TOTP u OIDC).
+
+## Acceso con Google Workspace (rama frontend React)
+
+Disponible como opción desactivada por defecto. Un usuario de personal previamente creado en NetBot puede usar su cuenta corporativa de Google. El backend mantiene los roles y las redes asignadas; no crea cuentas ni concede permisos por pertenecer al dominio. Admite los roles `admin`, `tecnico`, `operador` y `visor`. Los clientes y la autoatención de invitados conservan sus flujos actuales.
+
+### Configuración
+
+1. Aplicar `alembic upgrade head` (migración `022_google_login`) antes de arrancar API y procesos de la misma versión.
+2. Crear un cliente OAuth de tipo **Aplicación web** en Google Cloud. Registrar los **orígenes JavaScript autorizados**: en desarrollo, los orígenes que se usen realmente (`http://127.0.0.1:5173` y/o `http://localhost:5173`); en producción, el origen HTTPS exacto. Este flujo usa el callback JavaScript de Google Identity Services, sin callback de redirección en NetBot.
+3. Completar en el entorno del backend `GOOGLE_CLIENT_ID` y `GOOGLE_ALLOWED_DOMAINS`, este último como lista JSON de dominios Workspace exactos, por ejemplo `["empresa.example"]`. Se comprueba `hd` y el dominio del correo verificado, sin comodines ni subdominios implícitos. Confirmar el dominio real antes de habilitarlo. Revisar además las políticas de aplicaciones de terceros de la organización Workspace.
+4. Crear o revisar los usuarios corporativos autorizados en **Usuarios**, asignando sus roles y ámbito habituales. El modelo conserva una contraseña local como alternativa de acceso; el dominio por sí solo no habilita una cuenta nueva.
+5. Definir `GOOGLE_LOGIN_ENABLED=true`, reiniciar la API y reconstruir el frontend/proxy si aún sirve la versión previa a esta implementación. El ID de cliente se obtiene del backend: no configurar secretos ni claves en variables `VITE_*`.
+
+El ID de cliente es público. Este flujo de inicio de sesión no usa un client secret ni solicita acceso a Gmail o Drive. Se usa la biblioteca oficial `google-auth` para verificar firma, audiencia, emisor y tiempo del ID token. La API usa HTTPS con timeout acotado para consultar únicamente el endpoint fijo de certificados de Google. Una caída del proveedor rechaza el acceso Google y conserva el login local.
+
+### Flujo y límites
+
+- `GET /auth/google/config` publica únicamente si está habilitado y el ID de cliente público. La interfaz no carga el SDK cuando está desactivado.
+- `POST /auth/google/challenge` emite un secreto y nonce aleatorios con vigencia de cinco minutos. La base almacena sus hashes. La respuesta y las demás rutas de autenticación tienen `Cache-Control: no-store`. Hay límites por origen y globales, además del límite de cuerpo.
+- El botón oficial de Google recibe ese nonce. Su callback JavaScript envía JSON a `POST /auth/google`, con `credential` y `challenge_token`. No se aceptan roles, usuarios ni dominios elegidos por el navegador. El nonce firmado y el desafío de un solo uso vinculan la respuesta al intento de login; no hay autenticación por cookies ni procesamiento de formularios de redirección de terceros.
+- El desafío se consume atómicamente antes de consultar las claves externas. Un intento fallido, vencido o repetido requiere uno nuevo. No se mantiene el bloqueo de usuarios durante la espera externa. Después se releen cuenta activa, roles y vinculación antes de emitir una sesión NetBot.
+- En el primer acceso válido se vincula el identificador estable `sub` con la cuenta local de correo corporativo verificado. Después se exige la misma vinculación y el correo local correspondiente. Una cuenta Google diferente con un correo reciclado no reemplaza una vinculación existente. No hay desvinculación automática ni migración silenciosa entre cuentas.
+- Los tokens Google no se guardan en la base, localStorage, auditoría o historial. La aplicación emite sus propios tokens, con la expiración, revocación y permisos habituales. Desactivar una cuenta o cambiar sus roles en NetBot revoca sus sesiones. Suspender una cuenta únicamente en Google no revoca por sí solo sesiones NetBot ya emitidas; estas conservan sus controles locales y duración vigente.
+- Auditoría: `auth.google.linked`, `auth.google.succeeded` y `auth.google.failed`, sin credenciales ni contactos. Los errores no revelan si un correo está registrado.
+- La CSP de frontend/nginx permite exclusivamente los recursos necesarios de Google Identity Services en `accounts.google.com/gsi/` para scripts, estilos, conexiones e iframe; no habilita `unsafe-eval` ni scripts inline en producción. Los demás permisos de red se conservan.
+
+Las pruebas automatizadas usan cuentas ficticias, certificados RSA locales y transporte simulado. No acreditan configuración real de Google Cloud, aprobación de Workspace, MFA corporativo ni un login real con cuentas de Diktya. La prueba real requiere el cliente OAuth y el dominio autorizados. El downgrade de `022` se rechaza si existen identidades vinculadas para impedir que se pierda la protección por `sub`; conservarlas y respaldar antes de cualquier cambio de versión.
+
+Fuentes de implementación: [verificación de ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token), [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect) y [biblioteca oficial Python](https://google-auth.readthedocs.io/en/latest/reference/google.oauth2.id_token.html).

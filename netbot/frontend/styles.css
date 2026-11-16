@@ -188,3 +188,12 @@ button { cursor: pointer; }
 .audit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 20px 0; align-items: end; }
 .audit-filters label { display: flex; flex-direction: column; gap: 6px; }
 .audit-filters input, .audit-filters select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #7d8177; border-radius: 6px; background: #fff; color: #263428; }
+
+/* React composes the chat as an isolated feature beside the live metrics. */
+.overview-with-chat > .chat-host { position: sticky; top: 20px; min-width: 0; }
+.chat-host > .chat-panel { margin-top: 0; }
+.system-row dd { margin-left: auto; text-align: right; }
+@media (max-width: 1200px) { .overview-with-chat > .chat-host { position: static; } }
+@media (max-width: 700px) { .sidebar { top: 0; left: 0; overflow-y: auto; } }
+.google-sign-in { margin-top: 18px; min-height: 0; }
+.google-sign-in > div { min-height: 0; }

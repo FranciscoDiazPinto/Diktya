@@ -8,8 +8,8 @@ from app.core.database import get_db
 
 from .dependencies import get_current_user, require_permission
 from .models import User
-from . import service
-from .schemas import AuthAuditRead, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, RoleRead, TokenResponse, UserCreate, UserRead, UserUpdate
+from . import service, google_login
+from .schemas import AuthAuditRead, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, RoleRead, GoogleLoginConfig, GoogleChallengeRead, GoogleLoginRequest, TokenResponse, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 admin_router = APIRouter(prefix="/admin", tags=["administration"])
@@ -18,6 +18,21 @@ admin_router = APIRouter(prefix="/admin", tags=["administration"])
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     return service.login(data, db)
+
+
+@router.get("/google/config", response_model=GoogleLoginConfig)
+def google_config() -> GoogleLoginConfig:
+    return google_login.configuration()
+
+
+@router.post("/google/challenge", response_model=GoogleChallengeRead)
+def google_challenge(db: Session = Depends(get_db)) -> GoogleChallengeRead:
+    return google_login.challenge(db)
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_sign_in(data: GoogleLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    return google_login.login(data, db)
 
 
 @router.post("/refresh", response_model=TokenResponse)

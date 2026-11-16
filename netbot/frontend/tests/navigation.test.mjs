@@ -14,7 +14,7 @@ class Element {
   focus(){this.focused=true;}
 }
 function setup(hash='#overview') {
-  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  const html=readFileSync(new URL('./fixtures/controller-layout.html',import.meta.url),'utf8');
   const nodes=new Map([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>['#'+m[1],new Element()]));
   const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(new Set(ids).size,ids.length);
   const anchors=[];

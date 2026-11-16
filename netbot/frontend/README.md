@@ -1,22 +1,34 @@
-# Frontend
+# Frontend React
 
 La entrada es el chat temporal de invitados. `modules/guest.mjs` controla el QR, la confirmación y la limpieza a los 60 segundos, sin almacenamiento del navegador. El compositor cambia entre invitados, login y dashboard. Ver [configuración de autoatención](../docs/atencion-invitados.md).
 
-Prototipo del centro de monitoreo de Netbot. Esta primera versión no requiere
-dependencias ni build: servir con HTTP local, o con HTTPS en producción.
+Aplicación React 19 con Vite. Requiere Node 24 LTS y npm. Las versiones exactas se conservan en `package-lock.json`.
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run build
+```
+
+Desarrollo: `http://127.0.0.1:5173`, con proxy a `http://127.0.0.1:8000`. Para otro puerto de API, definir `NETBOT_DEV_API_TARGET` al iniciar Vite. La aplicación llama rutas del mismo origen, sin claves de integración en variables Vite. Producción sirve exclusivamente `dist/`; `npm run preview` permite revisar la compilación local. No servir las fuentes con `http.server`.
 
 ## Estructura
 
-- `index.html`: dashboard principal.
+- `index.html`: entrada de Vite y política CSP de producción.
+- `src/main.jsx` y `src/App.jsx`: raíz React, límites de error y pantallas públicas/autenticadas.
+- `src/hooks/`: sesión, navegación por hash y consultas de métricas.
+- `src/components/`: login, workspace, dashboard y vistas JSX.
+- `src/runtime/`: montaje de controladores de las funcionalidades, limpieza de timers/listeners y aislamiento de sesión.
+- `modules/`: controladores de chat, soporte, CSV, planes, inventario, tickets y administración reutilizados por los componentes.
+- `public/examples/`: plantilla CSV que se copia a `dist`.
 - `styles.css`: sistema visual responsive.
-- `app.js`: arranque del compositor; la lógica está en `modules/` por funcionalidad.
+- `Dockerfile`: compilación con Node y servicio estático nginx.
 
 ## Login
 
 El formulario usa `POST /auth/login`, valida la sesion con `GET /auth/me` y cierra
-sesion con `POST /auth/logout`. Por defecto busca la API en `http://localhost:8000`.
-Si el backend local usa el puerto 8001, configura la URL de la API como
-`http://localhost:8001` mediante el mecanismo indicado abajo.
+sesion con `POST /auth/logout`. La aplicación usa rutas del mismo origen. Vite las envía al backend de desarrollo en `127.0.0.1:8000`. Si usa el puerto 8001, configurar `NETBOT_DEV_API_TARGET=http://127.0.0.1:8001` al iniciar Vite.
 En producción usa la API del mismo origen mediante proxy HTTPS. La URL no se lee de localStorage. Los tokens viven únicamente en memoria; recargar o cerrar la página exige iniciar sesión de nuevo. El arranque borra tokens y URL base persistidos por versiones anteriores. El refresh explícito conserva rotación y aislamiento de sesión; no hay renovación automática ni cookies de autenticación.
 
 CORS admite por defecto `localhost:5173` y `127.0.0.1:5173`, sin `null`. En producción usar `CORS_ORIGINS` explícitos.
@@ -62,11 +74,11 @@ Los datos mock se rotulan como demostración; interfaz activa no significa Wi-Fi
 
 ## Organización del código
 
-El punto de entrada app.js solo crea y arranca modules/dashboard.mjs. El compositor inyecta entorno, API y callbacks a controladores separados: api, session, chat, monitoring, inventory, notifications, support, tickets y reservations. Las utilidades de vista y formato están en dom/format. No hay dependencias de npm ni paso de compilación.
+React controla composición, autenticación, navegación y el dashboard de métricas. Los controladores de las demás funcionalidades conservan su estado privado e interfaces existentes; `FeatureMarkup.jsx` define sus formularios y zonas de resultados como componentes estables. `runtime/features.mjs` los conecta por callbacks dentro de un `useLayoutEffect`. No es una reescritura declarativa de todos los controladores: ese trabajo puede realizarse por módulo sin cambiar contratos de API.
 
-Cada controlador mantiene estado privado; identidad y época de sesión son el único estado compartido. No añadir lógica de funcionalidad a app.js/dashboard ni importar el compositor desde otro módulo. Usar el cliente API común y preservar los controles que descartan respuestas tardías de otra cuenta/selección.
+`controller-scope.mjs` acota consultas al árbol montado, retira listeners, cancela timers y expone una época de sesión inválida al desmontar. Así el montaje de comprobación de StrictMode no duplica intervalos ni recupera respuestas de una sesión anterior. Las vistas autenticadas permanecen montadas al navegar para conservar conversaciones y formularios; salir de Mi red limpia las credenciales. Logout desmonta todo el árbol autenticado.
 
-Las pruebas (`node --test frontend/tests/*.test.mjs`) importan los mismos módulos ES que el navegador con entorno inyectado; no concatenan app.js ni reemplazan sus imports. Ver [guía modular](../docs/arquitectura-modular.md) y [AGENTS.md](../../AGENTS.md).
+Los módulos históricos `dashboard.mjs`, `session.mjs`, `navigation.mjs` y `monitoring.mjs` se conservan exclusivamente para pruebas de regresión de los contratos previos. No forman parte de la entrada ni del bundle de producción. Su fixture está en `tests/fixtures/controller-layout.html`. Las pruebas de React importan la aplicación real con sus controladores, verifican las vistas montadas y prueban polling, expiración, permisos y respuestas tardías. Ejecutar ambas suites con `npm test`.
 
 ### Carga CSV
 
@@ -75,11 +87,11 @@ Admin puede validar la [plantilla y contrato CSV](../docs/carga-csv.md), revisar
 
 ## Navegación por vistas
 
-El menú muestra una vista a la vez: Resumen y chat, Dispositivos, Alertas, SSID y VLAN, Planos, Puntos de acceso, Interfaces, Clientes, Firewall, Mi red, Tickets y Aprovisionamiento, según permisos. `modules/navigation.mjs` controla únicamente wrappers y navegación por hash, con enlaces directos, recarga y Atrás/Adelante sin reinstanciar controladores ni perder conversaciones. Los módulos conservan sus controles de autorización y estado privado; el backend sigue autorizando cada solicitud.
+El menú muestra una vista a la vez: Resumen y chat, Dispositivos, Alertas, SSID y VLAN, Planos, Puntos de acceso, Interfaces, Clientes, Firewall, Mi red, Tickets y Aprovisionamiento, según permisos. `src/hooks/useNavigation.jsx` controla navegación por hash, con enlaces directos, recarga y Atrás/Adelante sin reinstanciar controladores ni perder conversaciones. Los módulos conservan sus controles de autorización y estado privado; el backend sigue autorizando cada solicitud.
 
 Resumen reúne el chat con indicadores/gráficos para roles globales y accesos a funciones permitidas para otros usuarios. En escritorio se muestran monitoreo y chat en columnas; en pantallas estrechas se apilan. El enlace antiguo `#chat` abre esta vista combinada. CSV, planes SSID y reservas se agrupan en Aprovisionamiento. Acceso Wi-Fi y destinatarios se ubican en Mi red; salir de esa vista oculta credenciales y descarta respuestas pendientes. Los botones de propuestas del chat abren la vista correspondiente. Una respuesta tardía de preparación SSID no cambia de página si el usuario ya salió del chat.
 
-Para desarrollo, servir `frontend` normalmente: las rutas `#chat`, `#clients`, etc. no requieren reescrituras del servidor. Tras actualizar módulos estáticos en una demo ya abierta, recargar sin caché si el navegador conserva la versión anterior.
+Para desarrollo, iniciar Vite con `npm run dev`: las rutas `#chat`, `#clients`, etc. no requieren reescrituras del servidor. Para publicar una modificación hay que reconstruir `dist` o la imagen del proxy. Vite recarga los cambios durante desarrollo.
 
 Las notificaciones del equipo permanecen accesibles desde la barra superior en cualquier vista; sus enlaces abren Tickets. Los módulos inventory y notifications provienen del desarrollo de monitoreo/tickets integrado y conservan sus contratos de API.
 
@@ -96,4 +108,11 @@ Administradores con `audit:read` disponen de la vista Auditoría: filtros exacto
 - **Auditoría**: sin `audit:read`, un técnico ve únicamente sus propias acciones y no puede exportar.
 - El chat puede mostrar propuestas de cambio de VLAN y reinicio; el plan solo se crea cuando el usuario pulsa «Preparar revisión en el panel».
 
-`tests/markup.test.mjs` comprueba que cada elemento que estos módulos buscan por id exista en `index.html`. Estas vistas no tuvieron revisión visual en navegador.
+Las pruebas de marcado verifican los IDs de las vistas JSX. Las pruebas de React montan los paneles reales, incluyendo permisos y navegación. El recorrido local en Chromium se hizo con datos ficticios y fuentes simuladas, sin escrituras sobre equipos reales.
+
+
+## Inicio de sesión con Google Workspace
+
+El login muestra el botón oficial de Google cuando la API responde `enabled=true` en `/auth/google/config`. La configuración reside exclusivamente en el backend (`GOOGLE_LOGIN_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAINS`), sin client secret ni credenciales en Vite. Seguir la [configuración y política de acceso](../docs/epica-001-autenticacion-roles.md#acceso-con-google-workspace-rama-frontend-react).
+
+`GoogleSignIn.jsx` obtiene un desafío de cinco minutos, configura el nonce de Google Identity Services y entrega su credencial a `useSession.loginGoogle`. Un callback cancelado, duplicado o vencido no se acepta. Volver a invitados o iniciar otra sesión invalida las respuestas anteriores. Ante un fallo se necesita un desafío nuevo, y el acceso con contraseña permanece disponible. El SDK solo se carga cuando la API habilita Google.

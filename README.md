@@ -5,6 +5,7 @@ Asistente para consultar y gestionar soporte de redes de eventos, con permisos p
 ## Estado implementado
 
 - Autenticación y roles cliente, tecnico/operador, visor interno y admin.
+- Acceso Google Workspace opcional para personal previamente autorizado, con dominio verificado y roles locales. Desactivado hasta configurar el cliente OAuth y aplicar la migración 022.
 - Conversaciones privadas persistentes; admin no obtiene acceso a chats ajenos.
 - Monitoreo de solo lectura mediante OPNsense y UniFi Network o datos mock: inventario persistido, disponibilidad, alertas, planos de cobertura y dashboard. Falta validarlo contra equipos reales.
 - Entrega protegida de acceso Wi-Fi fuera del modelo y del historial.
@@ -15,13 +16,13 @@ Asistente para consultar y gestionar soporte de redes de eventos, con permisos p
 - Proveedor del asistente seleccionable (OpenRouter o Claude directo) con verificación de conexión.
 - Despliegue en contenedores con proxy TLS (`netbot/docker-compose.prod.yml`).
 
-Todo lo anterior está probado con controladores simulados. **Falta validarlo contra equipos reales** antes de habilitar escrituras: versión del controlador, contrato de actualización de SSID, reinicio y lectura de monitoreo. Siguen pendientes: MFA, edición de SSID en lote, creación de VLAN/DHCP/reglas en OPNsense (fuera de alcance), plazos de retención y la migración del frontend a React que exige el DoD de HU005. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
+Todo lo anterior está probado con controladores simulados. **Falta validarlo contra equipos reales** antes de habilitar escrituras: versión del controlador, contrato de actualización de SSID, reinicio y lectura de monitoreo. Siguen pendientes: MFA, edición de SSID en lote, creación de VLAN/DHCP/reglas en OPNsense (fuera de alcance), plazos de retención y validación integral del DoD de HU005. Una interfaz activa no prueba disponibilidad de Wi-Fi e Internet.
 
 ## Desarrollo y arquitectura
 
 Leer [AGENTS.md](AGENTS.md) y la [guía modular vigente](netbot/docs/arquitectura-modular.md) antes de modificar código. Las instrucciones para IA en [CLAUDE.md](CLAUDE.md) apuntan a la misma guía compartida.
 
-El proyecto ejecutable está en `netbot/`. Es un monolito modular Python/FastAPI y SQLAlchemy, con PostgreSQL para despliegue y SQLite para desarrollo/pruebas. El frontend actual es HTML/CSS y módulos ES, sin compilación ni React. El proveedor del asistente se usa únicamente desde el backend. En desarrollo, Docker Compose levanta PostgreSQL y la API y el frontend se arrancan por separado; `docker-compose.prod.yml` levanta el conjunto completo detrás de un proxy TLS.
+El proyecto ejecutable está en `netbot/`. Es un monolito modular Python/FastAPI y SQLAlchemy, con PostgreSQL para despliegue y SQLite para desarrollo/pruebas. El frontend usa React y Vite, con compilación estática en `netbot/frontend/dist`. Login, navegación y métricas tienen componentes y hooks propios; los paneles funcionales conservan sus controladores ES aislados por montaje. El proveedor del asistente se usa únicamente desde el backend. En desarrollo, Docker Compose levanta PostgreSQL y la API y el frontend se arrancan por separado; `docker-compose.prod.yml` levanta el conjunto completo detrás de un proxy TLS.
 
 Consultar [inicio local, migraciones y pruebas](netbot/README.md), [índice de documentación](netbot/docs/README.md) y [soporte al cliente](netbot/docs/soporte-cliente.md).
 
@@ -51,7 +52,7 @@ El equipo trabaja bajo **Scrum**, con las siguientes prácticas:
 
 Cada módulo posee sus datos y servicios. Los routers adaptan HTTP; los casos de uso autorizan, consultan y confirman operaciones; los adaptadores externos normalizan sus respuestas. El chat coordina servicios públicos y prepara propuestas con herramientas acotadas por permisos. La aplicación se compone en main/routes/lifecycle, sin dependencias inversas desde los dominios.
 
-El frontend tiene controladores por funcionalidad y un compositor pequeño. Los cambios deben mantener sus límites y pasar las pruebas de arquitectura e aislamiento.
+El frontend tiene componentes React, hooks de sesión/navegación/monitoreo y controladores por funcionalidad. Los cambios deben mantener sus límites y pasar las pruebas de arquitectura e aislamiento.
 
 ## Avance de carga CSV
 

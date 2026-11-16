@@ -1,5 +1,5 @@
 // Estado privado en memoria. No usa localStorage, cookies ni el chat autenticado.
-export function createGuest({document, window, api, Option, now = () => Date.now()}) {
+export function createGuest({document, window, api, Option, now = () => Date.now(), onLogin}) {
   const $ = (s) => document.querySelector(s);
   const screen = $('#guest-screen'), messages = $('#guest-messages'), input = $('#guest-message');
   input.addEventListener('keydown', (event) => {
@@ -183,10 +183,10 @@ export function createGuest({document, window, api, Option, now = () => Date.now
     checkExpiry(); arm();
     if (now() - lastActivity >= 15000) { lastActivity = now(); touch(); }
   });
-  function start() { visible = true; screen.hidden = false; $('#login-screen').style.display = 'none'; reset(); }
+  function start() { visible = true; screen.hidden = false; if ($('#login-screen')) $('#login-screen').style.display = 'none'; reset(); }
   function stop() { visible = false; reset(); screen.hidden = true; }
-  $('#guest-login').addEventListener('click', () => { stop(); $('#login-screen').style.display = ''; $('#email').focus(); });
-  $('#guest-back').addEventListener('click', start);
+  $('#guest-login').addEventListener('click', () => { stop(); if (onLogin) { onLogin(); return; } $('#login-screen').style.display = ''; $('#email').focus(); });
+  $('#guest-back')?.addEventListener('click', start);
   window.addEventListener?.('pagehide', () => reset());
   window.addEventListener?.('pageshow', checkExpiry);
   document.addEventListener?.('visibilitychange', checkExpiry);

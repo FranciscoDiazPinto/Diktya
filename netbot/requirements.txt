@@ -11,3 +11,4 @@ pydantic[email]>=2.7,<3.0
 httpx>=0.27,<1.0
 qrcode>=8.0,<9.0
 anthropic>=2.8,<3.0
+google-auth>=2.62.2,<3.0

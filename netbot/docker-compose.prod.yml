@@ -97,7 +97,9 @@ services:
     profiles: ["worker"]
 
   proxy:
-    image: nginx:1.27-alpine
+    build:
+      context: ./frontend
+    image: netbot-frontend:local
     restart: unless-stopped
     environment:
       NETBOT_SERVER_NAME: ${NETBOT_SERVER_NAME:?Configure el nombre DNS del equipo}
@@ -106,7 +108,6 @@ services:
       - "443:443"
     volumes:
       - ./deploy/nginx/netbot.compose.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - ./frontend:/opt/netbot/frontend:ro
       # fullchain.pem y privkey.pem del sitio; nunca se versionan.
       - ./deploy/tls:/etc/netbot/tls:ro
     depends_on:
