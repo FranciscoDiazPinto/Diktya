@@ -4,3 +4,5 @@ import { cleanup } from "@testing-library/react";
 afterEach(cleanup);
 
 window.scrollTo = vi.fn();
+
+HTMLElement.prototype.scrollIntoView = vi.fn();

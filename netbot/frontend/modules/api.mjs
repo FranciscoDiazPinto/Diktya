@@ -61,9 +61,9 @@ export function createApi({ fetch, localStorage, state, onSessionExpired = () =>
   }
 
   // Los endpoints de monitoreo responden 503 con el mismo envoltorio cuando la fuente no tiene datos.
-  async function monitoringRequest(path) {
+  async function monitoringRequest(path, options = {}) {
     try {
-      return await authedRequest(`${MONITORING}${path}`);
+      return await authedRequest(`${MONITORING}${path}`, options);
     } catch (error) {
       if (error.status === 503 && error.body?.status) return error.body;
       throw error;

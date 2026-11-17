@@ -26,46 +26,66 @@ export function TrafficChart({ series = [] }) {
       )
       .join(" L");
   return (
-    <div className="chart-area">
-      <div className="y-axis">
-        {[1, 0.75, 0.5, 0.25, 0].map((f) => (
-          <span key={f}>{formatRate(max * f)}</span>
-        ))}
-      </div>
-      <div className="chart">
-        <svg
-          viewBox="0 0 760 190"
-          preserveAspectRatio="none"
-          role="img"
-          aria-label="Tráfico WAN de entrada y salida"
-        >
-          <path
-            className="area-fill"
-            d={line("bytes_in_per_second") + " L760,190 L0,190 Z"}
-          />
-          <path className="line inbound-line" d={line("bytes_in_per_second")} />
-          <path
-            className="line outbound-line"
-            d={line("bytes_out_per_second")}
-          />
-        </svg>
-        <div className="x-axis">
-          {[0, 0.25, 0.5, 0.75, 1].map((f) => (
-            <span key={f}>{clockTime(start + span * f)}</span>
+    <>
+      <div className="chart-area">
+        <div className="y-axis">
+          {[1, 0.75, 0.5, 0.25, 0].map((f) => (
+            <span key={f}>{formatRate(max * f)}</span>
           ))}
         </div>
+        <div className="chart">
+          <svg
+            viewBox="0 0 760 190"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="Tráfico WAN de entrada y salida"
+          >
+            <path
+              className="area-fill"
+              d={line("bytes_in_per_second") + " L760,190 L0,190 Z"}
+            />
+            <path
+              className="line inbound-line"
+              d={line("bytes_in_per_second")}
+            />
+            <path
+              className="line outbound-line"
+              d={line("bytes_out_per_second")}
+            />
+          </svg>
+          <div className="x-axis">
+            {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+              <span key={f}>{clockTime(start + span * f)}</span>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+      <details className="traffic-data">
+        <summary>Ver datos del tráfico WAN</summary>
+        <Table
+          caption="Muestras del tráfico WAN"
+          head={["Hora", "Entrada", "Salida"]}
+          rows={points.map((p) => [
+            new Date(p.timestamp).toLocaleString("es-CL"),
+            formatRate(p.bytes_in_per_second),
+            formatRate(p.bytes_out_per_second),
+          ])}
+        />
+      </details>
+    </>
   );
 }
-function Table({ head, rows, empty = "Sin datos disponibles." }) {
+function Table({ caption, head, rows, empty = "Sin datos disponibles." }) {
   return (
     <div className="table-wrap">
       <table className="data-table">
+        <caption className="visually-hidden">{caption}</caption>
         <thead>
           <tr>
             {head.map((h) => (
-              <th key={h}>{h}</th>
+              <th key={h} scope="col">
+                {h}
+              </th>
             ))}
           </tr>
         </thead>
@@ -239,6 +259,7 @@ export function Interfaces({ monitoring }) {
         <h2>Interfaces</h2>
       </div>
       <Table
+        caption="Interfaces de red"
         head={[
           "Interfaz",
           "Estado",
@@ -293,6 +314,7 @@ export function Clients({ monitoring }) {
         </label>
       </div>
       <Table
+        caption="Clientes DHCP"
         head={["Equipo", "IP", "MAC", "Interfaz", "Vencimiento", "Estado"]}
         rows={clients.map((c) => [
           c.hostname || "Sin nombre",
@@ -348,6 +370,7 @@ export function Firewall({ monitoring }) {
         ))}
       </div>
       <Table
+        caption="Eventos del firewall"
         head={["Hora", "Acción", "Interfaz", "Origen", "Destino", "Protocolo"]}
         rows={events.map((e) => [
           clockTime(e.timestamp),

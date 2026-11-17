@@ -12,55 +12,93 @@ export function useMonitoring(runtime, enabled) {
     [lastSync, setLastSync] = useState(null);
   const [windowSeconds, setWindow] = useState(300),
     [busy, setBusy] = useState(false);
-  const generation = useRef(0),
-    active = useRef(false);
-  const refresh = useCallback(async () => {
-    if (!enabled || !active.current) return;
-    const version = ++generation.current,
-      epoch = runtime.state.session;
-    const current = () =>
-      active.current &&
-      generation.current === version &&
-      runtime.state.session === epoch;
-    setBusy(true);
-    const resources = {
-      ...RESOURCES,
-      traffic: `/interfaces/traffic?window=${windowSeconds}`,
-    };
-    const results = await Promise.allSettled(
-      Object.values(resources).map((path) =>
-        runtime.api.monitoringRequest(path),
-      ),
-    );
-    if (!current()) return;
-    const next = {},
-      failures = [];
-    Object.keys(resources).forEach((key, i) => {
-      const result = results[i];
-      if (result.status === "fulfilled") next[key] = result.value;
-      else {
-        next[key] = { status: "unavailable", data: null };
-        failures.push(key);
-      }
-    });
-    setData(next);
-    setLastSync(new Date());
-    setError(
-      failures.length
-        ? "No se pudieron consultar: " + failures.join(", ") + "."
-        : "",
-    );
-    setBusy(false);
-  }, [runtime, enabled, windowSeconds]);
+  const cycle = useRef(null);
+  const refresh = useCallback(() => cycle.current?.(), []);
   useEffect(() => {
-    active.current = true;
-    refresh();
-    const timer = enabled ? setInterval(refresh, 5000) : null;
-    return () => {
-      active.current = false;
-      generation.current++;
-      clearInterval(timer);
+    let active = true,
+      timer,
+      controller,
+      running = false,
+      version = 0;
+    const epoch = runtime.state.session;
+    const visible = () => document.visibilityState !== "hidden";
+    const stop = () => {
+      version++;
+      clearTimeout(timer);
+      controller?.abort();
+      running = false;
     };
-  }, [refresh, enabled]);
+    async function run() {
+      if (
+        !enabled ||
+        !active ||
+        !visible() ||
+        running ||
+        runtime.state.session !== epoch
+      )
+        return;
+      clearTimeout(timer);
+      running = true;
+      const currentVersion = ++version;
+      controller = new AbortController();
+      const signal = AbortSignal.any([
+        controller.signal,
+        AbortSignal.timeout(15000),
+      ]);
+      const current = () =>
+        active && version === currentVersion && runtime.state.session === epoch;
+      setBusy(true);
+      const resources = {
+        ...RESOURCES,
+        traffic: `/interfaces/traffic?window=${windowSeconds}`,
+      };
+      try {
+        const results = await Promise.allSettled(
+          Object.values(resources).map((path) =>
+            runtime.api.monitoringRequest(path, { signal }),
+          ),
+        );
+        if (!current()) return;
+        const next = {},
+          failures = [];
+        Object.keys(resources).forEach((key, i) => {
+          const result = results[i];
+          if (result.status === "fulfilled") next[key] = result.value;
+          else {
+            next[key] = { status: "unavailable", data: null };
+            failures.push(key);
+          }
+        });
+        setData(next);
+        setLastSync(new Date());
+        setError(
+          failures.length
+            ? "No se pudieron consultar: " + failures.join(", ") + "."
+            : "",
+        );
+      } finally {
+        if (current()) {
+          running = false;
+          setBusy(false);
+          if (visible()) timer = setTimeout(run, 5000);
+        }
+      }
+    }
+    const onVisibility = () => {
+      stop();
+      setBusy(false);
+      if (visible()) void run();
+    };
+    cycle.current = run;
+    setBusy(false);
+    void run();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (cycle.current === run) cycle.current = null;
+    };
+  }, [runtime, enabled, windowSeconds]);
   return { data, error, lastSync, busy, refresh, windowSeconds, setWindow };
 }

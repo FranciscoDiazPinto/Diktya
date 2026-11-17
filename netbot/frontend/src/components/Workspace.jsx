@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
+import { useMobileNavigation } from "../hooks/useMobileNavigation.jsx";
 import * as Markup from "./FeatureMarkup.jsx";
 import { mountFeatures } from "../runtime/features.mjs";
 import { navId, useNavigation, VIEWS } from "../hooks/useNavigation.jsx";
@@ -35,7 +36,8 @@ export function Workspace({ runtime }) {
     root = useRef(null),
     features = useRef(null);
   const { view, navigate, allowed } = useNavigation(user),
-    [mobile, setMobile] = useState(false);
+    mobile = useMobileNavigation();
+  const headingId = useId();
   const global = user.permissions?.includes("monitoring:read"),
     monitoring = useMonitoring(runtime, global);
   const heading = useRef(null);
@@ -53,10 +55,11 @@ export function Workspace({ runtime }) {
   }, [runtime]);
   useLayoutEffect(() => {
     if (view !== "support-panel") features.current?.support.clearWifiAccess();
-    setMobile(false);
+    mobile.close(false);
     heading.current?.focus({ preventScroll: true });
+    document.title = `${VIEWS.find((v) => v[0] === view)?.[1] || "Resumen"} | Netbot`;
     window.scrollTo({ top: 0, behavior: "instant" });
-  }, [view]);
+  }, [view, mobile.close]);
   const canView = (key) => allowed.some((v) => v[0] === key),
     name = user.full_name || user.email.split("@")[0],
     source = monitoring.data.system?.source;
@@ -80,7 +83,33 @@ export function Workspace({ runtime }) {
     global && ["overview", "interfaces", "clients", "firewall"].includes(view);
   return (
     <div className="app-shell" id="app-shell" ref={root}>
-      <aside className={"sidebar" + (mobile ? " open" : "")}>
+      <a
+        className="skip-link"
+        href={"#" + headingId}
+        onClick={(event) => {
+          event.preventDefault();
+          mobile.close(false);
+          heading.current?.focus();
+          heading.current?.scrollIntoView({ block: "start" });
+        }}
+      >
+        Saltar al contenido
+      </a>
+      <aside
+        id="workspace-navigation"
+        ref={mobile.sidebar}
+        hidden={mobile.small && !mobile.open}
+        className={"sidebar" + (mobile.open ? " open" : "")}
+      >
+        <button
+          type="button"
+          className="navigation-close"
+          ref={mobile.closeButton}
+          hidden={!mobile.small}
+          onClick={() => mobile.close()}
+        >
+          Cerrar navegación
+        </button>
         <div className="brand">
           <div className="brand-mark" aria-hidden="true">
             <span />
@@ -105,7 +134,8 @@ export function Workspace({ runtime }) {
               onClick={(e) => {
                 e.preventDefault();
                 navigate(key);
-                setMobile(false);
+                mobile.close(false);
+                heading.current?.focus();
               }}
             >
               {title}
@@ -156,8 +186,10 @@ export function Workspace({ runtime }) {
           <button
             className="mobile-menu"
             aria-label="Abrir navegación"
-            aria-expanded={mobile}
-            onClick={() => setMobile(!mobile)}
+            aria-expanded={mobile.small && mobile.open}
+            aria-controls="workspace-navigation"
+            ref={mobile.trigger}
+            onClick={mobile.toggle}
           >
             ☰
           </button>
@@ -210,7 +242,7 @@ export function Workspace({ runtime }) {
                   month: "long",
                 })}
               </p>
-              <h1 ref={heading} tabIndex={-1}>
+              <h1 id={headingId} ref={heading} tabIndex={-1}>
                 {view === "overview"
                   ? `Hola, ${name}`
                   : VIEWS.find((v) => v[0] === view)?.[1]}
@@ -222,7 +254,11 @@ export function Workspace({ runtime }) {
               </p>
             </div>
             {global && view === "overview" && (
-              <div className="period-picker" aria-label="Ventana del gráfico">
+              <div
+                className="period-picker"
+                role="group"
+                aria-label="Ventana del gráfico"
+              >
                 {[
                   [300, "5 min"],
                   [900, "15 min"],
@@ -234,6 +270,7 @@ export function Workspace({ runtime }) {
                       "period" +
                       (monitoring.windowSeconds === v ? " active" : "")
                     }
+                    aria-pressed={monitoring.windowSeconds === v}
                     onClick={() => monitoring.setWindow(v)}
                   >
                     {label}

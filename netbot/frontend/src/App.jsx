@@ -29,6 +29,10 @@ export class ErrorBoundary extends Component {
 }
 export default function App({ fetcher, storage }) {
   const session = useSession({ fetcher, storage });
+  useEffect(() => {
+    if (!session.user)
+      document.title = `${session.screen === "login" ? "Iniciar sesión" : "Atención de invitados"} | Netbot`;
+  }, [session.user, session.screen]);
   const [toast, setToast] = useState(""),
     timer = useRef(null);
   const notify = useCallback((text) => {
