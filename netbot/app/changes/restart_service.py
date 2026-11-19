@@ -204,6 +204,10 @@ class DeviceRestartService:
             raise ServiceUnavailable('Ejecución de reinicios deshabilitada o contrato no autorizado.')
         before = await self.writer.device(site_id, device_id)
         reauthorize()
+        if before['id'] != device_id or before['access_point'] != access_point:
+            raise Conflict('El dispositivo ya no coincide con la vista previa.')
+        if before['state'] != 'ONLINE':
+            raise Conflict('UniFi debe confirmar que el dispositivo está en línea antes de reiniciar.')
 
         resource_key = digest([site_id, 'device', device_id])
         try:

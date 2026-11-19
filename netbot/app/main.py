@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
         secret=derive_key(settings.jwt_secret_key, 'rate-limit'), json_limit=settings.max_json_body_bytes,
         upload_limits={'/api/v1/changes/csv-imports': settings.csv_max_bytes + 1024,
                        '/api/v1/changes/ssid-plans/csv': settings.csv_max_bytes * 3,
+                       '/api/v1/changes/ssid-plans/xlsx': ((settings.csv_max_bytes + 2) // 3) * 4 + 32768,
                        '/api/v1/monitoring/plans': settings.monitoring_plan_max_bytes + 1024},
         budgets={'chat-guest': settings.guest_llm_daily_budget, 'chat-user': settings.chat_llm_daily_budget})
     app.add_middleware(CORSMiddleware,

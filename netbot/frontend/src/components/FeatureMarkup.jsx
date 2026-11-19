@@ -869,12 +869,16 @@ export const ProvisioningMarkup = memo(function ProvisioningMarkup({
           </button>
           {"\n              "}
           <label htmlFor="ssid-csv">
-            {"O cargar el CSV de reservas (mismas columnas)"}
+            {"Cargar CSV de reservas o Excel de feria"}
           </label>
-          <input id="ssid-csv" type="file" accept=".csv,text/csv" />
+          <input id="ssid-csv" name="ssid-file" type="file" accept=".csv,.xlsx" aria-describedby="ssid-file-help" />
+          <p id="ssid-file-help">
+            Del Excel se leen Evento, WiFi / SSID y N° Vlan de la hoja Histórico.
+            Se usan los AP y el perfil seleccionados arriba para todas las filas.
+          </p>
           {"\n              "}
           <button id="ssid-upload" type="button" disabled>
-            {"Preparar planes del CSV"}
+            {"Revisar propuestas del archivo"}
           </button>
           {"\n            "}
         </form>

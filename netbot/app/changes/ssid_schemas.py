@@ -1,7 +1,7 @@
 
 from typing import Literal
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 
 class Strict(BaseModel):
@@ -58,13 +58,20 @@ class SsidProposal(Strict):
         return sorted(value)
 
 
-class SsidCsv(Strict):
+class SsidBatch(Strict):
     _unique_aps = field_validator("ap_ids")(classmethod(SsidProposal.unique_aps.__func__))
 
     scope_id: int = Field(gt=0)
     ap_ids: list[str] = Field(min_length=1, max_length=100)
     security_profile: str = Field(min_length=1, max_length=160)
+
+
+class SsidCsv(SsidBatch):
     csv_text: str = Field(min_length=1, max_length=1048576)
+
+
+class SsidWorkbook(SsidBatch):
+    xlsx_base64: SecretStr = Field(min_length=1, max_length=1398104)
 
 
 class SsidConfirm(Strict):

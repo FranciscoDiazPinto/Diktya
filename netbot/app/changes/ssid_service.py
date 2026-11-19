@@ -1,4 +1,6 @@
 """Planes SSID privados compartidos por CSV y chat. Confirmar no ejecuta UniFi."""
+from base64 import b64decode
+from binascii import Error as Base64Error
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
@@ -27,6 +29,7 @@ from .ssid_schemas import (
     ScopeWrite,
     SsidProposal,
     SsidCsv,
+    SsidWorkbook,
     SsidConfirm,
     SsidPlanRead,
     SsidVlanChangeProposal,
@@ -34,6 +37,7 @@ from .ssid_schemas import (
 )
 from .wifi_inventory import WifiInventory
 from .csv_parser import parse_csv
+from .event_workbook import parse_event_workbook
 from .csv_service import as_utc, utc_now
 from .service import mark_assigned
 from .execution import PlanBusy, exclusive_plan
@@ -129,9 +133,16 @@ class SsidPlanService:
         fingerprint=digest([safe,resources,remote['ssids'],self.settings.unifi_api_base_url,self.settings.monitoring_site_id,profile_revision])
         return safe, remote['ssids'], fingerprint
 
-    def validate(self, proposal: SsidProposal, options, existing):
-        if not set(proposal.ap_ids) <= {a['id'] for a in options['aps']}:
+    @staticmethod
+    def _validate_broadcast_aps(ap_ids, options):
+        available = {ap['id']: ap for ap in options['aps']}
+        if not set(ap_ids) <= available.keys():
             raise Conflict('Selecciona únicamente AP autorizados y presentes en el inventario.')
+        if any(available[ap_id].get('state') != 'ONLINE' for ap_id in ap_ids):
+            raise Conflict('Los AP seleccionados deben estar en línea y con estado confirmado.')
+
+    def validate(self, proposal: SsidProposal, options, existing):
+        self._validate_broadcast_aps(proposal.ap_ids, options)
         if proposal.network_id not in {n['id'] for n in options['networks']}:
             raise Conflict('La red/VLAN no está autorizada o no coincide con el inventario existente.')
         if proposal.security_profile not in options['security_profiles']:
@@ -175,7 +186,14 @@ class SsidPlanService:
             raise Conflict("La información del SSID cambió durante la consulta.")
         if current["network_id"] == proposal.network_id:
             raise Conflict("El SSID ya utiliza la red solicitada.")
+        fingerprint = self._vlan_target_fingerprint(fingerprint, current, options)
         return options, fingerprint, target_network, current, site_id
+
+    def _vlan_target_fingerprint(self, fingerprint, broadcast, options):
+        ap_ids = broadcast.get('ap_ids')
+        if ap_ids is not None:
+            self._validate_broadcast_aps(ap_ids, options)
+        return digest([fingerprint, ap_ids])
 
     async def check_vlan_change(self, actor: User, proposal: SsidVlanChangeProposal):
         """Para el chat: valida la propuesta sin guardarla ni confirmarla."""
@@ -234,7 +252,10 @@ class SsidPlanService:
             "current_vlan": current_vlan,
             "target_vlan": target_network["tag"],
             "impact": (f"Los clientes conectados a «{plan.ssid}» se desconectarán brevemente y "
-                       f"pasarán a la VLAN {target_network['tag']}. No cambia la clave ni los AP."),
+                       f"pasarán a la VLAN {target_network['tag']}. No cambia la clave ni los AP. "
+                       "La conectividad de extremo a extremo requiere una prueba con un cliente."
+                       + (" UniFi no identificó AP explícitos para esta señal."
+                          if current.get('ap_ids') is None else "")),
             "purpose": plan.purpose,
             "fingerprint": plan.fingerprint,
             "revision": plan.revision,
@@ -281,7 +302,7 @@ class SsidPlanService:
         scope = self.scope(actor, plan.scope_id, Permission.CHANGES_APPROVE)
         if digest([scope.site_id, scope.resources]) != scope_revision:
             raise Conflict("Cambió el ámbito. Prepara otra propuesta.")
-        if options["simulated"] or fingerprint != plan.fingerprint:
+        if options["simulated"] or self._vlan_target_fingerprint(fingerprint, current, options) != plan.fingerprint:
             raise Conflict("Cambió el inventario. Prepara otra propuesta.")
         if plan.target_network_id not in {n["id"] for n in options["networks"]}:
             raise Conflict("La VLAN de destino ya no está autorizada.")
@@ -409,8 +430,8 @@ class SsidPlanService:
         scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
         if digest([scope.site_id, scope.resources]) != scope_revision:
             raise Conflict('Cambió el ámbito o se revocó la autorización.')
-        if options['simulated'] or fingerprint != plan.fingerprint:
-            raise Conflict('Cambió el inventario desde la confirmación.')
+        if options['simulated']:
+            raise Conflict('El inventario simulado no permite ejecutar el cambio.')
         if plan.target_network_id not in {n['id'] for n in options['networks']}:
             raise Conflict('La red destino ya no está autorizada.')
         if not any(b['id'] == plan.broadcast_id and b['ssid'] == plan.ssid for b in existing):
@@ -422,6 +443,8 @@ class SsidPlanService:
         if (current['id'] != plan.broadcast_id or current['ssid'] != plan.ssid
                 or current['network_id'] != plan.current_network_id):
             raise Conflict('Cambió la VLAN original; prepara otro plan.')
+        if self._vlan_target_fingerprint(fingerprint, current, options) != plan.fingerprint:
+            raise Conflict('Cambió el inventario desde la confirmación.')
 
         # PK compartida con la creación: bloqueo durable por sitio + nombre de SSID.
         resource_key = digest([plan.site_id, plan.ssid.casefold()])
@@ -606,6 +629,45 @@ class SsidPlanService:
                         errors.append(exc.detail)
             rows.append({'row_number':row.row_number,'proposal':proposal.model_dump() if proposal else None,'errors':errors})
         return self._store(actor,payload.scope_id,options,fingerprint,rows)
+
+    async def workbook(self, actor: User, payload: SsidWorkbook):
+        self.scope(actor, payload.scope_id)
+        try:
+            content = b64decode(payload.xlsx_base64.get_secret_value(), validate=True)
+        except (Base64Error, ValueError):
+            raise InvalidInput('El contenido del Excel no es válido.') from None
+        parsed = parse_event_workbook(
+            content, max_bytes=self.settings.csv_max_bytes, max_rows=self.settings.csv_max_rows,
+        )
+        options, existing, fingerprint = await self.options(actor, payload.scope_id)
+        rows = []
+        for row in parsed:
+            errors = list(row.errors)
+            proposal = None
+            if row.event.casefold() != options['event_name'].casefold():
+                errors.append('El evento de la fila no corresponde al ámbito seleccionado.')
+            if not errors:
+                matches = [network for network in options['networks'] if network['tag'] == row.vlan]
+                if len(matches) != 1:
+                    errors.append('La VLAN no existe en el ámbito o coincide con más de una red.')
+                else:
+                    try:
+                        candidate = SsidProposal(
+                            scope_id=payload.scope_id,
+                            ssid=row.ssid,
+                            network_id=matches[0]['id'],
+                            ap_ids=payload.ap_ids,
+                            security_profile=payload.security_profile,
+                            purpose='Propuesta Wi-Fi desde la planilla del evento',
+                        )
+                        self.validate(candidate, options, existing)
+                        proposal = candidate.model_dump()
+                    except ValidationError:
+                        errors.append('SSID inválido: comprueba que ocupe hasta 32 bytes UTF-8.')
+                    except Conflict as exc:
+                        errors.append(exc.detail)
+            rows.append({'row_number': row.number, 'proposal': proposal, 'errors': errors})
+        return self._store(actor, payload.scope_id, options, fingerprint, rows)
 
     def owned(self, actor, plan_id, permission=Permission.CHANGES_REQUEST):
         require_user_permission(self.db,actor,permission)

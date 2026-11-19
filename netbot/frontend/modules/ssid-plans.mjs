@@ -94,19 +94,35 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     if(!options || !ap_ids.length || !$('#ssid-profile').value) throw new Error('Selecciona un ámbito, al menos un AP y un perfil de seguridad.');
     return {scope_id:Number(scope.value),ap_ids,security_profile:$('#ssid-profile').value};
   }
-  async function prepare(csv) {
+  function workbookBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",", 2)[1]);
+      reader.onerror = () => reject(new Error('No se pudo leer el Excel.'));
+      reader.readAsDataURL(file);
+    });
+  }
+  async function prepare(upload) {
     if(busy) return; const context=capture();
     try {
       const payload = common();
-      if(csv) {
-        const file=$('#ssid-csv').files?.[0]; if(!file || file.size>1048576) throw new Error('Selecciona un CSV de hasta 1 MiB.');
-        payload.csv_text=await file.text(); if(!current(context)) return;
+      let path = '/ssid-plans';
+      if (upload) {
+        const file = $('#ssid-csv').files?.[0];
+        const extension = file?.name.split('.').at(-1).toLowerCase();
+        if (!file || !['csv', 'xlsx'].includes(extension) || !file.size || file.size > 1048576)
+          throw new Error('Selecciona un archivo CSV o XLSX de hasta 1 MiB.');
+        controls(true);
+        path += '/' + extension;
+        if (extension === 'xlsx') payload.xlsx_base64 = await workbookBase64(file);
+        else payload.csv_text = await file.text();
+        if (!current(context)) return;
       } else {
         Object.assign(payload,{ssid:$('#ssid-name').value.trim(),network_id:$('#ssid-network').value,purpose:$('#ssid-purpose').value.trim()});
         if(!payload.ssid || !payload.network_id || !payload.purpose) throw new Error('Completa SSID, red/VLAN y motivo.');
       }
       controls(true);
-      const plan=await request(csv?'/ssid-plans/csv':'/ssid-plans',{method:'POST',body:JSON.stringify(payload)});
+      const plan=await request(path,{method:'POST',body:JSON.stringify(payload)});
       if(current(context)) {showPlan(plan);$('#ssid-status').textContent='Propuesta preparada. Revisa y selecciona las filas para confirmar.';}
     } catch(error) {if(current(context)) $('#ssid-status').textContent=error.status===422?'Revisa los campos y el tamaño UTF-8 del SSID.':error.message;}
     finally {if(current(context)) controls(false);}
