@@ -3,7 +3,7 @@ from typing import Optional
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
 COMMON_PASSWORDS = {"password1234", "contrasena123", "administrador", "qwertyuiopas", "123456789012", "netbot123456"}
@@ -16,11 +16,15 @@ def strong_password(value: str) -> str:
     return value
 
 
-class UserCreate(BaseModel):
+class CustomerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr
     password: str = Field(min_length=12, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=160)
+    _password = field_validator("password")(strong_password)
+
+
+class UserCreate(CustomerCreate):
     roles: list[str] = Field(default_factory=lambda: ["visor"], min_length=1, max_length=20)
 
     @field_validator("roles")
@@ -29,9 +33,6 @@ class UserCreate(BaseModel):
         if len(set(roles)) != len(roles):
             raise ValueError("No repitas roles.")
         return roles
-
-    _password = field_validator("password")(strong_password)
-
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -108,3 +109,20 @@ class AuthAuditRead(BaseModel):
     source: str
     details: dict
     created_at: datetime
+
+
+class GoogleLoginConfig(BaseModel):
+    enabled: bool
+    client_id: str | None = None
+
+
+class GoogleChallengeRead(BaseModel):
+    challenge_token: str
+    nonce: str
+    expires_in: int
+
+
+class GoogleLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    credential: SecretStr = Field(min_length=1, max_length=16384)
+    challenge_token: SecretStr = Field(min_length=32, max_length=256)

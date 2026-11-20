@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 from functools import lru_cache
 from urllib.parse import urlsplit
@@ -37,6 +38,37 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "production"
     database_url: str = Field("sqlite:///./netbot.db", repr=False)
     jwt_secret_key: str = Field("", repr=False)
+    # Google Workspace is opt-in. Only pre-approved active staff can sign in.
+    google_login_enabled: bool = False
+    google_client_id: str = ""
+    google_allowed_domains: list[str] = Field(default_factory=list)
+
+    @field_validator("google_client_id")
+    @classmethod
+    def _google_client_id(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("google_allowed_domains")
+    @classmethod
+    def _google_domains(cls, values: list[str]) -> list[str]:
+        normalized = []
+        for value in values:
+            domain = value.strip().lower()
+            if len(domain) > 253 or not re.fullmatch(r"(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}", domain):
+                raise ValueError("Google requiere dominios exactos, sin @, comodines, rutas ni URL")
+            if domain not in normalized:
+                normalized.append(domain)
+        return normalized
+
+    @model_validator(mode="after")
+    def _google_login_configuration(self) -> "Settings":
+        if self.google_login_enabled and (
+            not re.fullmatch(r"[A-Za-z0-9._-]+\.apps\.googleusercontent\.com", self.google_client_id)
+            or not self.google_allowed_domains
+        ):
+            raise ValueError("Google login requiere GOOGLE_CLIENT_ID válido y GOOGLE_ALLOWED_DOMAINS explícitos")
+        return self
+
     jwt_algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7

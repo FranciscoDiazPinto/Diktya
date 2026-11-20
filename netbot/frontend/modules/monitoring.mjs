@@ -148,7 +148,7 @@ export function createMonitoring({ document, window, sessionState, api, format, 
 
   function renderSparkline(id, values) {
     const element = $(`#${id}`);
-    if (!values.length) { element.innerHTML = ''; return; }
+    if (!values.length) { element.replaceChildren(); return; }
     const max = Math.max(...values);
     const min = Math.min(...values);
     element.innerHTML = values.map((v) => `<i style="height:${max === min ? 18 : 6 + ((v - min) / (max - min)) * 23}px"></i>`).join('');
@@ -230,7 +230,7 @@ export function createMonitoring({ document, window, sessionState, api, format, 
     if (samples.length < 2) {
       empty.style.display = '';
       ['#chart-area', '#chart-in', '#chart-out'].forEach((id) => $(id).setAttribute('d', ''));
-      $('#chart-x').innerHTML = '';
+      $('#chart-x').replaceChildren();
       return;
     }
     empty.style.display = 'none';

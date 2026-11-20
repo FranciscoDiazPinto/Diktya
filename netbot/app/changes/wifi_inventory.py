@@ -15,7 +15,7 @@ class WifiInventory:
             if site_id != 'demo-site':
                 raise ServiceUnavailable('El inventario simulado solo contiene demo-site.')
             return {'source':'mock', 'simulated':True, 'site_id':site_id,
-                    'aps':[{'id':'demo-ap-1','name':'AP de demostración'}],
+                    'aps':[{'id':'demo-ap-1','name':'AP de demostración','state':'ONLINE'}],
                     'networks':[{'id':'demo-network-20','name':'VLAN demo 20','tag':20}], 'ssids':[]}
         if s.unifi_inventory_mode != 'api' or not s.unifi_api_base_url or not s.unifi_api_key:
             raise ServiceUnavailable('Configura el inventario UniFi o habilita explícitamente el modo mock.')
@@ -51,7 +51,7 @@ class WifiInventory:
                 networks = await pages('networks')
                 broadcasts = await pages('wifi/broadcasts')
                 return {'source':'unifi', 'simulated':False, 'site_id':site_id, 'application_version':version,
-                        'aps':[{'id':d['id'],'name':d['name']} for d in devices if 'accessPoint' in d.get('features',[])],
+                        'aps':[{'id':d['id'],'name':d['name'],'state':d.get('state')} for d in devices if 'accessPoint' in d.get('features',[])],
                         'networks':[{'id':n['id'],'name':n['name'],'tag':n['vlanId']} for n in networks],
                         'ssids':[{'id':b['id'],'ssid':b['name']} for b in broadcasts]}
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
@@ -122,7 +122,18 @@ class WifiInventory:
                 if not isinstance(network_id, str) or not network_id:
                     raise ValueError('La red actual no tiene identificador válido.')
 
+                device_filter = data.get('broadcastingDeviceFilter')
+                ap_ids = None
+                if isinstance(device_filter, dict) and device_filter.get('type') == 'DEVICES':
+                    ap_ids = device_filter.get('deviceIds')
+                    if not isinstance(ap_ids, list) or not ap_ids or not all(
+                        isinstance(ap_id, str) and ap_id for ap_id in ap_ids
+                    ):
+                        raise ValueError('Selección de AP inválida.')
+                    ap_ids = sorted(set(ap_ids))
+
                 return {
+                    'ap_ids': ap_ids,
                     'id': broadcast_id,
                     'ssid': data.get('name'),
                     'network_id': network_id,

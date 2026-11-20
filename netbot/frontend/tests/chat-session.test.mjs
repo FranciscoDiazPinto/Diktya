@@ -39,7 +39,7 @@ const deferred = () => {
 const tick = () => new Promise((r) => setImmediate(r));
 
 function dashboard(fetch) {
-  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('./fixtures/controller-layout.html', import.meta.url), 'utf8');
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map((m) => [`#${m[1]}`, new Element()]));
   for (const selector of ['.mobile-menu', '.sidebar']) nodes.set(selector, new Element());
   const storage = new Map();

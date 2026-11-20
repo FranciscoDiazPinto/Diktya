@@ -282,3 +282,22 @@ def test_simultaneous_refresh_never_creates_two_live_sessions(tmp_path):
     with Session(engine) as db:
         assert db.scalar(select(func.count()).select_from(RefreshToken).where(RefreshToken.revoked_at.is_(None)))==1
     engine.dispose()
+
+
+def test_external_customer_can_login_but_cannot_be_promoted(client, admin_user, login):
+    _, admin = login(admin_user.email, 'admin-password')
+    payload = {'email': 'expositor@example.net', 'password': 'temporary-pass-42'}
+    route = '/admin/users/customers'
+    assert client.post(route, headers=admin, json={**payload, 'roles': ['admin']}).status_code == 422
+    created = client.post(route, headers=admin, json=payload)
+    assert created.status_code == 201
+    account = created.json()
+    path = f"/admin/users/{account['id']}"
+    assert account['roles'] == ['cliente']
+    _, customer = login(payload['email'], payload['password'])
+    assert client.patch(path, headers=customer, json={'roles': ['admin']}).status_code == 403
+    assert client.patch(path, headers=admin, json={'roles': ['visor']}).status_code == 409
+    assert client.patch(path, headers=admin, json={'roles': ['cliente', 'admin']}).status_code == 409
+    assert client.get('/api/v1/monitoring/summary', headers=customer).status_code == 403
+    assert client.patch(path, headers=admin, json={'is_active': False}).status_code == 200
+    assert client.get('/auth/me', headers=customer).status_code == 401

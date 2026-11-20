@@ -8,11 +8,11 @@ Para continuar las integraciones se dispone de una [síntesis técnica de Atlas]
 
 ## Organización
 
-Netbot es un monolito modular: una API FastAPI, una base SQL compartida y un frontend estático con módulos ES. Cada funcionalidad tiene propietario y una API interna. Compartir base de datos no autoriza a consultar tablas de otro módulo.
+Netbot es un monolito modular: una API FastAPI, una base SQL compartida y un frontend React/Vite compilado a archivos estáticos. Cada funcionalidad tiene propietario y una API interna. Compartir base de datos no autoriza a consultar tablas de otro módulo.
 
 ```mermaid
 flowchart TD
-    UI[Frontend: controladores ES] --> HTTP[Routers FastAPI]
+    UI[Frontend: React y controladores aislados] --> HTTP[Routers FastAPI]
     HTTP --> AUTH[Servicios de autenticación]
     HTTP --> CHAT[Caso de uso y orquestador del chat]
     HTTP --> NET[Servicios de redes]
@@ -92,14 +92,16 @@ Para un despliegue: detener API y todos los workers → `alembic upgrade head` �
 
 ## Frontend modular
 
-`app.js` únicamente crea y arranca `modules/dashboard.mjs`. El compositor inyecta dependencias y coordina el cambio de sesión; no contiene reglas del negocio de red.
+`frontend/src/main.jsx` monta React en StrictMode. `App.jsx` selecciona invitados, login o workspace. Los hooks `useSession`, `useNavigation` y `useMonitoring` controlan identidad, navegación y métricas declarativas. `src/runtime/features.mjs` compone los controladores funcionales en un efecto, con consultas DOM limitadas al montaje, limpieza de listeners/timers e invalidación de resultados tardíos. Los formularios de esos controladores son componentes JSX estables. No se ha reescrito toda su lógica de vista a estado declarativo.
+
+`modules/dashboard.mjs`, `session.mjs`, `navigation.mjs` y `monitoring.mjs` solo se conservan como referencia ejecutable de las pruebas de regresión anteriores; no se importan desde la entrada React. `npm test --prefix frontend` ejecuta esas regresiones y las pruebas de componentes React. `npm run build --prefix frontend` produce `dist/`.
 
 | Archivo en modules/ | Responsabilidad |
 |---|---|
 | api.mjs | HTTP, tokens, una renovación compartida y rechazo de respuestas de otra época de sesión. |
-| session.mjs | Login/logout/perfil; notifica autenticación y salida al compositor. |
+| src/hooks/useSession.jsx | Login/logout/perfil, expiración y cancelación de intentos anteriores. |
 | chat.mjs | Conversación, versión, selección, historial y mensajes. |
-| monitoring.mjs | Estado privado de métricas, polling y representación del dashboard. |
+| src/hooks/useMonitoring.jsx y components/Monitoring.jsx | Estado de métricas, polling, indicadores, gráficos y tablas React. |
 | inventory.mjs | Resumen, dispositivos, alertas, SSID/VLAN y planos de cobertura. |
 | support.mjs | Diagnóstico personal y panel temporal de acceso Wi-Fi. |
 | tickets.mjs | Formulario, confirmación, filtros, listado y seguimiento de tickets. |
@@ -129,13 +131,13 @@ La lectura de UniFi ya tiene adaptador propio en `monitoring/providers/unifi`. L
 
 ## Verificación y alcance real
 
-Desde netbot/: `.venv/bin/python -m pytest -q` y `node --test frontend/tests/*.test.mjs`.
+Desde netbot/: `.venv/bin/python -m pytest -q` y `npm test --prefix frontend`.
 
 `tests/test_architecture.py` impide dependencias hacia composición HTTP, FastAPI dentro de servicios, SQL/transacciones en routers e imports de tablas ajenas. También verifica CLI independiente y arranque de producción con esquema migrado. Los tests de frontend importan los módulos ES reales, con DOM/API inyectados; incluyen aislamiento entre dos instancias y representación de monitoreo.
 
 Estas pruebas no sustituyen revisión visual de cambios de diseño ni validación contra hardware real.
 
-Implementado: autenticación, aislamiento y persistencia de chat, reservas, monitoreo OPNsense/UniFi/mock de solo lectura con inventario, alertas y planos, acceso Wi-Fi protegido, tickets internos y por incidente, notificaciones, cambios controlados (creación SSID, cambio de VLAN, reinicio) con worker durable, verificación y recuperación, orquestador de agentes, proveedor LLM seleccionable y despliegue en contenedores. **Nada de lo que toca la red está validado contra equipos reales.** Pendiente: validación de laboratorio, MFA, edición de SSID en lote, retención de datos y administración de usuarios por chat. Frontend React y WebSocket pertenecen al diseño objetivo; `docker-compose.prod.yml` levanta proxy, API, worker y PostgreSQL.
+Implementado: autenticación, aislamiento y persistencia de chat, reservas, monitoreo OPNsense/UniFi/mock de solo lectura con inventario, alertas y planos, acceso Wi-Fi protegido, tickets internos y por incidente, notificaciones, cambios controlados (creación SSID, cambio de VLAN, reinicio) con worker durable, verificación y recuperación, orquestador de agentes, proveedor LLM seleccionable y despliegue en contenedores. **Nada de lo que toca la red está validado contra equipos reales.** Pendiente: validación de laboratorio, MFA, edición de SSID en lote, retención de datos y administración de usuarios por chat. El frontend ya usa React y tiene pruebas de componentes; WebSocket continúa en el diseño objetivo. `docker-compose.prod.yml` levanta proxy, API, worker y PostgreSQL.
 
 
 ## Integración vigente de monitoreo y tickets (02-11-2026)
@@ -144,7 +146,7 @@ El inventario, alertas, disponibilidad y planos se implementan en `monitoring.in
 
 `providers.access_points.AccessPointAdapter` reutiliza el inventario normalizado UniFi para DTO mínimos por red, con sitio resuelto y estado explícito. No recolecta estadísticas ni presume heartbeat. `networks.telemetry` filtra por vinculación sitio/AP de la migración 009 y reautoriza tras las esperas. `MonitoringResponse.stale` identifica lecturas anteriores en la retención acotada; cambios y diagnósticos rechazan datos vencidos.
 
-`frontend/modules/navigation.mjs` controla wrappers y hash; cada controlador mantiene su estado privado. Resumen contiene dashboard y chat; inventario, alertas, redes, planos y demás módulos tienen vistas independientes. `inventory.mjs` y `notifications.mjs` conservan sus contratos y reciben coordinación mediante callbacks del compositor.
+`frontend/src/hooks/useNavigation.jsx` controla las rutas por hash; cada controlador mantiene su estado privado. Resumen contiene dashboard y chat; inventario, alertas, redes, planos y demás módulos tienen vistas independientes. `inventory.mjs` y `notifications.mjs` conservan sus contratos y reciben coordinación mediante callbacks del compositor.
 
 ## Auditoría unificada · HU013
 
@@ -198,3 +200,8 @@ Migraciones: `018_monitoring_maintenance`, `019_change_recovery`, `020_agent_eve
 Pruebas de exclusión con SQLite y PostgreSQL: `tests/test_change_execution_lock.py` usa sesiones, procesos separados y muerte del propietario. Para incluir PostgreSQL fuera de CI, definir `NETBOT_TEST_POSTGRES_URL` hacia una instancia desechable; las pruebas de migración crean y eliminan una base nueva de nombre aleatorio, por lo que ese usuario de pruebas requiere `CREATEDB`. No usar la conexión de producción. Sin esa variable los casos PostgreSQL se omiten; CI proporciona un PostgreSQL 16 aislado.
 
 Límites conocidos: el orquestador vive en cada proceso (no hay bus entre procesos; se comunican por la base); las sesiones de invitados siguen exigiendo un solo worker web; no hay retención automática de trazas ni de auditoría.
+
+
+## Identidad Google Workspace
+
+`auth/google_login.py` verifica ID tokens mediante `google-auth` y un transporte HTTP acotado para certificados. El login Google exige dominio Workspace exacto, correo verificado y usuario de personal existente/activo. La identidad se vincula por `sub` sin alta automática ni cambios de roles. La migración `022_google_login` agrega identidades y desafíos temporales de un solo uso dentro del dominio auth, cuyo modelo ya registra `model_registry`. Los routers solo adaptan HTTP y delegan. React configura el botón oficial a partir de la configuración pública y un nonce del servidor; `useSession` instala la sesión propia de NetBot únicamente si el intento sigue vigente. Ver [contrato completo y configuración](epica-001-autenticacion-roles.md#acceso-con-google-workspace-rama-frontend-react). Desactivado por defecto.

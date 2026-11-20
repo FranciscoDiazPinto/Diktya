@@ -461,3 +461,19 @@ def test_h10_disabled_write_never_calls_writer(db_session, ssid_setup):
     with pytest.raises(ServiceUnavailable):
         asyncio.run(service.execute_vlan_change(plan['id']))
     writer.update_vlan.assert_not_awaited()
+
+
+def test_vlan_confirmation_requires_same_broadcast_aps(db_session, ssid_setup):
+    service = _service(db_session, ssid_setup)
+    options = service.options.return_value[0]
+    options['aps'] = [
+        {'id': 'ap-1', 'state': 'ONLINE'},
+        {'id': 'ap-2', 'state': 'ONLINE'},
+    ]
+    broadcast = service.inventory.read_broadcast.return_value
+    broadcast['ap_ids'] = ['ap-1']
+    plan = _preview(service, ssid_setup)
+
+    broadcast['ap_ids'] = ['ap-2']
+    with pytest.raises(Conflict, match='Cambió el inventario'):
+        _confirm(service, ssid_setup, plan)

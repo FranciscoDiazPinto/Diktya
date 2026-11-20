@@ -82,6 +82,8 @@ def has_permission(roles: AbstractSet[RoleName], permission: Permission) -> bool
 
 
 def effective_permissions(user) -> frozenset[Permission]:
+    if any(role.name == RoleName.CLIENTE.value for role in user.roles):
+        return DEFAULT_ROLES[RoleName.CLIENTE].permissions
     return frozenset(
         permission
         for role in user.roles

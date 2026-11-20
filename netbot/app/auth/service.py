@@ -6,7 +6,7 @@ from sqlalchemy import delete, select, update, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.errors import Unauthenticated, NotFound, Conflict, InvalidInput
-from .models import RefreshToken, Role, User, AuthAuditEvent, user_roles
+from .models import RefreshToken, Role, User, AuthAuditEvent, GoogleLoginChallenge, user_roles
 from .audit import current_peer, record_event, bind_request
 from app.core.config import settings
 from app.core.keys import derive_key
@@ -14,7 +14,7 @@ from app.core.keys import derive_key
 from .roles import effective_permissions
 from .access import require_user_permission
 from .permissions import Permission
-from .schemas import LoginRequest, PasswordChange, RefreshRequest, RoleCreate, TokenResponse, UserCreate, UserRead, UserUpdate, RoleRead
+from .schemas import CustomerCreate, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, TokenResponse, UserCreate, UserRead, UserUpdate, RoleRead
 from .security import create_access_token, create_refresh_token, hash_password, verify_password
 
 _DUMMY_PASSWORD_HASH = hash_password("netbot-login-timing-placeholder")
@@ -133,6 +133,8 @@ def refresh(data: RefreshRequest, db: Session) -> TokenResponse:
 def purge_expired_sessions(db: Session, now: datetime) -> int:
     """Conserva un día los tokens vencidos para distinguir reutilización de token inválido."""
     result = db.execute(delete(RefreshToken).where(RefreshToken.expires_at < now - timedelta(days=1)))
+    db.execute(delete(GoogleLoginChallenge).where(GoogleLoginChallenge.expires_at <= now),
+               execution_options={'synchronize_session': False})
     return result.rowcount or 0
 
 
@@ -161,6 +163,8 @@ def _ensure_admin_remains(db: Session, user: User, active: bool, roles: list[Rol
 
 
 def _roles(db: Session, names: list[str]) -> list[Role]:
+    if "cliente" in names and names != ["cliente"]:
+        raise InvalidInput("Una cuenta de cliente solo admite el perfil de cliente.", field="roles")
     roles = list(db.scalars(select(Role).where(Role.name.in_(names))))
     if len(roles) != len(set(names)):
         raise InvalidInput("Unknown role", field="roles")
@@ -182,6 +186,10 @@ def create_user(data: UserCreate, db: Session, actor: User) -> UserRead:
     _lock_administration(db)
     require_user_permission(db, actor, Permission.USERS_MANAGE)
     return _create_user(data, db, actor.id)
+
+
+def create_customer(data: CustomerCreate, db: Session, actor: User) -> UserRead:
+    return create_user(UserCreate(**data.model_dump(), roles=["cliente"]), db, actor)
 
 
 def _create_user(data: UserCreate, db: Session, actor_id, *, source="http") -> UserRead:
@@ -214,6 +222,8 @@ def _update_user(user_id: int, data: UserUpdate, db: Session, actor_id, *, sourc
     user = db.get(User, user_id)
     if not user:
         raise NotFound("User not found")
+    if any(role.name == "cliente" for role in user.roles) and data.roles is not None and data.roles != ["cliente"]:
+        raise Conflict("Las cuentas de cliente no pueden cambiar a un perfil interno.", field="roles")
     roles = _roles(db, data.roles) if data.roles is not None else user.roles
     active = data.is_active if data.is_active is not None else user.is_active
     _ensure_admin_remains(db, user, active, roles)

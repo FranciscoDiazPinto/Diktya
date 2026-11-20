@@ -23,3 +23,10 @@ backups/
 .*.change-locks/
 secrets/
 .DS_Store
+
+# Frontend dependencies, compiled assets and test reports
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/

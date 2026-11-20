@@ -237,3 +237,13 @@ def test_writer_reads_device_state_and_counts_clients_without_guessing():
     assert asyncio.run(writer.connected_clients('site1', 'ap1')) == 2
     broken = UniFiSsidWriter(settings, httpx.MockTransport(lambda request: httpx.Response(500)))
     assert asyncio.run(broken.connected_clients('site1', 'ap1')) is None  # desconocido, no cero
+
+
+def test_restart_rejects_device_already_offline_at_execution(db_session, ssid_setup):
+    svc, writer = service(db_session, [device(), device('OFFLINE', None)])
+    plan = approve(svc, ssid_setup.tech, ssid_setup.scope)
+
+    with pytest.raises(Conflict, match='en línea'):
+        asyncio.run(svc.execute(plan['id']))
+
+    writer.restart.assert_not_awaited()

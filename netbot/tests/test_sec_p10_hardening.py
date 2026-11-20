@@ -40,4 +40,7 @@ async def test_writer_uses_its_own_key_when_configured():
 def test_interface_declares_a_restrictive_content_policy():
     html = (ROOT / 'frontend' / 'index.html').read_text(encoding='utf-8')
     assert 'http-equiv="Content-Security-Policy"' in html
-    assert "script-src 'self';" in html and "object-src 'none'" in html and 'unsafe-eval' not in html
+    script_policy = html.split("script-src ", 1)[1].split(";", 1)[0]
+    assert script_policy == "'self' https://accounts.google.com/gsi/client"
+    assert "object-src 'none'" in html and 'unsafe-eval' not in html
+    assert "'unsafe-inline'" not in script_policy

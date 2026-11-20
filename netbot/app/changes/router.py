@@ -116,6 +116,7 @@ from .ssid_schemas import (
     ScopeWrite,
     SsidProposal,
     SsidCsv,
+    SsidWorkbook,
     SsidConfirm,
     SsidPlanRead,
     SsidVlanChangeProposal,
@@ -160,6 +161,15 @@ async def prepare_ssid_plan(payload: SsidProposal, actor: User = Depends(require
 @router.post('/ssid-plans/csv', response_model=SsidPlanRead, status_code=201)
 async def prepare_ssid_csv(payload: SsidCsv, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
     return await service.csv(actor,payload)
+
+
+@router.post('/ssid-plans/xlsx', response_model=SsidPlanRead, status_code=201)
+async def prepare_ssid_workbook(
+    payload: SsidWorkbook,
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return await service.workbook(actor, payload)
 
 
 @router.get('/ssid-plans/{plan_id}', response_model=SsidPlanRead)

@@ -17,6 +17,8 @@ SMALL_BODY_BYTES = 65536
 # anónimo nunca consume el cupo de un usuario autenticado, ni el login el de la renovación.
 EXACT_POLICIES = {
     '/auth/login': ('auth-login', 10, 600),
+    '/auth/google': ('auth-google', 10, 300),
+    '/auth/google/challenge': ('auth-google-start', 10, 300),
     '/auth/refresh': ('auth-refresh', 20, 1200),
     '/auth/logout': ('auth-logout', 20, 1200),
     '/auth/password': ('auth-password', 5, 120),

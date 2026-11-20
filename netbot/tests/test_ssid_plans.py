@@ -150,7 +150,7 @@ def execution_service(db_session, x, writer):
         data=[SimpleNamespace(parent_interface='igc1',tag=20)])
     monitoring=SimpleNamespace(get_vlan_inventory=AsyncMock(return_value=response))
     inventory=SimpleNamespace(read=AsyncMock(return_value={'source':'unifi','simulated':False,'application_version':'10.6.106',
-        'aps':[{'id':'demo-ap-1','name':'Lab AP'}],'networks':[{'id':'demo-network-20','tag':20}],'ssids':[]}))
+        'aps':[{'id':'demo-ap-1','name':'Lab AP','state':'ONLINE'}],'networks':[{'id':'demo-network-20','tag':20}],'ssids':[]}))
     service=SsidPlanService(db_session,settings,monitoring,inventory=inventory,writer=writer)
     service.save_scope(x.tech if False else db_session.query(User).filter_by(email='admin@example.com').one(),
         __import__('app.changes.ssid_schemas',fromlist=['ScopeWrite']).ScopeWrite(**{**x.data,'monitoring_site_id':'lab'}),x.scope)
@@ -222,3 +222,78 @@ def test_writer_uses_official_create_contract_and_rejects_other_version():
     version[0]='other-version'
     with pytest.raises(ServiceUnavailable): asyncio.run(writer.create('site1',proposal,lambda:None))
     assert len(posted)==1
+
+
+def test_worker_rejects_ssid_creation_if_an_approved_ap_goes_offline(db_session, ssid_setup):
+    from app.changes.ssid_schemas import SsidConfirm, SsidProposal
+    from app.core.errors import Conflict
+
+    actor = ssid_setup.tech
+    writer = SimpleNamespace(profile=lambda _: {}, create=AsyncMock())
+    service = execution_service(db_session, ssid_setup, writer)
+
+    async def run():
+        proposal = SsidProposal(**ssid_setup.proposal)
+        plan = await service.prepare(actor, proposal)
+        await service.confirm(actor, plan.id, SsidConfirm(revision=plan.revision, row_numbers=[1]))
+        service.inventory.read.return_value['aps'][0]['state'] = 'OFFLINE'
+        with pytest.raises(Conflict):
+            await service.execute(plan.id)
+        writer.create.assert_not_awaited()
+
+    asyncio.run(run())
+
+
+def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_session, ssid_setup):
+    from base64 import b64encode
+    from io import BytesIO
+    from zipfile import ZipFile
+
+    spreadsheet = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+    document = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+    package = 'http://schemas.openxmlformats.org/package/2006/relationships'
+
+    def row(number, event, ssid, vlan, key=''):
+        text_cells = {'A': event, 'B': ssid, 'D': key}
+        cells = ''.join(
+            f'<c r="{column}{number}" t="inlineStr"><is><t>{value}</t></is></c>'
+            for column, value in text_cells.items()
+        )
+        return f'<row r="{number}">{cells}<c r="C{number}"><v>{vlan}</v></c></row>'
+
+    rows = row(1, 'Evento', 'WiFi / SSID', 'N° Vlan', 'Clave')
+    rows += row(3, 'Feria', 'Clientes-A', '20.0', 'secret-workbook-value')
+    rows += row(4, 'Feria', '', '30')  # Fila de cableado.
+    rows += row(5, 'Feria', 'Clientes-B', '99')
+    rows += row(6, 'Otro evento', 'Clientes-C', '20')
+    buffer = BytesIO()
+    with ZipFile(buffer, 'w') as archive:
+        archive.writestr('xl/workbook.xml', f'<workbook xmlns="{spreadsheet}" xmlns:r="{document}">'
+                         '<sheets><sheet name="Histórico" r:id="history"/></sheets></workbook>')
+        archive.writestr('xl/_rels/workbook.xml.rels', f'<Relationships xmlns="{package}">'
+                         f'<Relationship Id="history" Type="{document}/worksheet" Target="worksheets/sheet2.xml"/>'
+                         '</Relationships>')
+        archive.writestr('xl/worksheets/sheet2.xml', f'<worksheet xmlns="{spreadsheet}">'
+                         f'<sheetData>{rows}</sheetData></worksheet>')
+
+    setup = ssid_setup
+    payload = {key: setup.proposal[key] for key in ('scope_id', 'security_profile', 'ap_ids')}
+    payload['xlsx_base64'] = b64encode(buffer.getvalue()).decode('ascii')
+    path = '/api/v1/changes/ssid-plans/xlsx'
+    assert client.post(path, json=payload).status_code == 401
+    response = client.post(path, headers=setup.headers, json=payload)
+    assert response.status_code == 201, response.text
+    plan = response.json()
+    assert plan['status'] == 'preview' and not plan['selection']
+    assert [row['row_number'] for row in plan['rows']] == [3, 5, 6]
+    valid, *invalid = plan['rows']
+    assert valid['proposal']['network_id'] == 'demo-network-20'
+    assert valid['proposal']['ap_ids'] == ['demo-ap-1']
+    assert all(row['errors'] and row['proposal'] is None for row in invalid)
+    assert 'secret-workbook-value' not in response.text
+    assert 'secret-workbook-value' not in str(db_session.scalars(select(SsidPlan)).one().rows)
+    confirm = f"/api/v1/changes/ssid-plans/{plan['id']}/confirm"
+    assert client.post(confirm, headers=setup.headers,
+                       json={'revision': plan['revision'], 'row_numbers': [5]}).status_code == 409
+    assert client.post(confirm, headers=setup.headers,
+                       json={'revision': plan['revision'], 'row_numbers': [3]}).status_code == 200
