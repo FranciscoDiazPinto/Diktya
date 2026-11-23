@@ -321,6 +321,7 @@ def test_vlan_batch_worker_stops_on_failure_and_resumes_only_confirmed_pending_r
         asyncio.run(worker.run_cycle())
     assert attempts == ['one', 'two']
     stopped = read(batch['id'])
+    assert stopped['execution_status'] == 'stopped'
     assert [row['status'] for row in stopped['results']] == ['completed', 'failed', 'confirmed']
 
     retry = client.post(f"{path}/{batch['id']}/retry", headers=x.headers)
@@ -333,5 +334,11 @@ def test_vlan_batch_worker_stops_on_failure_and_resumes_only_confirmed_pending_r
     for _ in range(3):
         asyncio.run(worker.run_cycle())
     assert attempts == ['one', 'two', 'two', 'three']
-    assert [row['status'] for row in read(resumed['id'])['results']] == ['completed', 'completed']
+    completed = read(resumed['id'])
+    assert completed['execution_status'] == 'completed'
+    assert [row['status'] for row in completed['results']] == ['completed', 'completed']
+    history = client.get(path, params={'scope_id': x.scope}, headers=x.headers).json()
+    assert {item['id']: item['execution_status'] for item in history} == {
+        batch['id']: 'superseded', resumed['id']: 'completed',
+    }
     assert [row['status'] for row in read(batch['id'])['results']] == ['completed', 'failed', 'cancelled']

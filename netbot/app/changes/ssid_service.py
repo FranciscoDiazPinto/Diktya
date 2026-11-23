@@ -271,9 +271,28 @@ class SsidPlanService:
                 return []
         return pending
 
+    @staticmethod
+    def _vlan_batch_execution_status(batch, states, now):
+        if batch.status == 'preview':
+            return 'expired' if as_utc(batch.expires_at) <= now else 'preview'
+        if batch.status != 'confirmed':
+            return batch.status
+        if states and states == {'completed'}:
+            return 'completed'
+        if states & {'uncertain', 'rollback_failed'}:
+            return 'needs_reconciliation'
+        if 'executing' in states:
+            return 'executing'
+        if states - {'confirmed', 'completed'} or as_utc(batch.expires_at) <= now:
+            return 'stopped'
+        return 'queued'
+
     def _read_vlan_batch(self, batch):
         children = self._vlan_batch_children(batch.id)
         return {'id': batch.id, 'scope_id': batch.scope_id, 'status': batch.status,
+                'execution_status': self._vlan_batch_execution_status(
+                    batch, {child.status for child in children}, utc_now(),
+                ),
                 'revision': batch.revision, 'rows': batch.rows, 'selection': batch.selection,
                 'expires_at': as_utc(batch.expires_at),
                 'can_retry': batch.status == 'confirmed' and bool(self._pending_vlan_batch_rows(children)),
@@ -315,10 +334,19 @@ class SsidPlanService:
 
     def list_vlan_batches(self, actor: User, scope_id: int, limit: int, offset: int):
         self.scope(actor, scope_id)
-        batches = self.db.scalars(select(SsidVlanBatchPlan).where(
+        batches = list(self.db.scalars(select(SsidVlanBatchPlan).where(
             SsidVlanBatchPlan.owner_id == actor.id, SsidVlanBatchPlan.scope_id == scope_id,
-        ).order_by(SsidVlanBatchPlan.expires_at.desc(), SsidVlanBatchPlan.id).limit(limit).offset(offset))
+        ).order_by(SsidVlanBatchPlan.expires_at.desc(), SsidVlanBatchPlan.id).limit(limit).offset(offset)))
+        if not batches:
+            return []
+        states = {batch.id: set() for batch in batches}
+        for batch_id, status in self.db.execute(select(
+            SsidVlanChangePlan.batch_id, SsidVlanChangePlan.status,
+        ).where(SsidVlanChangePlan.batch_id.in_(states))):
+            states[batch_id].add(status)
+        now = utc_now()
         return [{'id': batch.id, 'status': batch.status, 'row_count': len(batch.rows),
+                 'execution_status': self._vlan_batch_execution_status(batch, states[batch.id], now),
                  'expires_at': as_utc(batch.expires_at)} for batch in batches]
 
     def get_vlan_batch(self, actor: User, batch_id: str):

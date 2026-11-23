@@ -8,6 +8,20 @@ const STATUS = {
   rolled_back: 'No verificada · se restauró el estado anterior', rollback_failed: 'No se pudo restaurar · requiere conciliación',
   uncertain: 'Resultado incierto · requiere conciliación', cancelled: 'Cancelada',
 };
+const BATCH_STATUS = {
+  queued: 'Aprobado · en cola',
+  executing: 'En ejecución',
+  completed: 'Todas las filas aprobadas verificadas',
+  needs_reconciliation: 'Detenido · requiere conciliación',
+  stopped: 'Detenido · revisa las filas pendientes',
+  superseded: 'Reemplazado por una nueva propuesta',
+};
+
+function batchStatus(batch) {
+  const status = batch.execution_status || batch.status;
+  return BATCH_STATUS[status] || STATUS[status] || status;
+}
+
 const RESULT = {
   verified_configuration: 'Configuración releída y verificada en el controlador. No equivale a una prueba de conexión.',
   returned_online: 'El equipo volvió en línea después del reinicio.',
@@ -55,7 +69,7 @@ export function createChangePlans({document, Option, state, api, textNode, captu
   function showBatch(batch) {
     selectedBatch = batch.id;
     batchDetail.replaceChildren();
-    const title = textNode('h4', `Lote ${batch.id} · ${STATUS[batch.status] || batch.status}`);
+    const title = textNode('h4', `Lote ${batch.id} · ${batchStatus(batch)}`);
     title.tabIndex = -1;
     batchDetail.append(title);
     const selected = new Set();
@@ -110,7 +124,7 @@ export function createChangePlans({document, Option, state, api, textNode, captu
     const batches = await request(`${batchBase}?scope_id=${Number(scope.value)}`);
     if (!current(context)) return;
     batchHistory.replaceChildren(new Option('Selecciona un lote', ''), ...batches.map(batch =>
-      new Option(`${batch.id} · ${STATUS[batch.status] || batch.status} · ${batch.row_count} fila(s)`, batch.id)));
+      new Option(`${batch.id} · ${batchStatus(batch)} · ${batch.row_count} fila(s)`, batch.id)));
     batchHistory.value = batches.some(batch => batch.id === selectedBatch) ? selectedBatch : '';
     batchHistory.disabled = !batches.length;
   }
