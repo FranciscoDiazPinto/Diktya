@@ -440,3 +440,27 @@ def test_retry_keeps_verified_rows_and_requires_new_confirmation(client, db_sess
     assert [row['row_number'] for row in resumed['rows']] == [2, 3]
     assert [row['proposal']['ssid'] for row in resumed['rows']] == names[1:3]
     assert db_session.get(SsidPlan, original['id'], populate_existing=True).status == 'partial'
+
+
+def test_open_successor_fair_requires_review_and_keeps_a_separate_scope(client, ssid_setup):
+    x = ssid_setup
+    base = '/api/v1/changes/wifi-scopes'
+    source = f'{base}/{x.scope}'
+    preview = client.get(f'{source}/closure-preview', headers=x.admin).json()
+    payload = {'name': 'Feria siguiente', 'event_name': 'Feria siguiente', 'revision': preview['revision']}
+    assert client.post(f'{source}/successor', headers=x.headers, json=payload).status_code == 403
+    assert client.post(f'{source}/successor', headers=x.admin, json=payload).status_code == 409
+    closure = client.post(f'{source}/closure-confirm', headers=x.admin, json={'revision': preview['revision']})
+    assert closure.status_code == 200, closure.text
+    assert client.post(f'{source}/successor', headers=x.admin, json=payload).status_code == 409
+    payload['revision'] = closure.json()['revision']
+    opened = client.post(f'{source}/successor', headers=x.admin, json=payload)
+    assert opened.status_code == 201, opened.text
+    result = opened.json()
+    assert result['id'] != x.scope
+    assert result['networks'] == x.data['networks']
+    assert result['user_ids'] == []
+    successor = client.get(f"{base}/{result['id']}/closure-preview", headers=x.admin).json()
+    assert successor['accepts_changes'] is True
+    assert successor['pending'] == successor['linked_reservations'] == []
+    assert client.post(f'{source}/successor', headers=x.admin, json=payload).status_code == 409

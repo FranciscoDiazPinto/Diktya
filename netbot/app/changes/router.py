@@ -150,6 +150,7 @@ from .ssid_schemas import (
     DeviceRestartProposal,
     PlanRevision,
     ScopeWrite,
+    FairSuccessor,
     SsidProposal,
     SsidCsv,
     SsidWorkbook,
@@ -167,6 +168,16 @@ from .reconciliation import reconcile_plan
 @router.get('/wifi-scopes')
 def wifi_scopes(actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
     return service.scopes(actor)
+
+
+@router.post('/wifi-scopes/{scope_id}/successor', status_code=201)
+def open_successor_fair(
+    scope_id: int,
+    payload: FairSuccessor,
+    actor: User = Depends(require_permission(Permission.NETWORKS_MANAGE.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return service.open_successor_fair(actor, scope_id, payload)
 
 
 @router.post('/wifi-scopes', status_code=201)

@@ -28,6 +28,7 @@ from .models import (
 )
 from .ssid_schemas import (
     ScopeWrite,
+    FairSuccessor,
     SsidProposal,
     SsidCsv,
     SsidWorkbook,
@@ -43,7 +44,7 @@ from .event_workbook import parse_event_workbook
 from .csv_service import as_utc, utc_now
 from .service import clear_reservation_hold, find_reserved_vlan, hold_reservation, mark_assigned
 from .execution import PlanBusy, exclusive_plan
-from .fair_closure import require_open_scope
+from .fair_closure import lock_fair_scope, preview_fair_closure, require_open_scope
 
 
 def digest(value):
@@ -91,7 +92,7 @@ class SsidPlanService:
             statement = statement.join(WifiScopeGrant).where(WifiScopeGrant.user_id == actor.id)
         return [{'id':s.id,'name':s.name,'site_id':s.site_id} for s in self.db.scalars(statement)]
 
-    def save_scope(self, actor, payload: ScopeWrite, scope_id=None):
+    def save_scope(self, actor, payload: ScopeWrite, scope_id=None, *, copied_from=None):
         require_user_permission(self.db, actor, Permission.NETWORKS_MANAGE)
         if any(not user_exists(self.db, i) for i in payload.user_ids):
             raise InvalidInput('Uno de los usuarios no existe.')
@@ -103,9 +104,33 @@ class SsidPlanService:
         self.db.execute(delete(WifiScopeGrant).where(WifiScopeGrant.scope_id == scope.id))
         self.db.add_all([WifiScopeGrant(scope_id=scope.id, user_id=i) for i in sorted(set(payload.user_ids))])
         record_event(self.db, 'wifi.scope.saved', actor_id=actor.id,
-                     details={'scope_id': scope.id, 'site_id': scope.site_id, 'user_ids': sorted(set(payload.user_ids))})
+                     details={'scope_id': scope.id, 'site_id': scope.site_id, 'user_ids': sorted(set(payload.user_ids)),
+                              **({'copied_from_scope_id': copied_from} if copied_from is not None else {})})
         self.db.commit()
         return {'id':scope.id, **payload.model_dump()}
+
+    def open_successor_fair(self, actor: User, scope_id: int, payload: FairSuccessor):
+        require_user_permission(self.db, actor, Permission.NETWORKS_MANAGE)
+        lock_fair_scope(self.db, scope_id)
+        preview = preview_fair_closure(self.db, actor, scope_id)
+        if preview['revision'] != payload.revision:
+            raise Conflict('El cierre cambió. Revisa el ámbito antes de abrir la próxima feria.')
+        if preview['accepts_changes'] or preview['pending'] or preview['blockers']:
+            raise Conflict('Cierra el ámbito y resuelve sus trabajos pendientes antes de abrir la próxima feria.')
+        if any(row['releasable'] for row in preview['linked_reservations']):
+            raise Conflict('Confirma la liberación de las reservas pendientes antes de abrir la próxima feria.')
+        source = self.db.get(WifiScope, scope_id)
+        if payload.event_name.casefold() == preview['event_name'].casefold():
+            raise Conflict('La feria siguiente requiere un nombre de evento distinto.')
+        matching = self.db.scalars(select(WifiScope).where(WifiScope.site_id == source.site_id))
+        if any(scope.resources.get('event_name', '').casefold() == payload.event_name.casefold()
+               for scope in matching):
+            raise Conflict('Ya existe un ámbito para ese evento en el sitio.')
+        scope_data = ScopeWrite.model_validate({
+            **source.resources, 'site_id': source.site_id, 'name': payload.name,
+            'event_name': payload.event_name, 'user_ids': payload.user_ids,
+        })
+        return self.save_scope(actor, scope_data, copied_from=scope_id)
 
     async def options(self, actor, scope_id):
         scope = self.scope(actor, scope_id)

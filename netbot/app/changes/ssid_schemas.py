@@ -35,6 +35,13 @@ class ScopeWrite(Strict):
         return self
 
 
+class FairSuccessor(Strict):
+    name: str = Field(min_length=1, max_length=160)
+    event_name: str = Field(min_length=1, max_length=160)
+    user_ids: list[int] = Field(default_factory=list, max_length=500)
+    revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class SsidProposal(Strict):
     scope_id: int = Field(gt=0)
     ssid: str = Field(min_length=1, max_length=32)

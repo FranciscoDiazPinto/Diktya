@@ -105,13 +105,17 @@ def preview_fair_closure(db: Session, actor: User, scope_id: int) -> dict:
     return {**inventory, 'revision': revision}
 
 
-def confirm_fair_closure(db: Session, actor: User, scope_id: int, revision: str) -> dict:
-    require_user_permission(db, actor, Permission.NETWORKS_MANAGE)
+def lock_fair_scope(db: Session, scope_id: int) -> None:
     locked = db.execute(update(WifiScope).where(WifiScope.id == scope_id).values(
         accepts_changes=WifiScope.accepts_changes,
     ), execution_options={'synchronize_session': False})
     if locked.rowcount != 1:
         raise NotFound('Ámbito de feria no encontrado.')
+
+
+def confirm_fair_closure(db: Session, actor: User, scope_id: int, revision: str) -> dict:
+    require_user_permission(db, actor, Permission.NETWORKS_MANAGE)
+    lock_fair_scope(db, scope_id)
 
     preview = preview_fair_closure(db, actor, scope_id)
     if preview['revision'] != revision:
