@@ -130,7 +130,7 @@ def test_active_execution_cannot_be_reconciled_even_when_old(db_session, ssid_se
             await worker.run_cycle()  # otro worker tampoco puede conciliar ni repetirlo
             db_session.refresh(row)
             assert row.status == 'executing'
-            assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 1
+            assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == (1 if kind == "restart" else 2)
             assert not task.done()
             release.set()
             result = await asyncio.wait_for(task, timeout=3)

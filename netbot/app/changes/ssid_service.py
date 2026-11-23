@@ -52,6 +52,10 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def vlan_lease_key(site_id: str, network_id: str) -> str:
+    return digest(['vlan-target', site_id, network_id])
+
+
 def authorized_scope(db: Session, actor: User, scope_id: int, permission=Permission.CHANGES_REQUEST) -> WifiScope:
     """Ámbito de aprovisionamiento vigente del actor. La ausencia de concesión deniega."""
     require_user_permission(db, actor, permission)
@@ -700,9 +704,10 @@ class SsidPlanService:
         check_reservation()
         require_open_scope(self.db, plan.scope_id)
         # PK compartida con la creación: bloqueo durable por sitio + nombre de SSID.
-        resource_key = digest([plan.site_id, plan.ssid.casefold()])
+        keys = sorted({digest([plan.site_id, plan.ssid.casefold()]),
+                       vlan_lease_key(plan.site_id, plan.target_network_id)})
         try:
-            self.db.add(WifiWriteLease(resource_key=resource_key, vlan_plan_id=plan.id))
+            self.db.add_all([WifiWriteLease(resource_key=key, vlan_plan_id=plan.id) for key in keys])
             self.db.flush()
         except IntegrityError:
             self.db.rollback()
@@ -753,14 +758,14 @@ class SsidPlanService:
             # Una respuesta ambigua del PUT usa WriteUncertain y sí requiere recuperación.
             self.db.rollback()
             if not write_returned:
-                return self._finish_vlan_change(plan_id, actor.id, resource_key, 'failed')
+                return self._finish_vlan_change(plan_id, actor.id, 'failed')
             verified = False
         except Exception:
             # No guardar respuestas, excepciones ni credenciales del proveedor.
             self.db.rollback()
             verified = False
         outcome = 'completed' if verified else await self._recover_vlan_change(plan_id)
-        return self._finish_vlan_change(plan_id, actor.id, resource_key, outcome)
+        return self._finish_vlan_change(plan_id, actor.id, outcome)
 
     async def _recover_vlan_change(self, plan_id: str) -> str:
         """Concilia y restaura el estado previo. Solo revierte lo que este trabajo aplicó."""
@@ -790,7 +795,7 @@ class SsidPlanService:
             restored = False
         return 'rolled_back' if restored else 'rollback_failed'
 
-    def _finish_vlan_change(self, plan_id: str, actor_id: int, resource_key: str, outcome: str):
+    def _finish_vlan_change(self, plan_id: str, actor_id: int, outcome: str):
         """Persiste el resultado, la auditoría y el escalamiento en una sola transacción."""
         plan = self.db.get(SsidVlanChangePlan, plan_id)
         plan.status = outcome
@@ -806,7 +811,7 @@ class SsidPlanService:
                      details={'plan_id': plan.id, 'scope_id': plan.scope_id, 'broadcast_id': plan.broadcast_id})
         if outcome in ('completed', 'failed', 'rolled_back'):
             self.db.execute(delete(WifiWriteLease).where(
-                WifiWriteLease.resource_key == resource_key, WifiWriteLease.vlan_plan_id == plan.id))
+                WifiWriteLease.vlan_plan_id == plan.id))
         # uncertain / rollback_failed conservan el lease hasta la conciliación.
         key = f'change:vlan:{plan.id}'
         if outcome == 'rolled_back':
@@ -841,7 +846,6 @@ class SsidPlanService:
             outcome = 'rolled_back' if plan.status == 'rollback_failed' else 'failed'
         else:
             raise Conflict('El SSID usa una red distinta de la original y de la solicitada. Revísalo en el controlador.')
-        resource_key = digest([plan.site_id, plan.ssid.casefold()])
         plan = self.db.get(SsidVlanChangePlan, plan_id)
         plan.status = outcome
         if plan.reservation_id is not None:
@@ -854,7 +858,7 @@ class SsidPlanService:
                      source='worker', outcome='success' if outcome == 'completed' else 'failure',
                      details={'plan_id': plan.id, 'result': outcome})
         self.db.execute(delete(WifiWriteLease).where(
-            WifiWriteLease.resource_key == resource_key, WifiWriteLease.vlan_plan_id == plan.id))
+            WifiWriteLease.vlan_plan_id == plan.id))
         self.db.commit()
         return self.read_vlan_change_plan(plan)
 
@@ -1097,7 +1101,9 @@ class SsidPlanService:
         require_open_scope(self.db, plan.scope_id)
         # Exclusión durable por SSID/sitio, también entre ámbitos superpuestos.
         try:
-            self.db.add_all([WifiWriteLease(resource_key=digest([scope.site_id,p.ssid.casefold()]),plan_id=plan_id) for p in selected])
+            keys = {digest([scope.site_id, proposal.ssid.casefold()]) for proposal in selected}
+            keys.update(vlan_lease_key(scope.site_id, proposal.network_id) for proposal in selected)
+            self.db.add_all([WifiWriteLease(resource_key=key, plan_id=plan_id) for key in sorted(keys)])
             self.db.flush()
         except IntegrityError:
             self.db.rollback()
@@ -1191,12 +1197,14 @@ class SsidPlanService:
         else:
             status='partial' if verified else 'failed'
         plan.status=status; plan.execution_results=[dict(r) for r in results]
-        # El bloqueo solo se conserva para los SSID cuyo estado remoto no se pudo acreditar.
-        resolved=[digest([site_id,r['ssid'].casefold()]) for r in results
-                  if r['status'] not in ('uncertain','rollback_failed','verifying','writing')]
-        if resolved:
-            self.db.execute(delete(WifiWriteLease).where(WifiWriteLease.plan_id==plan_id,
-                                                         WifiWriteLease.resource_key.in_(resolved)))
+        pending = {row['ssid'] for row in results
+                   if row['status'] in {'uncertain', 'rollback_failed', 'verifying', 'writing'}}
+        held_keys = {digest([site_id, ssid.casefold()]) for ssid in pending}
+        held_keys.update(vlan_lease_key(site_id, row['proposal']['network_id']) for row in plan.rows
+                         if row['proposal'] and row['proposal']['ssid'] in pending)
+        self.db.execute(delete(WifiWriteLease).where(
+            WifiWriteLease.plan_id == plan_id, WifiWriteLease.resource_key.not_in(held_keys),
+        ))
         record_event(self.db, 'ssid.plan.executed', actor_id=actor_id, source='worker',
                      outcome='success' if status == 'completed' else 'failure',
                      details={'plan_id': plan_id, 'status': status,

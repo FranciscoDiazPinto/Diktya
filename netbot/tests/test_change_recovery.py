@@ -71,7 +71,7 @@ def test_failed_rollback_keeps_lock_and_opens_critical_ticket(db_session, ssid_s
     service, plan = ready(db_session, ssid_setup, writer)
     result = asyncio.run(service.execute_vlan_change(plan['id']))
     assert result['status'] == 'rollback_failed' and result['needs_reconciliation'] is True
-    assert count(db_session, WifiWriteLease) == 1
+    assert count(db_session, WifiWriteLease) == 2
     ticket = db_session.scalar(select(Ticket))
     assert ticket.incident_type == 'rollback_failed' and ticket.criticality == 'critica'
     with pytest.raises(Conflict):
@@ -100,7 +100,7 @@ def test_third_party_change_is_never_overwritten(db_session, ssid_setup):
     service, plan = ready(db_session, ssid_setup, writer)
     result = asyncio.run(service.execute_vlan_change(plan['id']))
     assert result['status'] == 'uncertain' and writer.update_vlan.await_count == 1
-    assert count(db_session, WifiWriteLease) == 1
+    assert count(db_session, WifiWriteLease) == 2
     assert db_session.scalar(select(Ticket.incident_type)) == 'verification_failed'
 
 
@@ -174,7 +174,7 @@ def test_failed_compensation_keeps_the_ssid_locked(client, db_session, ssid_setu
     writer = creator(verify=AsyncMock(return_value=False), delete_created=AsyncMock(return_value=False))
     _, result = run_creation(db_session, ssid_setup, writer)
     assert result.status == 'uncertain' and result.execution_results[0]['status'] == 'rollback_failed'
-    assert count(db_session, WifiWriteLease) == 1
+    assert count(db_session, WifiWriteLease) == 2
     assert db_session.scalar(select(Ticket.criticality)) == 'critica'
 
 

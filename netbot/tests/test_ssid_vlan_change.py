@@ -346,7 +346,7 @@ def test_h10_uncertain_retains_lock_and_never_retries(db_session, ssid_setup):
     service, plan = _ready_executor(db_session, x, writer)
     result = asyncio.run(service.execute_vlan_change(plan['id']))
     assert result['status'] == 'uncertain' and result['executed'] is False
-    assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 1
+    assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 2
     with pytest.raises(Conflict):
         asyncio.run(service.execute_vlan_change(plan['id']))
     assert writer.update_vlan.await_count == 1
@@ -360,7 +360,7 @@ def test_h10_verify_failure_keeps_lock(db_session, ssid_setup):
     service, plan = _ready_executor(db_session, x, writer)
     result = asyncio.run(service.execute_vlan_change(plan['id']))
     assert result['status'] == 'uncertain'
-    assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 1
+    assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 2
 
 
 def test_h10_blocks_stale_vlan_before_write(db_session, ssid_setup):
