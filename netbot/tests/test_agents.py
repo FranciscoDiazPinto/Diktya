@@ -19,6 +19,7 @@ from app.core.database import Base
 from app.core.errors import AccessDenied
 from app.model_registry import register_models
 from app.tickets.models import Ticket
+from tests.test_ssid_plans import ssid_setup
 
 T0 = datetime(2026, 11, 13, 12, 0, tzinfo=timezone.utc)
 
@@ -177,7 +178,6 @@ def test_changes_cli_keeps_working_without_loading_the_http_application():
 
 def test_end_to_end_vlan_change_from_request_to_verified_result(client, db_session, admin_user, login):
     """HU018: solicitud -> confirmación explícita -> worker -> verificación -> trazas, por las fronteras reales."""
-    from sqlalchemy.orm import sessionmaker
     from app.changes.dependencies import get_ssid_service
     from app.changes.restart_service import DeviceRestartService
     from app.changes.ssid_service import SsidPlanService
@@ -244,3 +244,94 @@ def test_end_to_end_vlan_change_from_request_to_verified_result(client, db_sessi
         assert f"wifi.ssid_vlan_change.{action}" in trail
     traces = client.get(f"/api/v1/agents/events?correlation_id=change:vlan:{plan['id']}", headers=admin).json()
     assert [(t["agent_id"], t["event_type"], t["outcome"]) for t in traces] == [("changes", "change.vlan.executed", "success")]
+
+
+def test_vlan_batch_worker_stops_on_failure_and_resumes_only_confirmed_pending_rows(
+    client, db_session, ssid_setup,
+):
+    from app.changes.dependencies import get_ssid_service
+    from app.changes.restart_service import DeviceRestartService
+    from app.changes.ssid_executor import WriteUncertain
+    from app.changes.ssid_service import SsidPlanService
+    from app.main import app
+
+    x = ssid_setup
+    broadcasts = {'one': 'Primero', 'two': 'Segundo', 'three': 'Tercero'}
+    networks = {broadcast: 'old-network' for broadcast in broadcasts}
+    attempts = []
+    live = Settings(_env_file=None, unifi_inventory_mode='api',
+                    unifi_write_enabled=True, unifi_api_contract='10.6.106')
+
+    async def update_vlan(_site, broadcast, current, target, authorize):
+        authorize()
+        assert networks[broadcast] == current
+        attempts.append(broadcast)
+        if attempts == ['one', 'two']:
+            raise WriteUncertain()
+        networks[broadcast] = target
+
+    writer = SimpleNamespace(
+        update_vlan=update_vlan,
+        verify_vlan=AsyncMock(side_effect=lambda _s, b, _name, target: networks[b] == target),
+        read_network=AsyncMock(side_effect=lambda _s, b: networks[b]),
+    )
+    worker = ChangeWorker(sessionmaker(bind=db_session.get_bind(), expire_on_commit=False), live,
+                          monitoring=None)
+
+    def service(db):
+        plans = SsidPlanService(db, live, monitoring=None, writer=writer, incidents=worker._report)
+        plans.options = AsyncMock(return_value=(
+            {'simulated': False, 'event_name': 'Feria',
+             'networks': [{'id': 'demo-network-20', 'tag': 20, 'parent_interface': 'igc1'}]},
+            [{'id': key, 'ssid': name} for key, name in broadcasts.items()],
+            'inventory-fingerprint',
+        ))
+        plans.inventory.read_broadcast = AsyncMock(side_effect=lambda _scope, broadcast: {
+            'id': broadcast, 'ssid': broadcasts[broadcast], 'network_id': networks[broadcast],
+        })
+        return plans
+
+    app.dependency_overrides[get_ssid_service] = lambda: service(db_session)
+    worker._services = lambda db: (service(db), DeviceRestartService(db, live, writer=writer))
+    path = '/api/v1/changes/ssid-vlan-batches'
+
+    def read(batch_id):
+        response = client.get(f'{path}/{batch_id}', headers=x.headers)
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def confirm(batch):
+        response = client.post(f"{path}/{batch['id']}/confirm", headers=x.headers, json={
+            'revision': batch['revision'], 'row_numbers': [row['row_number'] for row in batch['rows']],
+        })
+        assert response.status_code == 200, response.text
+
+    preview = client.post(f'{path}/preview', headers=x.headers, json={
+        'scope_id': x.scope, 'rows': [
+            {'broadcast_id': broadcast, 'network_id': 'demo-network-20', 'purpose': 'Prueba de lote'}
+            for broadcast in broadcasts
+        ],
+    })
+    assert preview.status_code == 200, preview.text
+    batch = preview.json()
+    asyncio.run(worker.run_cycle())
+    assert attempts == []
+    confirm(batch)
+    for _ in range(3):
+        asyncio.run(worker.run_cycle())
+    assert attempts == ['one', 'two']
+    stopped = read(batch['id'])
+    assert [row['status'] for row in stopped['results']] == ['completed', 'failed', 'confirmed']
+
+    retry = client.post(f"{path}/{batch['id']}/retry", headers=x.headers)
+    assert retry.status_code == 201, retry.text
+    resumed = retry.json()
+    assert [row['row_number'] for row in resumed['rows']] == [2, 3]
+    asyncio.run(worker.run_cycle())
+    assert attempts == ['one', 'two']
+    confirm(resumed)
+    for _ in range(3):
+        asyncio.run(worker.run_cycle())
+    assert attempts == ['one', 'two', 'two', 'three']
+    assert [row['status'] for row in read(resumed['id'])['results']] == ['completed', 'completed']
+    assert [row['status'] for row in read(batch['id'])['results']] == ['completed', 'failed', 'cancelled']
