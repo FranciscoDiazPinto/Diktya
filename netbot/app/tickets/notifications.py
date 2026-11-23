@@ -11,15 +11,16 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.auth.service import active_staff
 from app.core.config import Settings
-from app.core.errors import NotFound
+from app.core.errors import AccessDenied, NotFound
 from app.networks.access import assigned_user_ids
 
+from .access import visible_tickets
 from .models import Notification, Ticket
 from .schemas import NotificationPage, NotificationRead
 
@@ -95,16 +96,27 @@ def register_attempt(row: Notification, error: Exception | None, settings: Setti
     row.next_attempt_at = now + timedelta(seconds=settings.notification_email_retry_seconds * 2 ** (row.attempts - 1))
 
 
+def _visible_inbox(db: Session, user: User):
+    try:
+        tickets = visible_tickets(db, user).with_only_columns(Ticket.id)
+    except AccessDenied:
+        return (false(),)
+    return (Notification.user_id == user.id, Notification.channel == "in_app",
+            Notification.ticket_id.in_(tickets))
+
+
 def list_for_user(db: Session, user: User, limit: int) -> NotificationPage:
-    mine = (Notification.user_id == user.id, Notification.channel == "in_app")
+    mine = _visible_inbox(db, user)
     rows = db.scalars(select(Notification).where(*mine).order_by(Notification.id.desc()).limit(limit)).all()
     unread = db.scalar(select(func.count()).select_from(Notification).where(*mine, Notification.read_at.is_(None)))
     return NotificationPage(items=[NotificationRead.model_validate(row) for row in rows], unread=unread or 0)
 
 
 def mark_read(db: Session, user: User, notification_id: int) -> NotificationRead:
-    row = db.get(Notification, notification_id)
-    if row is None or row.user_id != user.id or row.channel != "in_app":
+    row = db.scalar(select(Notification).where(
+        Notification.id == notification_id, *_visible_inbox(db, user),
+    ))
+    if row is None:
         raise NotFound("Notificación no encontrada.")
     if row.read_at is None:
         row.read_at = datetime.now(timezone.utc)

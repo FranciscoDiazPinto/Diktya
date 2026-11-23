@@ -120,7 +120,7 @@ Son tickets internos de Netbot; no se conecta una mesa de ayuda externa.
 
 Un gateway o firewall fuera de línea es Crítica. Con `TICKET_MASS_INCIDENT_DEVICES` (3) o más incidentes del mismo tipo a la vez se sube un nivel. Un tipo sin regla queda en Media con `needs_review`. `TICKET_CRITICALITY_RULES_JSON` sustituye reglas: `{"device_offline":"critica"}`. La cantidad de usuarios afectados no entra en el cálculo: el inventario no la registra.
 
-**Notificaciones.** Cada creación, escalamiento, reapertura o resolución se notifica a técnicos y administradores activos. Los tickets de una red solo llegan a administradores y técnicos asignados a ella, para no revelar datos de un cliente. La entrega interna se guarda junto con el ticket, así que un fallo de correo no la afecta. El correo requiere `SMTP_HOST`; sin él solo se notifica en la aplicación. Se reintenta con espera progresiva hasta `NOTIFICATION_EMAIL_MAX_ATTEMPTS`, se cancela si el usuario fue desactivado, y Alta y Crítica salen primero y se destacan. Cada entrega registra estado, intentos, envío y lectura.
+**Notificaciones.** Cada creación, escalamiento, reapertura o resolución se notifica a técnicos y administradores activos. Los tickets de una red solo llegan a administradores y técnicos asignados a ella, para no revelar datos de un cliente. La entrega interna se guarda junto con el ticket, así que un fallo de correo no la afecta. El correo requiere `SMTP_HOST`; sin él solo se notifica en la aplicación. Se reintenta con espera progresiva hasta `NOTIFICATION_EMAIL_MAX_ATTEMPTS`, se cancela si el usuario fue desactivado o perdió acceso al ámbito, y Alta y Crítica salen primero y se destacan. Cada entrega registra estado, intentos, envío y lectura.
 
 **Seguimiento.** Un ticket abierto y sin responsable que supera su tiempo máximo reenvía la notificación y sube de criticidad. `TICKET_ATTENTION_MINUTES_JSON` lo define por criticidad: Crítica 15, Alta 30, Media 120 y Baja 480 minutos. Si la alerta se normaliza, el ticket pasa a Resuelto y espera el cierre de un técnico. Cerrar exige un motivo de al menos 5 caracteres.
 
@@ -133,10 +133,10 @@ Un gateway o firewall fuera de línea es Crítica. Con `TICKET_MASS_INCIDENT_DEV
 | `POST /api/v1/tickets/{id}/assign` | Autoasignación, con `version`. |
 | `POST /api/v1/tickets/{id}/comments` | Comentario, sin cambiar el estado. |
 | `PATCH /api/v1/tickets/{id}/criticality` | Ajuste con motivo; quita `needs_review`. |
-| `GET /api/v1/notifications` | Bandeja propia y cantidad sin leer. |
-| `POST /api/v1/notifications/{id}/read` | Marca como leída, solo la propia. |
+| `GET /api/v1/notifications` | Bandeja propia y cantidad sin leer de tickets que el usuario todavía puede consultar. |
+| `POST /api/v1/notifications/{id}/read` | Marca como leída una notificación propia cuyo ticket sigue visible. |
 
-La migración `008_ticket_incidents` agrega columnas a tickets y la tabla `notifications`. Revertirla borra los tickets de infraestructura, que no caben en el esquema anterior. Enviar correo no se ha probado contra un servidor SMTP real.
+La migración `008_ticket_incidents` agrega columnas a tickets y la tabla `notifications`. Revertirla borra los tickets de infraestructura, que no caben en el esquema anterior. El envío y el reintento pasaron con SMTP local de prueba y STARTTLS. La entrega con el proveedor operativo sigue pendiente.
 
 ## Auditoría y migración
 

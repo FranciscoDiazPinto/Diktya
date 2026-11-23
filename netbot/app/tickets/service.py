@@ -1,7 +1,7 @@
-from app.core.errors import Unauthenticated, AccessDenied, NotFound, Conflict, RateLimited
+from app.core.errors import NotFound, Conflict, RateLimited
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,37 +13,15 @@ from app.core.config import Settings
 from app.core.errors import InvalidInput
 from app.monitoring.alerts import device_brief
 from app.monitoring.service import MonitoringService
-from app.networks.access import accessible_network_ids
 from app.networks.access import authorize
 from app.networks.diagnostics import network_status
 from app.networks.audit import record_audit
+from .access import visible_tickets
 from .criticality import attention_due
 from .models import Notification, Ticket, TicketEvent
 from .notifications import enqueue
 from .schemas import (DeliveryRead, TicketAssign, TicketComment, TicketCreate, TicketCriticalityUpdate, TicketDetail,
                       TicketEventRead, TicketManualCreate, TicketRead, TicketUpdate)
-
-
-def _ticket_query(db: Session, user: User):
-    db.expire_all()
-    if not user.is_active:
-        raise Unauthenticated("Usuario inactivo.")
-    permissions = effective_permissions(user)
-    query = select(Ticket)
-    if Permission.TICKETS_READ in permissions:
-        return query
-    conditions = []
-    if Permission.TICKETS_READ_OWN in permissions or Permission.TICKETS_READ_ASSIGNED in permissions:
-        scoped = Ticket.network_id.in_(accessible_network_ids(db, user))
-        if Permission.TICKETS_READ_ASSIGNED not in permissions:
-            scoped = scoped & (Ticket.created_by_id == user.id)
-        conditions.append(scoped)
-    # Infraestructura: el equipo técnico la gestiona y el supervisor la consulta.
-    if Permission.TICKETS_READ_ASSIGNED in permissions or Permission.MONITORING_READ in permissions:
-        conditions.append(Ticket.network_id.is_(None))
-    if not conditions:
-        raise AccessDenied("Permiso insuficiente para consultar tickets.")
-    return query.where(or_(*conditions))
 
 
 def _require_manage(db: Session, user: User, ticket: Ticket) -> None:
@@ -71,7 +49,7 @@ def _apply(db: Session, ticket: Ticket, version: int, **values) -> None:
 
 
 def _get_ticket(db: Session, user: User, ticket_id: int) -> Ticket:
-    ticket = db.scalar(_ticket_query(db, user).where(Ticket.id == ticket_id))
+    ticket = db.scalar(visible_tickets(db, user).where(Ticket.id == ticket_id))
     if ticket is None:
         raise NotFound("Ticket no encontrado.")
     return ticket
@@ -136,7 +114,7 @@ async def create_manual_ticket(db: Session, user: User, payload: TicketManualCre
         require_user_permission(db, user, Permission.TICKETS_MANAGE_ASSIGNED)
     key = str(payload.request_key)
     # La idempotencia no entrega un ticket que la cuenta ya no puede consultar.
-    existing = db.scalar(_ticket_query(db, user).where(Ticket.created_by_id == user.id, Ticket.request_key == key))
+    existing = db.scalar(visible_tickets(db, user).where(Ticket.created_by_id == user.id, Ticket.request_key == key))
     if existing:
         return TicketRead.model_validate(_same_request(existing, payload))
     _enforce_creation_quota(db, user, settings)
@@ -242,7 +220,7 @@ def set_criticality(db: Session, user: User, ticket_id: int, payload: TicketCrit
 def list_tickets(db: Session, user: User, *, limit: int = 50, offset: int = 0, network_id: int | None = None,
                  status: str | None = None, criticality: str | None = None,
                  assignee_id: int | None = None) -> list[TicketRead]:
-    query = _ticket_query(db, user)
+    query = visible_tickets(db, user)
     if criticality is not None:
         query = query.where(Ticket.criticality == criticality)
     if assignee_id is not None:
@@ -269,7 +247,7 @@ def ticket_detail(db: Session, user: User, ticket_id: int) -> TicketDetail:
 
 def list_ticket_summaries(db: Session, user: User, network_ids: set[int]) -> list[dict]:
     """Contrato del chat: autorizar primero y devolver datos mínimos, nunca ORM."""
-    rows = db.scalars(_ticket_query(db, user).where(Ticket.network_id.in_(network_ids))
+    rows = db.scalars(visible_tickets(db, user).where(Ticket.network_id.in_(network_ids))
                       .order_by(Ticket.updated_at.desc(), Ticket.id.desc()).limit(5)).all()
     return [TicketRead.model_validate(row).model_dump(mode="json", include={
         "id", "network_id", "summary", "status", "version", "updated_at"

@@ -405,3 +405,28 @@ async def test_recipient_is_reauthorized_after_previous_smtp_wait(lab):
     assert {row.user_id: row.status for row in lab.rows(channel="email")} == {
         lab.tech.id: "sent", lab.admin.id: "cancelled",
     }
+
+
+def test_inbox_hides_ticket_and_unread_count_after_network_revocation(client, db_session, team):
+    from app.networks.models import Network, NetworkAssignment
+
+    tech = db_session.scalar(select(User).where(User.email == "tech@example.com"))
+    network = Network(name="Feria", site="site", event_name="Evento",
+                      external_id="network-30", ssid="Staff", vlan_tag=30)
+    db_session.add(network)
+    db_session.flush()
+    assignment = NetworkAssignment(network_id=network.id, user_id=tech.id)
+    db_session.add(assignment)
+    db_session.commit()
+
+    created = manual(client, team["admin"], network_id=network.id)
+    assert created.status_code == 201, created.text
+    inbox = client.get("/api/v1/notifications", headers=team["tech"]).json()
+    assert inbox["unread"] == 1
+    notification_id = inbox["items"][0]["id"]
+
+    db_session.delete(assignment)
+    db_session.commit()
+    assert client.get("/api/v1/notifications", headers=team["tech"]).json() == {"items": [], "unread": 0}
+    assert client.post(f"/api/v1/notifications/{notification_id}/read", headers=team["tech"]).status_code == 404
+    assert client.get("/api/v1/notifications", headers=team["admin"]).json()["unread"] == 1
