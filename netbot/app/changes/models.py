@@ -90,6 +90,9 @@ class WifiWriteLease(Base):
     plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_plans.id"), index=True, nullable=True)
     vlan_plan_id: Mapped[str | None] = mapped_column(ForeignKey("ssid_vlan_change_plans.id"), index=True, nullable=True)
     restart_plan_id: Mapped[str | None] = mapped_column(ForeignKey("device_restart_plans.id"), index=True, nullable=True)
+    vlan_batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ssid_vlan_batch_plans.id", name="fk_wifi_lease_vlan_batch"), index=True,
+    )
 
 
 class SsidVlanBatchPlan(Base):

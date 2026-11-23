@@ -46,6 +46,7 @@ from .service import (clear_reservation_hold, find_reserved_vlan, hold_reservati
                       vlan_has_pending_reservation)
 from .execution import PlanBusy, exclusive_plan
 from .fair_closure import lock_fair_scope, preview_fair_closure, require_open_scope
+from .queue import release_finished_batch_leases
 
 
 def digest(value):
@@ -355,6 +356,7 @@ class SsidPlanService:
         for child in current:
             if child.status == 'confirmed':
                 child.status = 'cancelled'
+        release_finished_batch_leases(self.db)
         retry = self._store_vlan_batch(actor, batch.scope_id, rows)
         record_event(self.db, 'wifi.vlan_batch.retried', actor_id=actor.id,
                      details={'batch_id': retry.id, 'retry_of': batch_id,
@@ -428,6 +430,14 @@ class SsidPlanService:
             self.db.add(child)
             self.db.flush()
             predecessor_id = child.id
+        targets = {vlan_lease_key(child.site_id, child.target_network_id) for _, child in children}
+        self.db.add_all([WifiWriteLease(resource_key=key, vlan_batch_id=batch_id)
+                         for key in sorted(targets)])
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            raise Conflict('Una VLAN del lote ya está reservada por otro cambio.') from None
         record_event(self.db, 'wifi.vlan_batch.confirmed', actor_id=actor.id,
                      details={'batch_id': batch_id, 'revision': payload.revision, 'rows': payload.row_numbers})
         self.db.commit()
@@ -621,6 +631,8 @@ class SsidPlanService:
             self.db.rollback()
             raise Conflict("El plan ya fue tomado por el ejecutor o está finalizado.")
         self.db.execute(delete(WifiWriteLease).where(WifiWriteLease.vlan_plan_id == plan_id))
+        if plan.batch_id is not None:
+            release_finished_batch_leases(self.db)
         record_event(self.db, 'wifi.ssid_vlan_change.cancelled', actor_id=actor.id, target_id=actor.id,
                      details={'plan_id': plan.id})
         self.db.commit()
@@ -711,15 +723,15 @@ class SsidPlanService:
 
         check_reservation()
         require_open_scope(self.db, plan.scope_id)
-        # El cambio individual requiere la reserva adquirida al confirmar.
         target_key = vlan_lease_key(plan.site_id, plan.target_network_id)
+        target_lease = self.db.get(WifiWriteLease, target_key, populate_existing=True)
+        owns_target = target_lease is not None and (
+            target_lease.vlan_plan_id == plan.id if plan.batch_id is None
+            else target_lease.vlan_batch_id == plan.batch_id
+        )
+        if not owns_target:
+            raise Conflict('El plan no tiene una reserva de ejecución vigente. Prepara otro plan.')
         keys = {digest([plan.site_id, plan.ssid.casefold()])}
-        if plan.batch_id is None:
-            target_lease = self.db.get(WifiWriteLease, target_key, populate_existing=True)
-            if target_lease is None or target_lease.vlan_plan_id != plan.id:
-                raise Conflict('El plan no tiene una reserva de ejecución vigente. Prepara otro plan.')
-        else:
-            keys.add(target_key)
         try:
             self.db.add_all([WifiWriteLease(resource_key=key, vlan_plan_id=plan.id) for key in sorted(keys)])
             self.db.flush()
@@ -826,6 +838,8 @@ class SsidPlanService:
         if outcome in ('completed', 'failed', 'rolled_back'):
             self.db.execute(delete(WifiWriteLease).where(
                 WifiWriteLease.vlan_plan_id == plan.id))
+            if plan.batch_id is not None:
+                release_finished_batch_leases(self.db)
         # uncertain / rollback_failed conservan el lease hasta la conciliación.
         key = f'change:vlan:{plan.id}'
         if outcome == 'rolled_back':
@@ -873,6 +887,8 @@ class SsidPlanService:
                      details={'plan_id': plan.id, 'result': outcome})
         self.db.execute(delete(WifiWriteLease).where(
             WifiWriteLease.vlan_plan_id == plan.id))
+        if plan.batch_id is not None:
+            release_finished_batch_leases(self.db)
         self.db.commit()
         return self.read_vlan_change_plan(plan)
 

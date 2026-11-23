@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.changes.queue import KINDS, confirmed_ids, expire_approvals, interrupted_ids, reject_approval
+from app.changes.queue import (KINDS, confirmed_ids, expire_approvals, interrupted_ids,
+                               reject_approval, release_finished_batch_leases)
 from app.changes.execution import PlanBusy
 from app.changes.restart_service import DeviceRestartService
 from app.changes.service import expire_due
@@ -81,6 +82,10 @@ class ChangeWorker:
                 db.commit()
             if expire_approvals(db, now):
                 db.commit()
+            if release_finished_batch_leases(db):
+                db.commit()
+            else:
+                db.rollback()  # la comprobación local no debe conservar locks al esperar la red
             if not self._settings.unifi_write_enabled:
                 return  # las aprobaciones vigentes esperan sin escribir en la red
             # Recuperación tras una caída: solo lectura sobre la red.

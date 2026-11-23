@@ -250,6 +250,7 @@ def test_vlan_batch_worker_stops_on_failure_and_resumes_only_confirmed_pending_r
     client, db_session, ssid_setup,
 ):
     from app.changes.dependencies import get_ssid_service
+    from app.changes.models import WifiWriteLease
     from app.changes.restart_service import DeviceRestartService
     from app.changes.ssid_executor import WriteUncertain
     from app.changes.ssid_service import SsidPlanService
@@ -317,16 +318,23 @@ def test_vlan_batch_worker_stops_on_failure_and_resumes_only_confirmed_pending_r
     asyncio.run(worker.run_cycle())
     assert attempts == []
     confirm(batch)
+    def reserved_vlans(batch_id):
+        return db_session.scalar(select(func.count()).select_from(WifiWriteLease).where(
+            WifiWriteLease.vlan_batch_id == batch_id,
+        ))
+    assert reserved_vlans(batch['id']) == 1
     for _ in range(3):
         asyncio.run(worker.run_cycle())
     assert attempts == ['one', 'two']
     stopped = read(batch['id'])
     assert stopped['execution_status'] == 'stopped'
+    assert reserved_vlans(batch['id']) == 1
     assert [row['status'] for row in stopped['results']] == ['completed', 'failed', 'confirmed']
 
     retry = client.post(f"{path}/{batch['id']}/retry", headers=x.headers)
     assert retry.status_code == 201, retry.text
     resumed = retry.json()
+    assert reserved_vlans(batch['id']) == 0
     assert [row['row_number'] for row in resumed['rows']] == [2, 3]
     asyncio.run(worker.run_cycle())
     assert attempts == ['one', 'two']
@@ -336,6 +344,7 @@ def test_vlan_batch_worker_stops_on_failure_and_resumes_only_confirmed_pending_r
     assert attempts == ['one', 'two', 'two', 'three']
     completed = read(resumed['id'])
     assert completed['execution_status'] == 'completed'
+    assert reserved_vlans(resumed['id']) == 0
     assert [row['status'] for row in completed['results']] == ['completed', 'completed']
     history = client.get(path, params={'scope_id': x.scope}, headers=x.headers).json()
     assert {item['id']: item['execution_status'] for item in history} == {

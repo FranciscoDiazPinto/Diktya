@@ -38,10 +38,25 @@ def interrupted_ids(db: Session, kind: str, before: datetime, limit: int = 20) -
                            .limit(limit)))
 
 
+def release_finished_batch_leases(db: Session) -> int:
+    """Una VLAN del lote sigue reservada hasta resolver todas sus filas."""
+    db.flush()
+    unfinished = select(SsidVlanChangePlan.id).where(
+        SsidVlanChangePlan.batch_id == WifiWriteLease.vlan_batch_id,
+        SsidVlanChangePlan.status.in_(('confirmed', 'executing', 'uncertain', 'rollback_failed')),
+    ).exists()
+    result = db.execute(delete(WifiWriteLease).where(
+        WifiWriteLease.vlan_batch_id.is_not(None), ~unfinished,
+    ), execution_options={'synchronize_session': False})
+    return result.rowcount or 0
+
+
 def release_pending_plan_leases(db: Session, kind: str, plan_ids: list[str]) -> None:
     column = {'ssid': WifiWriteLease.plan_id, 'vlan': WifiWriteLease.vlan_plan_id}.get(kind)
     if column is not None and plan_ids:
         db.execute(delete(WifiWriteLease).where(column.in_(plan_ids)))
+        if kind == 'vlan':
+            release_finished_batch_leases(db)
 
 
 def expire_approvals(db: Session, now: datetime) -> int:
