@@ -109,6 +109,23 @@ class SsidVlanChangeProposal(Strict):
     purpose: str = Field(min_length=1, max_length=500)
 
 
+class SsidVlanBatchRow(Strict):
+    broadcast_id: str = Field(min_length=1, max_length=160)
+    network_id: str = Field(min_length=1, max_length=160)
+    purpose: str = Field(min_length=1, max_length=500)
+
+
+class SsidVlanBatch(Strict):
+    scope_id: int = Field(gt=0)
+    rows: list[SsidVlanBatchRow] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode='after')
+    def unique_broadcasts(self):
+        if len({row.broadcast_id for row in self.rows}) != len(self.rows):
+            raise ValueError('Cada SSID puede aparecer una sola vez en el lote.')
+        return self
+
+
 class SsidVlanChangeConfirm(Strict):
     """Confirmación explícita de un cambio de VLAN existente."""
 

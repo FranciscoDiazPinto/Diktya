@@ -4,6 +4,7 @@ No se importa código del otro producto. Toda llamada requiere un plan confirmad
 autorización inmediatamente anterior a la escritura. Ninguna excepción, cabecera ni
 cuerpo del controlador sale de este módulo: pueden contener secretos.
 """
+import asyncio
 import json
 from contextlib import asynccontextmanager
 from urllib.parse import quote, urlsplit
@@ -105,7 +106,23 @@ class UniFiSsidWriter:
         except (httpx.HTTPError, ValueError, TypeError):
             raise WriteUncertain() from None
 
+    async def _verify_until(self, check, *args):
+        settings = self.settings
+        try:
+            async with asyncio.timeout(settings.unifi_verification_timeout_seconds):
+                for attempt in range(settings.unifi_verification_attempts):
+                    if attempt:
+                        await asyncio.sleep(settings.unifi_verification_interval_seconds)
+                    if await check(*args):
+                        return True
+        except TimeoutError:
+            return False
+        return False
+
     async def verify(self, site_id, external_id, proposal):
+        return await self._verify_until(self._verify_created_once, site_id, external_id, proposal)
+
+    async def _verify_created_once(self, site_id, external_id, proposal):
         try:
             async with self._client() as client:
                 response = await client.get(_path(site_id, 'wifi/broadcasts', external_id))
@@ -207,6 +224,9 @@ class UniFiSsidWriter:
 
     async def verify_vlan(self, site_id, broadcast_id, ssid, target_network_id):
         """Comprobación read-only de identidad y red, sin revelar datos sensibles."""
+        return await self._verify_until(self._verify_vlan_once, site_id, broadcast_id, ssid, target_network_id)
+
+    async def _verify_vlan_once(self, site_id, broadcast_id, ssid, target_network_id):
         try:
             async with self._client() as client:
                 response = await client.get(_path(site_id, 'wifi/broadcasts', broadcast_id))

@@ -1,12 +1,14 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.auth.access import require_user_permission
+from app.auth.audit import record_event
 from app.auth.permissions import Permission
+from app.core.errors import Conflict
 from app.monitoring.schemas import MonitoringStatus
 from app.monitoring.service import MonitoringService
 
@@ -48,19 +50,63 @@ def build_reservation(data, item, actor_id: int, now: datetime, ttl_hours: float
 
 def expire_due(db: Session, now: datetime) -> int:
     """Libera reservas vencidas sin asignar. No confirma: el llamante posee la transacción."""
-    result = db.execute(update(VlanReservation).where(
+    rows = db.execute(update(VlanReservation).where(
         VlanReservation.status == "reserved", VlanReservation.expires_at.is_not(None),
-        VlanReservation.expires_at <= now).values(status="released", released_at=now, released_by_id=None),
-        execution_options={"synchronize_session": False})
-    return result.rowcount or 0
+        VlanReservation.expires_at <= now, VlanReservation.held_by_plan_id.is_(None)).values(status="released", released_at=now, released_by_id=None)
+        .returning(VlanReservation.id, VlanReservation.requested_by_id),
+        execution_options={"synchronize_session": "fetch"}).all()
+    for reservation_id, requester_id in rows:
+        record_event(db, 'vlan.reservation.expired', target_id=requester_id,
+                     source='system', details={'reservation_id': reservation_id})
+    return len(rows)
 
 
-def mark_assigned(db: Session, parent_interface: str, tag: int, now: datetime) -> bool:
-    """La reserva pasa a asignada cuando el cambio que la usa se verificó. No confirma."""
+
+def find_reserved_vlan(
+    db: Session, *, parent_interface: str, tag: int, event_name: str,
+    ssid: str, actor_id: int, now: datetime, lock: bool = False,
+) -> int | None:
+    """Identifica una reserva vigente del actor para la operación exacta."""
+    conditions = (
+        VlanReservation.status == "reserved",
+        VlanReservation.parent_interface == parent_interface,
+        VlanReservation.tag == tag,
+        VlanReservation.event_name == event_name,
+        VlanReservation.ssid == ssid,
+        VlanReservation.requested_by_id == actor_id,
+        VlanReservation.held_by_plan_id.is_(None),
+        or_(VlanReservation.expires_at.is_(None), VlanReservation.expires_at > now),
+    )
+    if lock:
+        return db.scalar(update(VlanReservation).where(*conditions).values(
+            status=VlanReservation.status,
+        ).returning(VlanReservation.id), execution_options={'synchronize_session': False})
+    return db.scalar(select(VlanReservation.id).where(*conditions))
+
+
+def hold_reservation(db: Session, reservation_id: int, plan_id: str, now: datetime) -> None:
+    changed = db.execute(update(VlanReservation).where(
+        VlanReservation.id == reservation_id, VlanReservation.status == 'reserved',
+        VlanReservation.held_by_plan_id.is_(None),
+        or_(VlanReservation.expires_at.is_(None), VlanReservation.expires_at > now),
+    ).values(held_by_plan_id=plan_id))
+    if changed.rowcount != 1:
+        raise Conflict('La reserva confirmada ya no está vigente o pertenece a un cambio activo.')
+
+
+def clear_reservation_hold(db: Session, reservation_id: int, plan_id: str) -> None:
+    db.execute(update(VlanReservation).where(
+        VlanReservation.id == reservation_id, VlanReservation.held_by_plan_id == plan_id,
+    ).values(held_by_plan_id=None))
+
+
+def mark_assigned(db: Session, reservation_id: int, now: datetime, *, plan_id: str | None = None) -> bool:
+    """Asigna la reserva exacta y libera el bloqueo propio en la misma operación."""
     result = db.execute(update(VlanReservation).where(
-        VlanReservation.status == "reserved", VlanReservation.parent_interface == parent_interface,
-        VlanReservation.tag == tag).values(status="assigned", assigned_at=now, expires_at=None),
-        execution_options={"synchronize_session": False})
+        VlanReservation.id == reservation_id,
+        VlanReservation.status == "reserved",
+        VlanReservation.held_by_plan_id == plan_id,
+    ).values(status="assigned", assigned_at=now, expires_at=None, held_by_plan_id=None))
     return bool(result.rowcount)
 
 
@@ -116,6 +162,18 @@ class VlanReservationService:
                                .order_by(VlanReservation.created_at)).all()
         return [VlanReservationRead.from_model(row) for row in rows]
 
+    def list_my_expired(self, actor: User, limit: int, offset: int) -> list[VlanReservationRead]:
+        require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
+        if expire_due(self.db, datetime.now(timezone.utc)):
+            self.db.commit()
+        rows = self.db.scalars(select(VlanReservation).where(
+            VlanReservation.requested_by_id == actor.id,
+            VlanReservation.status == 'released',
+            VlanReservation.released_by_id.is_(None),
+            VlanReservation.expires_at <= VlanReservation.released_at,
+        ).order_by(VlanReservation.released_at.desc(), VlanReservation.id.desc()).limit(limit).offset(offset))
+        return [VlanReservationRead.from_model(row) for row in rows]
+
     def release(self, reservation_id: int, actor: User) -> VlanReservationRead:
         require_user_permission(self.db, actor, Permission.VLAN_RESERVE)
         row = self.db.get(VlanReservation, reservation_id)
@@ -123,9 +181,12 @@ class VlanReservationService:
             raise ReservationNotFound
         if row.status not in ACTIVE:
             raise ReservationAlreadyReleased
-        row.status = "released"
-        row.released_by_id = actor.id
-        row.released_at = datetime.now(timezone.utc)
+        changed = self.db.execute(update(VlanReservation).where(
+            VlanReservation.id == reservation_id, VlanReservation.status.in_(ACTIVE),
+            VlanReservation.held_by_plan_id.is_(None),
+        ).values(status="released", released_by_id=actor.id, released_at=datetime.now(timezone.utc)))
+        if changed.rowcount != 1:
+            raise Conflict('La reserva cambió o está protegida por una ejecución o conciliación.')
         self.db.commit()
         self.db.refresh(row)
         return VlanReservationRead.from_model(row)

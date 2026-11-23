@@ -101,14 +101,14 @@ def login(data: GoogleLoginRequest, db: Session) -> TokenResponse:
     # Atomic consume, before the external wait. No transaction/administrative lock
     # is held while fetching Google signing keys. Failed attempts need a new nonce.
     token_hash = _digest(data.challenge_token.get_secret_value())
-    stored = db.get(GoogleLoginChallenge, token_hash)
-    if stored is None:
-        _deny(db, 'challenge')
-    nonce_hash = stored.nonce_hash
-    consumed = db.execute(delete(GoogleLoginChallenge).where(
-        GoogleLoginChallenge.token_hash == token_hash, GoogleLoginChallenge.expires_at > now),
-        execution_options={'synchronize_session': False})
-    if consumed.rowcount != 1:
+    nonce_hash = db.scalar(
+        delete(GoogleLoginChallenge).where(
+            GoogleLoginChallenge.token_hash == token_hash,
+            GoogleLoginChallenge.expires_at > now,
+        ).returning(GoogleLoginChallenge.nonce_hash),
+        execution_options={'synchronize_session': 'fetch'},
+    )
+    if nonce_hash is None:
         _deny(db, 'challenge')
     db.commit()
     try:

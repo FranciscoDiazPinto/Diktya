@@ -165,6 +165,9 @@ class Settings(BaseSettings):
     # Una reserva sin asignar se libera sola al vencer (HU009).
     vlan_reservation_ttl_hours: float = Field(72.0, gt=0, le=8760)
     # Reinicio de equipos (HU011): espera máxima del retorno y frecuencia de consulta.
+    unifi_verification_attempts: int = Field(3, ge=1, le=10)
+    unifi_verification_interval_seconds: float = Field(0.5, ge=0, le=30)
+    unifi_verification_timeout_seconds: float = Field(10.0, gt=0, le=120)
     device_restart_timeout_seconds: float = Field(300.0, ge=10, le=3600)
     device_restart_poll_seconds: float = Field(5.0, gt=0, le=60)
     # Worker de cambios (proceso propio): frecuencia con que busca trabajos aprobados.

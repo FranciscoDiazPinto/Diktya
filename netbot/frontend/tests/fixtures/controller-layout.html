@@ -261,6 +261,12 @@
               <label for="ssid-csv">O cargar el CSV de reservas (mismas columnas)</label><input id="ssid-csv" type="file" accept=".csv,text/csv" />
               <button id="ssid-upload" type="button" disabled>Preparar planes del CSV</button>
             </form>
+            <section id="fair-closure" hidden aria-labelledby="fair-closure-heading">
+              <h3 id="fair-closure-heading">Cierre de feria</h3>
+              <button id="fair-closure-preview" type="button" disabled>Revisar cierre del ámbito</button>
+              <div id="fair-closure-summary"></div>
+              <button id="fair-closure-confirm" type="button" hidden>Confirmar cierre del ámbito</button>
+            </section>
             <p id="ssid-status" role="status"></p>
             <div id="ssid-plan-list" class="reservation-list"></div>
           </section>
@@ -275,6 +281,15 @@
               <label for="vlan-change-purpose">Motivo</label><input id="vlan-change-purpose" maxlength="500" placeholder="Mover a los expositores a su VLAN" />
               <button id="vlan-change-prepare" type="submit" disabled>Preparar cambio de VLAN</button>
             </form>
+            <section aria-labelledby="vlan-batch-heading" class="support-form">
+              <h3 id="vlan-batch-heading">Cambios de VLAN en lote</h3>
+              <button id="vlan-batch-add" type="button" disabled>Agregar selección al lote</button>
+              <ol id="vlan-batch-draft"></ol>
+              <button id="vlan-batch-preview" type="button" disabled>Revisar lote</button>
+              <label for="vlan-batch-history">Lotes anteriores del ámbito</label>
+              <select id="vlan-batch-history" disabled><option value="">Selecciona un lote</option></select>
+              <div id="vlan-batch-detail"></div>
+            </section>
             <form id="restart-form" class="support-form">
               <h3>Reiniciar un equipo</h3>
               <label for="restart-device">Punto de acceso del ámbito</label><select id="restart-device"><option value="">Selecciona un AP</option></select>

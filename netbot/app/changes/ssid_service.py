@@ -24,6 +24,7 @@ from .models import (
     SsidPlan,
     WifiWriteLease,
     SsidVlanChangePlan,
+    SsidVlanBatchPlan,
 )
 from .ssid_schemas import (
     ScopeWrite,
@@ -33,14 +34,16 @@ from .ssid_schemas import (
     SsidConfirm,
     SsidPlanRead,
     SsidVlanChangeProposal,
+    SsidVlanBatch,
     SsidVlanChangeConfirm,
 )
 from .wifi_inventory import WifiInventory
 from .csv_parser import parse_csv
 from .event_workbook import parse_event_workbook
 from .csv_service import as_utc, utc_now
-from .service import mark_assigned
+from .service import clear_reservation_hold, find_reserved_vlan, hold_reservation, mark_assigned
 from .execution import PlanBusy, exclusive_plan
+from .fair_closure import require_open_scope
 
 
 def digest(value):
@@ -131,7 +134,7 @@ class SsidPlanService:
               'networks':bindings,'security_profiles':resources['security_profiles']}
         profile_revision = digest(self.settings.ssid_security_profiles_json.get_secret_value()) if self.settings.ssid_security_profiles_json else None
         fingerprint=digest([safe,resources,remote['ssids'],self.settings.unifi_api_base_url,self.settings.monitoring_site_id,profile_revision])
-        return safe, remote['ssids'], fingerprint
+        return {**safe, 'accepts_changes': scope.accepts_changes}, remote['ssids'], fingerprint
 
     @staticmethod
     def _validate_broadcast_aps(ap_ids, options):
@@ -150,9 +153,10 @@ class SsidPlanService:
         if any(b['ssid'].casefold()==proposal.ssid.casefold() for b in existing):
             raise Conflict('El SSID ya existe. No se sobrescribe mediante una creación.')
 
-    async def _vlan_change_context(self, actor: User, proposal: SsidVlanChangeProposal):
+    async def _vlan_change_context(self, actor: User, proposal: SsidVlanChangeProposal, context=None):
         """Validación común de H10 contra el inventario vigente. Solo lectura."""
-        options, existing, fingerprint = await self.options(actor, proposal.scope_id)
+        options, existing, fingerprint = (context if context is not None
+                                          else await self.options(actor, proposal.scope_id))
 
         if options["simulated"]:
             raise Conflict("H10 requiere inventarios reales para preparar cambios.")
@@ -202,13 +206,193 @@ class SsidPlanService:
                 "status": "awaiting_confirmation",
                 "message": "Propuesta de cambio de VLAN. Revísala y confírmala en el panel; todavía no se modificó nada."}
 
+    async def preview_vlan_batch(self, actor: User, batch: SsidVlanBatch) -> dict:
+        proposals = [
+            (number, SsidVlanChangeProposal(scope_id=batch.scope_id, **row.model_dump()))
+            for number, row in enumerate(batch.rows, 1)
+        ]
+        rows = await self._preview_vlan_batch_rows(actor, batch.scope_id, proposals)
+        plan = self._store_vlan_batch(actor, batch.scope_id, rows)
+        self.db.commit()
+        return self._read_vlan_batch(plan)
+
+    async def _preview_vlan_batch_rows(self, actor: User, scope_id: int, proposals):
+        scope = self.scope(actor, scope_id)
+        if not scope.accepts_changes:
+            raise Conflict('El ámbito de feria ya no acepta cambios.')
+        baseline = digest([scope.site_id, scope.resources])
+        options, existing, fingerprint = await self.options(actor, scope_id)
+        rows = []
+        for number, proposal in proposals:
+            try:
+                plan, preview = await self._build_vlan_change(actor, proposal, (options, existing, fingerprint))
+            except Conflict as error:
+                rows.append({'row_number': number, 'errors': [error.detail]})
+            else:
+                rows.append({'row_number': number, 'proposal': proposal.model_dump(),
+                             'ssid': plan.ssid, 'current_vlan': preview['current_vlan'],
+                             'target_vlan': preview['target_vlan'], 'impact': preview['impact'],
+                             'revision': plan.revision, 'errors': []})
+        scope = self.scope(actor, scope_id)
+        if not scope.accepts_changes or digest([scope.site_id, scope.resources]) != baseline:
+            raise Conflict('El ámbito cambió durante la revisión del lote.')
+        return rows
+
+    def _store_vlan_batch(self, actor: User, scope_id: int, rows):
+        require_open_scope(self.db, scope_id)
+        plan = SsidVlanBatchPlan(
+            id=str(uuid4()), owner_id=actor.id, scope_id=scope_id, status='preview',
+            revision=digest([scope_id, rows]), rows=rows, selection=[],
+            expires_at=utc_now() + timedelta(seconds=self.settings.csv_preview_ttl_seconds),
+        )
+        self.db.add(plan)
+        return plan
+
+    def _owned_vlan_batch(self, actor: User, batch_id: str, permission=Permission.CHANGES_REQUEST):
+        require_user_permission(self.db, actor, permission)
+        batch = self.db.get(SsidVlanBatchPlan, batch_id, populate_existing=True)
+        if batch is None or batch.owner_id != actor.id:
+            raise NotFound('Lote de cambios de VLAN no encontrado.')
+        self.scope(actor, batch.scope_id, permission)
+        return batch
+
+    def _vlan_batch_children(self, batch_id: str):
+        return list(self.db.scalars(select(SsidVlanChangePlan).where(
+            SsidVlanChangePlan.batch_id == batch_id,
+        ).order_by(SsidVlanChangePlan.batch_row).execution_options(populate_existing=True)))
+
+    def _pending_vlan_batch_rows(self, children):
+        pending = [child for child in children if child.status != 'completed']
+        if not pending or any(child.status in {'executing', 'uncertain', 'rollback_failed'} for child in pending):
+            return []
+        first = pending[0]
+        if first.status not in {'failed', 'rolled_back', 'expired', 'rejected', 'cancelled'}:
+            if first.status != 'confirmed' or as_utc(first.expires_at) > utc_now():
+                return []
+        return pending
+
+    def _read_vlan_batch(self, batch):
+        children = self._vlan_batch_children(batch.id)
+        return {'id': batch.id, 'scope_id': batch.scope_id, 'status': batch.status,
+                'revision': batch.revision, 'rows': batch.rows, 'selection': batch.selection,
+                'expires_at': as_utc(batch.expires_at),
+                'can_retry': batch.status == 'confirmed' and bool(self._pending_vlan_batch_rows(children)),
+                'results': [{'row_number': child.batch_row, 'plan_id': child.id, 'status': child.status}
+                            for child in children]}
+
+    async def retry_vlan_batch(self, actor: User, batch_id: str):
+        batch = self._owned_vlan_batch(actor, batch_id)
+        pending = self._pending_vlan_batch_rows(self._vlan_batch_children(batch_id))
+        if batch.status != 'confirmed' or not pending:
+            raise Conflict('El lote aún está activo, requiere conciliación o ya no tiene filas pendientes.')
+        original = {row['row_number']: row for row in batch.rows}
+        proposals = [(child.batch_row, SsidVlanChangeProposal.model_validate(
+            original[child.batch_row]['proposal'],
+        )) for child in pending]
+        rows = await self._preview_vlan_batch_rows(actor, batch.scope_id, proposals)
+        invalid = next((row for row in rows if row['errors']), None)
+        if invalid:
+            raise Conflict(
+                f"Fila {invalid['row_number']}: {invalid['errors'][0]} Prepara un listado nuevo con las filas pendientes."
+            )
+        batch = self._owned_vlan_batch(actor, batch_id)
+        require_open_scope(self.db, batch.scope_id)
+        self.db.refresh(batch)
+        current = self._pending_vlan_batch_rows(self._vlan_batch_children(batch_id))
+        if batch.status != 'confirmed' or [row.batch_row for row in current] != [number for number, _ in proposals]:
+            self.db.rollback()
+            raise Conflict('El resultado del lote cambió. Recarga su estado antes de retomarlo.')
+        batch.status = 'superseded'
+        for child in current:
+            if child.status == 'confirmed':
+                child.status = 'cancelled'
+        retry = self._store_vlan_batch(actor, batch.scope_id, rows)
+        record_event(self.db, 'wifi.vlan_batch.retried', actor_id=actor.id,
+                     details={'batch_id': retry.id, 'retry_of': batch_id,
+                              'rows': [row['row_number'] for row in rows]})
+        self.db.commit()
+        return self._read_vlan_batch(retry)
+
+    def list_vlan_batches(self, actor: User, scope_id: int, limit: int, offset: int):
+        self.scope(actor, scope_id)
+        batches = self.db.scalars(select(SsidVlanBatchPlan).where(
+            SsidVlanBatchPlan.owner_id == actor.id, SsidVlanBatchPlan.scope_id == scope_id,
+        ).order_by(SsidVlanBatchPlan.expires_at.desc(), SsidVlanBatchPlan.id).limit(limit).offset(offset))
+        return [{'id': batch.id, 'status': batch.status, 'row_count': len(batch.rows),
+                 'expires_at': as_utc(batch.expires_at)} for batch in batches]
+
+    def get_vlan_batch(self, actor: User, batch_id: str):
+        return self._read_vlan_batch(self._owned_vlan_batch(actor, batch_id))
+
+    async def confirm_vlan_batch(self, actor: User, batch_id: str, payload: SsidConfirm):
+        batch = self._owned_vlan_batch(actor, batch_id, Permission.CHANGES_APPROVE)
+        if batch.revision != payload.revision:
+            raise Conflict('La revisión del lote no coincide.')
+        if batch.status == 'confirmed' and batch.selection == payload.row_numbers:
+            return self._read_vlan_batch(batch)
+        if batch.status != 'preview' or as_utc(batch.expires_at) <= utc_now():
+            raise Conflict('El lote ya no admite confirmación.')
+        rows = {row['row_number']: row for row in batch.rows}
+        if any(number not in rows or rows[number]['errors'] for number in payload.row_numbers):
+            raise Conflict('Selecciona únicamente filas válidas.')
+        context = await self.options(actor, batch.scope_id)
+        children = []
+        for number in payload.row_numbers:
+            proposal = SsidVlanChangeProposal.model_validate(rows[number]['proposal'])
+            child, _ = await self._build_vlan_change(actor, proposal, context)
+            if child.revision != rows[number]['revision']:
+                raise Conflict(f'Cambió el inventario de la fila {number}. Prepara otra vista previa.')
+            children.append((number, child))
+        batch = self._owned_vlan_batch(actor, batch_id, Permission.CHANGES_APPROVE)
+        require_open_scope(self.db, batch.scope_id)
+        now = utc_now()
+        claimed = self.db.execute(update(SsidVlanBatchPlan).where(
+            SsidVlanBatchPlan.id == batch_id, SsidVlanBatchPlan.status == 'preview',
+            SsidVlanBatchPlan.revision == payload.revision, SsidVlanBatchPlan.expires_at > now,
+        ).values(status='confirmed', selection=payload.row_numbers),
+            execution_options={'synchronize_session': False})
+        if claimed.rowcount != 1:
+            self.db.rollback()
+            raise Conflict('Otro proceso modificó el lote. Recarga su estado.')
+        options = context[0]
+        bindings = {network['id']: network for network in options['networks']}
+        predecessor_id = None
+        for number, child in children:
+            child.batch_id = batch_id
+            child.batch_row = number
+            child.predecessor_id = predecessor_id
+            child.status = 'confirmed'
+            child.confirmed_at = now
+            child.expires_at = batch.expires_at
+            child.reservation_id = self._reservation_for(
+                actor.id, options, bindings, child.target_network_id, child.ssid, now, lock=True,
+            )
+            self.db.add(child)
+            self.db.flush()
+            predecessor_id = child.id
+        record_event(self.db, 'wifi.vlan_batch.confirmed', actor_id=actor.id,
+                     details={'batch_id': batch_id, 'revision': payload.revision, 'rows': payload.row_numbers})
+        self.db.commit()
+        return self.get_vlan_batch(actor, batch_id)
+
     async def propose_vlan_change(
         self,
         actor: User,
         proposal: SsidVlanChangeProposal,
     ):
-        """Valida y guarda una vista previa H10; nunca escribe en UniFi."""
-        options, fingerprint, target_network, current, site_id = await self._vlan_change_context(actor, proposal)
+        """Valida y guarda una vista previa H10."""
+        plan, preview = await self._build_vlan_change(actor, proposal)
+        require_open_scope(self.db, plan.scope_id)
+        self.db.add(plan)
+        record_event(self.db, 'wifi.ssid_vlan_change.requested', actor_id=actor.id, target_id=actor.id,
+                     details={'plan_id': plan.id, 'scope_id': plan.scope_id, 'broadcast_id': plan.broadcast_id})
+        self.db.commit()
+        return preview
+
+    async def _build_vlan_change(self, actor: User, proposal: SsidVlanChangeProposal, context=None):
+        options, fingerprint, target_network, current, site_id = await self._vlan_change_context(
+            actor, proposal, context,
+        )
 
         revision = digest([
             proposal.model_dump(), fingerprint, site_id,
@@ -234,13 +418,9 @@ class SsidPlanService:
             expires_at=now + timedelta(seconds=self.settings.csv_preview_ttl_seconds),
             confirmed_at=None,
         )
-        self.db.add(plan)
-        record_event(self.db, 'wifi.ssid_vlan_change.requested', actor_id=actor.id, target_id=actor.id,
-                     details={'plan_id': plan.id, 'scope_id': plan.scope_id, 'broadcast_id': plan.broadcast_id})
-        self.db.commit()
         current_vlan = next((n["tag"] for n in options["networks"] if n["id"] == current["network_id"]), None)
 
-        return {
+        return plan, {
             "id": plan.id,
             "status": plan.status,
             "scope_id": plan.scope_id,
@@ -316,6 +496,11 @@ class SsidPlanService:
         ):
             raise Conflict("La configuración del SSID cambió. Prepara otra propuesta.")
 
+        require_open_scope(self.db, plan.scope_id)
+        bindings = {network['id']: network for network in options['networks']}
+        reservation_id = self._reservation_for(
+            actor.id, options, bindings, plan.target_network_id, plan.ssid, utc_now(), lock=True,
+        )
         result = self.db.execute(
             update(SsidVlanChangePlan)
             .where(
@@ -325,14 +510,14 @@ class SsidPlanService:
                 SsidVlanChangePlan.revision == payload.revision,
                 SsidVlanChangePlan.expires_at > utc_now(),
             )
-            .values(status="confirmed", confirmed_at=utc_now()),
+            .values(status="confirmed", confirmed_at=utc_now(), reservation_id=reservation_id),
             execution_options={"synchronize_session": False},
         )
         if result.rowcount != 1:
             self.db.rollback()
             raise Conflict("El plan fue modificado por otra solicitud.")
         record_event(self.db, 'wifi.ssid_vlan_change.confirmed', actor_id=actor.id, target_id=actor.id,
-                     details={'plan_id': plan_id, 'revision': payload.revision})
+                     details={'plan_id': plan_id, 'revision': payload.revision, 'reservation_id': reservation_id})
         self.db.commit()
         self.db.refresh(plan)
         return self.read_vlan_change_plan(plan)
@@ -419,6 +604,10 @@ class SsidPlanService:
         scope = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
         if plan.status != 'confirmed' or as_utc(plan.expires_at) <= utc_now():
             raise Conflict('El plan no está confirmado o ya venció.')
+        if plan.predecessor_id is not None:
+            predecessor = self.db.get(SsidVlanChangePlan, plan.predecessor_id, populate_existing=True)
+            if predecessor is None or predecessor.status != 'completed':
+                raise PlanBusy('La fila anterior del lote aún no se ha verificado.')
         if scope.site_id != plan.site_id:
             raise Conflict('El sitio del ámbito cambió.')
         if (not self.settings.unifi_write_enabled or self.settings.unifi_api_contract != '10.6.106'
@@ -446,6 +635,16 @@ class SsidPlanService:
         if self._vlan_target_fingerprint(fingerprint, current, options) != plan.fingerprint:
             raise Conflict('Cambió el inventario desde la confirmación.')
 
+        bindings = {network['id']: network for network in options['networks']}
+
+        def check_reservation():
+            if plan.reservation_id is not None and self._reservation_for(
+                actor.id, options, bindings, plan.target_network_id, plan.ssid, utc_now(),
+            ) != plan.reservation_id:
+                raise Conflict('La reserva confirmada ya no está vigente para este cambio.')
+
+        check_reservation()
+        require_open_scope(self.db, plan.scope_id)
         # PK compartida con la creación: bloqueo durable por sitio + nombre de SSID.
         resource_key = digest([plan.site_id, plan.ssid.casefold()])
         try:
@@ -454,6 +653,8 @@ class SsidPlanService:
         except IntegrityError:
             self.db.rollback()
             raise PlanBusy('El SSID está bloqueado por otra operación o conciliación pendiente.') from None
+        if plan.reservation_id is not None:
+            hold_reservation(self.db, plan.reservation_id, plan.id, utc_now())
         claim = self.db.execute(
             update(SsidVlanChangePlan).where(
                 SsidVlanChangePlan.id == plan.id,
@@ -478,17 +679,25 @@ class SsidPlanService:
 
         # Desde executing nunca se repite la escritura original: se verifica y, si no se
         # puede acreditar el resultado, se concilia leyendo el controlador.
+        write_returned = False
         try:
             reauthorize()
             await self.writer.update_vlan(
                 plan.site_id, plan.broadcast_id, plan.current_network_id,
                 plan.target_network_id, authorize=reauthorize,
             )
+            write_returned = True
             plan.execution_results = [{'status': 'verifying', 'broadcast_id': plan.broadcast_id}]
             self.db.commit()
             verified = await self.writer.verify_vlan(
                 plan.site_id, plan.broadcast_id, plan.ssid, plan.target_network_id,
             ) is True
+        except Conflict:
+            # El callback se ejecuta antes del PUT. Un rechazo aquí no requiere recuperación.
+            self.db.rollback()
+            if not write_returned:
+                return self._finish_vlan_change(plan_id, actor.id, resource_key, 'failed')
+            verified = False
         except Exception:
             # No guardar respuestas, excepciones ni credenciales del proveedor.
             self.db.rollback()
@@ -528,6 +737,11 @@ class SsidPlanService:
         """Persiste el resultado, la auditoría y el escalamiento en una sola transacción."""
         plan = self.db.get(SsidVlanChangePlan, plan_id)
         plan.status = outcome
+        if plan.reservation_id is not None:
+            if outcome == 'completed':
+                mark_assigned(self.db, plan.reservation_id, utc_now(), plan_id=plan.id)
+            elif outcome in {'failed', 'rolled_back'}:
+                clear_reservation_hold(self.db, plan.reservation_id, plan.id)
         result = 'verified_configuration' if outcome == 'completed' else outcome
         plan.execution_results = [{'status': result, 'broadcast_id': plan.broadcast_id}]
         record_event(self.db, f'wifi.ssid_vlan_change.{outcome}', actor_id=actor_id, target_id=actor_id,
@@ -573,6 +787,11 @@ class SsidPlanService:
         resource_key = digest([plan.site_id, plan.ssid.casefold()])
         plan = self.db.get(SsidVlanChangePlan, plan_id)
         plan.status = outcome
+        if plan.reservation_id is not None:
+            if outcome == 'completed':
+                mark_assigned(self.db, plan.reservation_id, utc_now(), plan_id=plan.id)
+            elif outcome in {'failed', 'rolled_back'}:
+                clear_reservation_hold(self.db, plan.reservation_id, plan.id)
         plan.execution_results = [{'status': 'reconciled_' + outcome, 'broadcast_id': plan.broadcast_id}]
         record_event(self.db, 'wifi.ssid_vlan_change.reconciled', actor_id=plan.owner_id, target_id=plan.owner_id,
                      source='worker', outcome='success' if outcome == 'completed' else 'failure',
@@ -588,16 +807,18 @@ class SsidPlanService:
         return {'proposal':proposal.model_dump(),'status':'awaiting_confirmation',
                 'simulated':options['simulated'],'message':'Propuesta de creación. Confirma en el panel; todavía no se creó ningún SSID.'}
 
-    def _store(self, actor, scope_id, options, fingerprint, rows):
+    def _store(self, actor, scope_id, options, fingerprint, rows, *, retry_of=None):
         self.scope(actor,scope_id)
         now=utc_now()
         revision=digest([scope_id,fingerprint,rows])
         plan=SsidPlan(id=str(uuid4()),owner_id=actor.id,scope_id=scope_id,status='preview',
                       source='mock' if options['simulated'] else 'unifi', fingerprint=fingerprint,revision=revision,
                       rows=rows,selection=[],created_at=now,expires_at=now+timedelta(seconds=self.settings.csv_preview_ttl_seconds))
+        require_open_scope(self.db, plan.scope_id)
         self.db.add(plan)
         record_event(self.db, 'ssid.plan.prepared', actor_id=actor.id,
-                     details={'plan_id': plan.id, 'scope_id': scope_id, 'revision': revision})
+                     details={'plan_id': plan.id, 'scope_id': scope_id, 'revision': revision,
+                              **({'retry_of': retry_of} if retry_of else {})})
         self.db.commit()
         return self.read(plan)
 
@@ -605,6 +826,39 @@ class SsidPlanService:
         options, existing, fingerprint=await self.options(actor,proposal.scope_id)
         self.validate(proposal,options,existing)
         return self._store(actor,proposal.scope_id,options,fingerprint,[{'row_number':1,'proposal':proposal.model_dump(),'errors':[]}])
+
+    async def retry(self, actor: User, plan_id: str) -> SsidPlanRead:
+        original = self.owned(actor, plan_id)
+        if original.status not in {'partial', 'failed'}:
+            raise Conflict('Solo se retoman planes fallidos o parciales con resultado resuelto.')
+        scope_id = original.scope_id
+        options, existing, fingerprint = await self.options(actor, scope_id)
+        original = self.owned(actor, plan_id)
+        if original.status not in {'partial', 'failed'}:
+            raise Conflict('El resultado del plan cambió. Recarga antes de retomarlo.')
+
+        results = {row['ssid']: row['status'] for row in original.execution_results}
+        approved_numbers = set(original.selection)
+        rows = []
+        for row in original.rows:
+            if row['row_number'] not in approved_numbers:
+                continue
+            proposal = SsidProposal.model_validate(row['proposal'])
+            status = results.get(proposal.ssid)
+            if status == 'verified_configuration':
+                continue
+            if status not in {'failed', 'rolled_back', 'not_started'}:
+                raise Conflict('El resultado de una fila no está resuelto. Revisa el plan original.')
+            try:
+                self.validate(proposal, options, existing)
+            except Conflict as error:
+                raise Conflict(
+                    f"Fila {row['row_number']}: {error.detail} Corrige las filas pendientes en un nuevo listado."
+                ) from None
+            rows.append({'row_number': row['row_number'], 'proposal': proposal.model_dump(), 'errors': []})
+        if not rows:
+            raise Conflict('El plan no tiene filas pendientes que se puedan retomar.')
+        return self._store(actor, scope_id, options, fingerprint, rows, retry_of=plan_id)
 
     async def csv(self, actor, payload: SsidCsv):
         self.scope(actor,payload.scope_id)
@@ -707,18 +961,30 @@ class SsidPlanService:
                 raise Conflict('Selecciona únicamente filas válidas.')
         old=check()
         if old: return old
-        _,_,fingerprint=await self.options(actor,plan.scope_id)
+        options, _, fingerprint = await self.options(actor, plan.scope_id)
         plan=self.owned(actor,plan_id,Permission.CHANGES_APPROVE)
         old=check()
         if old: return old
         if fingerprint!=plan.fingerprint: raise Conflict('Cambió el inventario o ámbito. Prepara una nueva propuesta.')
+        bindings = {network['id']: network for network in options['networks']}
+        require_open_scope(self.db, plan.scope_id)
+        now = utc_now()
+        approved_rows = []
+        for row in plan.rows:
+            if row['row_number'] in payload.row_numbers:
+                proposal = SsidProposal.model_validate(row['proposal'])
+                reservation_id = self._reservation_for(actor.id, options, bindings, proposal.network_id, proposal.ssid, now, lock=True)
+                row = {**row, 'reservation_id': reservation_id}
+            approved_rows.append(row)
         result=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan_id,SsidPlan.status=='preview',
             SsidPlan.expires_at>utc_now(),SsidPlan.revision==payload.revision).values(status='confirmed',
-            selection=payload.row_numbers,confirmed_at=utc_now()),execution_options={'synchronize_session':False})
+            selection=payload.row_numbers,confirmed_at=now,rows=approved_rows),execution_options={'synchronize_session':False})
         if result.rowcount!=1:
             self.db.rollback(); raise Conflict('Otra solicitud modificó el plan. Recarga su estado.')
         record_event(self.db, 'ssid.plan.confirmed', actor_id=actor.id,
-                     details={'plan_id': plan_id, 'revision': payload.revision, 'rows': payload.row_numbers})
+                     details={'plan_id': plan_id, 'revision': payload.revision, 'rows': payload.row_numbers,
+                              'reservation_ids': [row['reservation_id'] for row in approved_rows
+                                                  if row.get('reservation_id') is not None]})
         self.db.commit(); self.db.refresh(plan)
         return self.read(plan)
 
@@ -731,6 +997,15 @@ class SsidPlanService:
         self.db.commit(); self.db.refresh(plan)
         return self.read(plan)
 
+
+    def _reservation_for(self, actor_id, options, bindings, network_id, ssid, now, *, lock=False):
+        binding = bindings.get(network_id)
+        if binding is None:
+            return None
+        return find_reserved_vlan(
+            self.db, parent_interface=binding['parent_interface'], tag=binding['tag'],
+            event_name=options['event_name'], ssid=ssid, actor_id=actor_id, now=now, lock=lock,
+        )
 
     @exclusive_plan('ssid')
     async def execute(self, plan_id):
@@ -747,7 +1022,8 @@ class SsidPlanService:
         options,existing,fingerprint=await self.options(actor,scope.id)
         scope=self.scope(actor,plan.scope_id,Permission.CHANGES_EXECUTE)
         if fingerprint!=plan.fingerprint: raise Conflict('Cambió el inventario/perfil. Es necesaria otra propuesta y confirmación.')
-        selected=[SsidProposal.model_validate(r['proposal']) for r in plan.rows if r['row_number'] in plan.selection]
+        approved_rows = [row for row in plan.rows if row['row_number'] in plan.selection]
+        selected = [SsidProposal.model_validate(row['proposal']) for row in approved_rows]
         if not selected: raise Conflict('El plan no contiene una selección aprobada.')
         if plan.source=='mock':
             raise Conflict('Un plan simulado nunca se ejecuta en infraestructura real.')
@@ -756,6 +1032,7 @@ class SsidPlanService:
         for proposal in selected:
             self.validate(proposal,options,existing)
             self.writer.profile(proposal.security_profile)
+        require_open_scope(self.db, plan.scope_id)
         # Exclusión durable por SSID/sitio, también entre ámbitos superpuestos.
         try:
             self.db.add_all([WifiWriteLease(resource_key=digest([scope.site_id,p.ssid.casefold()]),plan_id=plan_id) for p in selected])
@@ -778,11 +1055,21 @@ class SsidPlanService:
         results=[{'ssid':p.ssid,'status':'not_started'} for p in selected]
         # Política de lote: detener en el primer fallo, compensar solo la fila afectada y
         # conservar las filas ya verificadas. Nunca se reintenta una escritura ambigua.
-        for entry,proposal in zip(results,selected):
+        for entry, proposal, row in zip(results, selected, approved_rows):
+            reservation_id = row.get('reservation_id')
             try:
-                # Reautorizar después de cada espera y antes de la siguiente escritura.
                 reauthorize()
-                external_id=await self.writer.create(site_id,proposal,authorize=reauthorize)
+                if reservation_id is not None:
+                    expected = self._reservation_for(
+                        actor.id, options, bindings, proposal.network_id, proposal.ssid, utc_now(),
+                    )
+                    if expected != reservation_id:
+                        raise Conflict('La reserva confirmada ya no está vigente para este cambio.')
+                    hold_reservation(self.db, reservation_id, plan_id, utc_now())
+                entry['status'] = 'writing'
+                plan.execution_results = [dict(result) for result in results]
+                self.db.commit()
+                external_id = await self.writer.create(site_id, proposal, authorize=reauthorize)
             except WriteUncertain:
                 entry['status']='uncertain'; break
             except ApplicationError:
@@ -798,9 +1085,10 @@ class SsidPlanService:
                 verified=False
             if verified:
                 entry['status']='verified_configuration'
-                binding=bindings.get(proposal.network_id)
-                if binding:
-                    mark_assigned(self.db,binding['parent_interface'],binding['tag'],utc_now())
+                if reservation_id is not None:
+                    mark_assigned(self.db, reservation_id, utc_now(), plan_id=plan_id)
+                plan.execution_results = [dict(result) for result in results]
+                self.db.commit()
                 continue
             # Compensación: se elimina únicamente el SSID creado por este trabajo.
             try:
@@ -814,9 +1102,19 @@ class SsidPlanService:
     def _finish_plan(self, plan_id, actor_id, site_id, results):
         """Estado final del lote, liberación de bloqueos resueltos, auditoría y escalamiento."""
         plan=self.db.get(SsidPlan,plan_id)
+        by_ssid = {result['ssid']: result['status'] for result in results}
+        for row in plan.rows:
+            reservation_id = row.get('reservation_id')
+            if reservation_id is None:
+                continue
+            outcome = by_ssid.get(row['proposal']['ssid'])
+            if outcome == 'verified_configuration':
+                mark_assigned(self.db, reservation_id, utc_now(), plan_id=plan_id)
+            elif outcome not in {'uncertain', 'rollback_failed', 'verifying', 'writing'}:
+                clear_reservation_hold(self.db, reservation_id, plan_id)
         states=[r['status'] for r in results]
         verified=states.count('verified_configuration')
-        if any(s in ('uncertain','rollback_failed','verifying') for s in states):
+        if any(s in ('uncertain','rollback_failed','verifying','writing') for s in states):
             status='uncertain'
         elif verified==len(states):
             status='completed'
@@ -825,7 +1123,7 @@ class SsidPlanService:
         plan.status=status; plan.execution_results=[dict(r) for r in results]
         # El bloqueo solo se conserva para los SSID cuyo estado remoto no se pudo acreditar.
         resolved=[digest([site_id,r['ssid'].casefold()]) for r in results
-                  if r['status'] not in ('uncertain','rollback_failed','verifying')]
+                  if r['status'] not in ('uncertain','rollback_failed','verifying','writing')]
         if resolved:
             self.db.execute(delete(WifiWriteLease).where(WifiWriteLease.plan_id==plan_id,
                                                          WifiWriteLease.resource_key.in_(resolved)))
@@ -860,7 +1158,7 @@ class SsidPlanService:
         results=[]
         for ssid,proposal in selected.items():
             entry=dict(previous.get(ssid) or {'ssid':ssid,'status':'not_started'})
-            if entry['status'] in ('uncertain','rollback_failed','verifying','not_started'):
+            if entry['status'] in ('uncertain','rollback_failed','verifying','not_started','writing'):
                 external_id=remote.get(ssid)
                 if external_id is None:
                     # Ausente: no se creó o la compensación sí se aplicó.

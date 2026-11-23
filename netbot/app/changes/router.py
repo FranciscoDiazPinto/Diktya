@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import require_permission
 from app.auth.models import User
@@ -15,10 +16,34 @@ from .service import (InventoryUnavailable, ReservationAlreadyReleased, Reservat
                       VlanReservationService)
 
 from .csv_service import CsvImportService
+from .fair_closure import confirm_fair_closure, preview_fair_closure
 from .csv_schemas import CsvImportRead, CsvImportSummary, CsvConfirm, CsvLimits
 from .dependencies import get_csv_service, read_csv_body
 
 router = APIRouter(prefix="/changes", tags=["changes"])
+
+
+@router.get("/wifi-scopes/{scope_id}/closure-preview")
+def fair_closure_preview(
+    scope_id: int,
+    actor: User = Depends(require_permission(Permission.NETWORKS_MANAGE.value)),
+    db: Session = Depends(get_db),
+):
+    return preview_fair_closure(db, actor, scope_id)
+
+
+class FairClosureConfirm(BaseModel):
+    revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+@router.post("/wifi-scopes/{scope_id}/closure-confirm")
+def fair_closure_confirm(
+    scope_id: int,
+    payload: FairClosureConfirm,
+    actor: User = Depends(require_permission(Permission.NETWORKS_MANAGE.value)),
+    db: Session = Depends(get_db),
+):
+    return confirm_fair_closure(db, actor, scope_id, payload.revision)
 
 
 @router.get("/csv-imports/options", response_model=CsvLimits)
@@ -84,6 +109,17 @@ def list_reservations(monitoring: MonitoringServiceDep,
     return _service(monitoring, db).list_active()
 
 
+@router.get("/vlan-reservations/mine/expired", response_model=list[VlanReservationRead])
+def list_my_expired_reservations(
+    monitoring: MonitoringServiceDep,
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    actor: User = Depends(require_permission(Permission.VLAN_RESERVE.value)),
+    db: Session = Depends(get_db),
+):
+    return _service(monitoring, db).list_my_expired(actor, limit, offset)
+
+
 @router.post("/vlan-reservations", response_model=VlanReservationRead, status_code=201)
 async def create_reservation(payload: VlanReservationCreate, monitoring: MonitoringServiceDep,
                              user: User = Depends(require_permission(Permission.VLAN_RESERVE.value)),
@@ -120,6 +156,7 @@ from .ssid_schemas import (
     SsidConfirm,
     SsidPlanRead,
     SsidVlanChangeProposal,
+    SsidVlanBatch,
     SsidVlanChangeConfirm,
 )
 from .dependencies import get_restart_service
@@ -182,9 +219,66 @@ async def confirm_ssid_plan(plan_id: UUID, payload: SsidConfirm, actor: User = D
     return await service.confirm(actor,str(plan_id),payload)
 
 
+@router.post('/ssid-plans/{plan_id}/retry', response_model=SsidPlanRead, status_code=201)
+async def retry_ssid_plan(
+    plan_id: UUID,
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return await service.retry(actor, str(plan_id))
+
+
 @router.post('/ssid-plans/{plan_id}/cancel', response_model=SsidPlanRead)
 def cancel_ssid_plan(plan_id: UUID, actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)), service: SsidPlanService = Depends(get_ssid_service)):
     return service.cancel(actor,str(plan_id))
+
+
+@router.post('/ssid-vlan-batches/preview')
+async def preview_ssid_vlan_batch(
+    payload: SsidVlanBatch,
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return await service.preview_vlan_batch(actor, payload)
+
+
+@router.get('/ssid-vlan-batches')
+def list_ssid_vlan_batches(
+    scope_id: int = Query(gt=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return service.list_vlan_batches(actor, scope_id, limit, offset)
+
+
+@router.get('/ssid-vlan-batches/{batch_id}')
+def get_ssid_vlan_batch(
+    batch_id: UUID,
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return service.get_vlan_batch(actor, str(batch_id))
+
+
+@router.post('/ssid-vlan-batches/{batch_id}/confirm')
+async def confirm_ssid_vlan_batch(
+    batch_id: UUID,
+    payload: SsidConfirm,
+    actor: User = Depends(require_permission(Permission.CHANGES_APPROVE.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return await service.confirm_vlan_batch(actor, str(batch_id), payload)
+
+
+@router.post('/ssid-vlan-batches/{batch_id}/retry', status_code=201)
+async def retry_ssid_vlan_batch(
+    batch_id: UUID,
+    actor: User = Depends(require_permission(Permission.CHANGES_REQUEST.value)),
+    service: SsidPlanService = Depends(get_ssid_service),
+):
+    return await service.retry_vlan_batch(actor, str(batch_id))
 
 
 @router.post('/ssid-vlan-change-plans', status_code=201)

@@ -30,6 +30,7 @@ from .execution import PlanBusy, exclusive_plan
 from .ssid_executor import UniFiSsidWriter, WriteUncertain
 from .ssid_schemas import DeviceRestartProposal, PlanRevision
 from .ssid_service import authorized_scope, digest
+from .fair_closure import require_open_scope
 
 ACTIVE = ('confirmed', 'executing', 'uncertain')
 UNIFI_SOURCE = 'unifi'  # fuente del inventario de monitoreo que observa estos equipos
@@ -104,6 +105,7 @@ class DeviceRestartService:
             revision=digest([proposal.model_dump(), site_id, device['name'], device['access_point'], clients]),
             execution_results=[], created_at=now,
             expires_at=now + timedelta(seconds=self.settings.csv_preview_ttl_seconds))
+        require_open_scope(self.db, plan.scope_id)
         self.db.add(plan)
         record_event(self.db, 'device.restart.requested', actor_id=actor.id, target_id=actor.id,
                      details={'plan_id': plan.id, 'scope_id': plan.scope_id, 'device_id': plan.device_id})
@@ -120,6 +122,7 @@ class DeviceRestartService:
             raise Conflict('El plan ya no puede confirmarse o está vencido.')
         if self._busy(plan.site_id, plan.device_id, excluding=plan.id):
             raise Conflict('Ya existe un reinicio aprobado o en curso para este dispositivo.')
+        require_open_scope(self.db, plan.scope_id)
         result = self.db.execute(update(DeviceRestartPlan).where(
             DeviceRestartPlan.id == plan.id, DeviceRestartPlan.status == 'preview',
             DeviceRestartPlan.revision == payload.revision, DeviceRestartPlan.expires_at > utc_now())
@@ -210,6 +213,7 @@ class DeviceRestartService:
             raise Conflict('UniFi debe confirmar que el dispositivo está en línea antes de reiniciar.')
 
         resource_key = digest([site_id, 'device', device_id])
+        require_open_scope(self.db, plan.scope_id)
         try:
             self.db.add(WifiWriteLease(resource_key=resource_key, restart_plan_id=plan.id))
             self.db.flush()

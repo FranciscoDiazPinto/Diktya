@@ -31,6 +31,7 @@ class VlanReservation(Base):
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    held_by_plan_id: Mapped[str | None] = mapped_column(String(36), index=True)
 
 
 class CsvImport(Base):
@@ -56,6 +57,7 @@ class WifiScope(Base):
     name: Mapped[str] = mapped_column(String(160))
     site_id: Mapped[str] = mapped_column(String(160))
     resources: Mapped[dict] = mapped_column(JSON)
+    accepts_changes: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
 
 
 class WifiScopeGrant(Base):
@@ -90,6 +92,19 @@ class WifiWriteLease(Base):
     restart_plan_id: Mapped[str | None] = mapped_column(ForeignKey("device_restart_plans.id"), index=True, nullable=True)
 
 
+class SsidVlanBatchPlan(Base):
+    __tablename__ = "ssid_vlan_batch_plans"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    scope_id: Mapped[int] = mapped_column(ForeignKey("wifi_scopes.id"))
+    status: Mapped[str] = mapped_column(String(32))
+    revision: Mapped[str] = mapped_column(String(64))
+    rows: Mapped[list] = mapped_column(JSON)
+    selection: Mapped[list] = mapped_column(JSON, default=list)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class SsidVlanChangePlan(Base):
     """Plan persistente para modificar la VLAN de un SSID existente."""
 
@@ -106,12 +121,23 @@ class SsidVlanChangePlan(Base):
         ForeignKey("wifi_scopes.id"),
     )
 
+    batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ssid_vlan_batch_plans.id", name="fk_vlan_plan_batch"), index=True,
+    )
+    batch_row: Mapped[int | None] = mapped_column(Integer)
+    predecessor_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ssid_vlan_change_plans.id", name="fk_vlan_plan_predecessor"),
+    )
+
     broadcast_id: Mapped[str] = mapped_column(String(160))
     site_id: Mapped[str] = mapped_column(String(160))
     ssid: Mapped[str] = mapped_column(String(160))
 
     current_network_id: Mapped[str] = mapped_column(String(160))
     target_network_id: Mapped[str] = mapped_column(String(160))
+    reservation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vlan_reservations.id", name="fk_ssid_vlan_change_reservation"),
+    )
 
     purpose: Mapped[str] = mapped_column(String(500))
 

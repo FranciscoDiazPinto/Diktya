@@ -29,8 +29,144 @@ export function createChangePlans({document, Option, state, api, textNode, captu
   const post = (path, body) => request(path, {method: 'POST', ...(body ? {body: JSON.stringify(body)} : {})});
   const placeholder = (select, label) => select.replaceChildren(new Option(label, ''));
 
+  const batchBase = '/ssid-vlan-batches';
+  const batchAdd = $('vlan-batch-add'), batchPreview = $('vlan-batch-preview');
+  const batchDraft = $('vlan-batch-draft'), batchHistory = $('vlan-batch-history'), batchDetail = $('vlan-batch-detail');
+  let draftRows = [], batchBusy = false, canApprove = false, selectedBatch = null;
+
+  function reviewDraft() {
+    batchDraft.replaceChildren();
+    for (const row of draftRows) {
+      const item = textNode('li', `${row.label} · ${row.purpose}`);
+      const remove = textNode('button', `Quitar ${row.label}`);
+      remove.type = 'button';
+      remove.addEventListener('click', () => {
+        if (batchBusy) return;
+        draftRows = draftRows.filter(current => current !== row);
+        reviewDraft();
+        batchAdd.focus();
+      });
+      item.append(remove);
+      batchDraft.append(item);
+    }
+    batchPreview.disabled = !loaded || batchBusy || !draftRows.length;
+  }
+
+  function showBatch(batch) {
+    selectedBatch = batch.id;
+    batchDetail.replaceChildren();
+    const title = textNode('h4', `Lote ${batch.id} · ${STATUS[batch.status] || batch.status}`);
+    title.tabIndex = -1;
+    batchDetail.append(title);
+    const selected = new Set();
+    const results = new Map(batch.results.map(result => [result.row_number, result]));
+    const reviewable = batch.status === 'preview' && new Date(batch.expires_at).getTime() > Date.now();
+    const confirm = textNode('button', 'Confirmar filas del lote');
+    confirm.type = 'button';
+    confirm.disabled = true;
+    const rows = document.createElement('ol');
+    for (const row of batch.rows) {
+      const item = document.createElement('li');
+      const result = results.get(row.row_number);
+      const text = row.errors.length ? row.errors.join(' ') :
+        `${row.ssid} → VLAN ${row.target_vlan}. ${row.impact}`;
+      const label = `Fila ${row.row_number}: ${text}`;
+      if (reviewable && canApprove && !row.errors.length) {
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        const wrapper = document.createElement('label');
+        wrapper.append(check, textNode('span', label));
+        check.addEventListener('change', () => {
+          if (check.checked) selected.add(row.row_number);
+          else selected.delete(row.row_number);
+          confirm.disabled = !selected.size;
+        });
+        item.append(wrapper);
+      } else {
+        item.append(textNode('p', result ? `${label} · ${STATUS[result.status] || result.status}` : label));
+      }
+      rows.append(item);
+    }
+    batchDetail.append(rows);
+    if (reviewable && canApprove) {
+      confirm.addEventListener('click', () => batchAction(
+        () => post(`${batchBase}/${batch.id}/confirm`, {revision: batch.revision, row_numbers: [...selected]}),
+        'Aprobación registrada. Actualiza el estado para consultar la ejecución.',
+      ));
+      batchDetail.append(confirm);
+    }
+    if (batch.can_retry) {
+      const retry = textNode('button', 'Retomar cambios pendientes');
+      retry.type = 'button';
+      retry.addEventListener('click', () => batchAction(() => post(`${batchBase}/${batch.id}/retry`),
+        'Lote preparado desde la primera fila pendiente. Revisa y confirma para continuar.'));
+      batchDetail.append(retry);
+    }
+    return title;
+  }
+
+  async function loadBatchHistory(context) {
+    if (!scope.value) return;
+    const batches = await request(`${batchBase}?scope_id=${Number(scope.value)}`);
+    if (!current(context)) return;
+    batchHistory.replaceChildren(new Option('Selecciona un lote', ''), ...batches.map(batch =>
+      new Option(`${batch.id} · ${STATUS[batch.status] || batch.status} · ${batch.row_count} fila(s)`, batch.id)));
+    batchHistory.value = batches.some(batch => batch.id === selectedBatch) ? selectedBatch : '';
+    batchHistory.disabled = !batches.length;
+  }
+
+  async function batchAction(run, message, {clearDraft = false} = {}) {
+    if (batchBusy || !scope.value) return;
+    const context = capture();
+    batchBusy = true;
+    try {
+      const batch = await run();
+      if (!current(context)) return;
+      if (clearDraft) draftRows = [];
+      const title = showBatch(batch);
+      status.textContent = message;
+      title.focus();
+      await loadBatchHistory(context);
+    } catch (error) {
+      if (current(context)) status.textContent = error.message;
+    } finally {
+      if (current(context)) { batchBusy = false; reviewDraft(); }
+    }
+  }
+
+  batchAdd.addEventListener('click', () => {
+    if (!loaded || batchBusy) return;
+    const ssid = $('vlan-change-ssid'), network = $('vlan-change-network');
+    const purpose = $('vlan-change-purpose').value.trim();
+    if (!ssid.value || !network.value || !purpose) {
+      status.textContent = 'Selecciona SSID, red destino y escribe el motivo.';
+      return;
+    }
+    if (draftRows.length >= 50 || draftRows.some(row => row.broadcast_id === ssid.value)) {
+      status.textContent = 'El lote admite hasta 50 SSID distintos.';
+      return;
+    }
+    const label = `${ssid.selectedOptions[0].text} → ${network.selectedOptions[0].text}`;
+    draftRows.push({broadcast_id: ssid.value, network_id: network.value, purpose, label});
+    reviewDraft();
+    status.textContent = 'Cambio agregado al lote.';
+  });
+  batchPreview.addEventListener('click', () => batchAction(() => post(`${batchBase}/preview`, {
+    scope_id: Number(scope.value),
+    rows: draftRows.map(({label, ...row}) => row),
+  }), 'Lote preparado. Revisa las filas antes de confirmar.', {clearDraft: true}));
+  batchHistory.addEventListener('change', () => {
+    if (batchHistory.value) {
+      return batchAction(() => request(`${batchBase}/${batchHistory.value}`), 'Lote recuperado.');
+    }
+    selectedBatch = null;
+    batchDetail.replaceChildren();
+  });
+
   function clearOptions() {
-    loaded = false;
+    loaded = false; draftRows = []; batchBusy = false; selectedBatch = null;
+    batchAdd.disabled = true; batchHistory.disabled = true;
+    placeholder(batchHistory, 'Selecciona un lote'); batchDetail.replaceChildren(); reviewDraft();
     placeholder($('vlan-change-ssid'), 'Selecciona un SSID'); placeholder($('vlan-change-network'), 'Selecciona la red destino');
     placeholder($('restart-device'), 'Selecciona un AP');
     $('vlan-change-prepare').disabled = $('restart-prepare').disabled = true; $('changes-source').textContent = '';
@@ -99,6 +235,7 @@ export function createChangePlans({document, Option, state, api, textNode, captu
     const permissions = user.permissions || [];
     if (!permissions.includes('changes:request')) return;
     admin = permissions.includes('networks:manage');
+    canApprove = permissions.includes('changes:approve');
     panel.hidden = false; $('restart-device-id-field').hidden = !admin;
     const context = capture();
     try {
@@ -124,9 +261,19 @@ export function createChangePlans({document, Option, state, api, textNode, captu
       $('restart-device').replaceChildren(new Option('Selecciona un AP', ''), ...options.aps.map(a => new Option(a.name, a.id)));
       const ssids = await request(`/wifi-scopes/${id}/ssids`); if (!current(context)) return;
       $('vlan-change-ssid').replaceChildren(new Option('Selecciona un SSID', ''), ...ssids.map(s => new Option(s.ssid, s.id)));
-      loaded = true; $('vlan-change-prepare').disabled = $('restart-prepare').disabled = false; status.textContent = '';
+      loaded = options.accepts_changes !== false;
+      batchAdd.disabled = $('vlan-change-prepare').disabled = $('restart-prepare').disabled = !loaded;
+      status.textContent = loaded ? '' : 'Este ámbito ya no acepta cambios.';
     } catch (error) { if (current(context)) status.textContent = error.message; }
-    finally { if (current(context)) await refresh(); }
+    finally {
+      if (current(context)) {
+        await refresh();
+        if (current(context)) {
+          try { await loadBatchHistory(context); }
+          catch (error) { if (current(context)) status.textContent = error.message; }
+        }
+      }
+    }
   }
   scope.addEventListener('change', loadScope);
 
@@ -153,7 +300,15 @@ export function createChangePlans({document, Option, state, api, textNode, captu
     if (!loaded || !payload.device_id || !payload.purpose) { status.textContent = 'Selecciona el equipo y escribe el motivo.'; return; }
     return prepare('/device-restart-plans', payload, $('restart-prepare'));
   });
-  $('changes-refresh').addEventListener('click', refresh);
+  $('changes-refresh').addEventListener('click', async () => {
+    await refresh();
+    if (selectedBatch) await batchAction(() => request(`${batchBase}/${selectedBatch}`), 'Estado del lote actualizado.');
+    else {
+      const context = capture();
+      try { await loadBatchHistory(context); }
+      catch (error) { if (current(context)) status.textContent = error.message; }
+    }
+  });
 
   // El chat solo propone: el plan se crea aquí, tras una acción explícita del usuario.
   function proposalCard(text, path, proposal) {

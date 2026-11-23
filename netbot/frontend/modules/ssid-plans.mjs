@@ -5,12 +5,86 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
   const capture = () => ({session:state.session,generation});
   const current = c => c.session === state.session && c.generation === generation;
   const request = (path, extra = {}) => api.authedRequest(`/api/v1/changes${path}`,extra);
+  const closure = $('#fair-closure');
+  const previewButton = $('#fair-closure-preview');
+  const confirmButton = $('#fair-closure-confirm');
+  const summary = $('#fair-closure-summary');
+  let closurePreview = null;
+  let closed = false;
+
+  function clearClosure() {
+    closurePreview = null;
+    summary.replaceChildren();
+    confirmButton.hidden = true;
+  }
+
+  function showClosure(result) {
+    clearClosure();
+    closurePreview = result;
+    closed = !result.accepts_changes;
+    summary.append(textNode('p', `${result.event_name} · ${closed ? 'Cambios bloqueados' : 'Acepta cambios'}`));
+    const kinds = {ssid: 'Alta de SSID', vlan: 'Cambio de VLAN', vlan_batch: 'Lote de cambios de VLAN', restart: 'Reinicio'};
+    const groups = [
+      ['Planes que se cancelarán', result.pending.map(plan => `${kinds[plan.kind]} · ${plan.id} · ${plan.status}`)],
+      ['Trabajos activos o por conciliar', result.blockers.map(plan => `${kinds[plan.kind]} · ${plan.id} · ${plan.status}`)],
+      ['Resultados para revisión', result.review.map(plan => `${kinds[plan.kind]} · ${plan.id} · ${plan.status}`)],
+      ['Reservas vinculadas', result.linked_reservations.map(row =>
+        `Reserva ${row.id} · ${row.releasable ? 'Se liberará al confirmar' : 'Se conserva'}`)],
+    ];
+    for (const [label, items] of groups) {
+      summary.append(textNode('h4', label));
+      if (!items.length) {
+        summary.append(textNode('p', 'Ninguno.'));
+        continue;
+      }
+      const list = document.createElement('ul');
+      list.append(...items.map(item => textNode('li', item)));
+      summary.append(list);
+    }
+    confirmButton.hidden = closed && !result.linked_reservations.some(row => row.releasable);
+    confirmButton.textContent = closed ? 'Confirmar liberación de reservas' : 'Confirmar cierre del ámbito';
+  }
+
+  async function reviewClosure(confirm) {
+    if (busy || !scope.value || closure.hidden || (confirm && !closurePreview)) return;
+    const context = capture();
+    const endpoint = `/wifi-scopes/${Number(scope.value)}/closure-`;
+    const approval = confirm ? {method: 'POST', body: JSON.stringify({revision: closurePreview.revision})} : {};
+    clearClosure();
+    controls(true);
+    try {
+      const result = await request(endpoint + (confirm ? 'confirm' : 'preview'), approval);
+      if (!current(context)) return;
+      showClosure(result);
+      $('#ssid-status').textContent = confirm
+        ? result.blockers.length
+          ? 'Cambios bloqueados. Quedan trabajos activos o pendientes de conciliación.'
+          : 'Cambios bloqueados para esta feria.'
+        : 'Vista previa disponible. Revisa los planes y las reservas antes de confirmar.';
+      if (confirm) await refresh();
+    } catch (error) {
+      if (current(context)) $('#ssid-status').textContent = error.message;
+    } finally {
+      if (current(context)) {
+        controls(false);
+        if (confirm) previewButton.focus();
+      }
+    }
+  }
+
+  previewButton.addEventListener('click', () => reviewClosure(false));
+  confirmButton.addEventListener('click', () => reviewClosure(true));
+
   function controls(value) {
     busy = value; scope.disabled = value;
-    $('#ssid-prepare').disabled = value || !options; $('#ssid-upload').disabled = value || !options;
+    $('#ssid-prepare').disabled = value || !options || closed;
+    $('#ssid-upload').disabled = value || !options || closed;
+    previewButton.disabled = value || !scope.value;
+    confirmButton.disabled = value;
   }
   function reset() {
     generation += 1; options = null; aps = []; panel.hidden = true;
+    closed = false; closure.hidden = true; clearClosure();
     scope.replaceChildren(new Option('Selecciona un ámbito',''));
     $('#ssid-network').replaceChildren(new Option('Selecciona una red','')); $('#ssid-profile').replaceChildren(new Option('Selecciona un perfil',''));
     $('#ssid-aps').replaceChildren(); $('#ssid-plan-list').replaceChildren();
@@ -59,7 +133,30 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     for (const result of plan.execution_results || []) card.append(textNode('p', `${result.ssid}: ${result.status}${result.external_id ? ' · ID '+result.external_id : ''}`));
     if (plan.status === 'completed') card.append(textNode('p','Configuración releída y verificada en el controlador. No equivale a una prueba de conexión Wi-Fi o Internet.'));
     if (['executing','uncertain'].includes(plan.status)) card.append(textNode('p','El trabajo no se reintenta automáticamente. Un estado incierto requiere conciliación del equipo técnico.'));
+    if (['partial', 'failed'].includes(plan.status) && plan.execution_results?.length) {
+      const retry = textNode('button', 'Retomar filas pendientes');
+      retry.type = 'button';
+      retry.addEventListener('click', async () => {
+        if (!current(context) || retry.disabled) return;
+        retry.disabled = true;
+        try {
+          const resumed = await request(`/ssid-plans/${plan.id}/retry`, {method: 'POST'});
+          if (!current(context)) return;
+          const previewCard = showPlan(resumed);
+          $('#ssid-status').textContent = 'Propuesta preparada con las filas pendientes. Revisa y confirma para continuar.';
+          previewCard.tabIndex = -1;
+          previewCard.focus();
+        } catch (error) {
+          if (!current(context)) return;
+          $('#ssid-status').textContent = error.message;
+          retry.disabled = false;
+          retry.focus();
+        }
+      });
+      card.append(retry);
+    }
     $('#ssid-plan-list').append(card);
+    return card;
   }
   async function refresh() {
     const context = capture();
@@ -68,7 +165,9 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
   }
   async function configureUser(user) {
     if(!user.permissions?.includes('changes:request')) return;
-    panel.hidden = false; const context = capture();
+    panel.hidden = false;
+    closure.hidden = !user.permissions.includes('networks:manage');
+    const context = capture();
     try {
       const scopes = await request('/wifi-scopes'); if(!current(context)) return;
       scope.replaceChildren(new Option('Selecciona un ámbito',''),...scopes.map(s => new Option(s.name,s.id)));
@@ -77,11 +176,13 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     } catch(error) { if(current(context)) $('#ssid-status').textContent = error.message; }
   }
   scope.addEventListener('change',async () => {
+    closed = false; clearClosure();
     generation += 1; options = null; aps = []; $('#ssid-aps').replaceChildren(); $('#ssid-source').textContent=''; controls(false);
     $('#ssid-network').replaceChildren(new Option('Selecciona una red','')); $('#ssid-profile').replaceChildren(new Option('Selecciona un perfil',''));
     if(!scope.value) return; const context = capture(); controls(true);
     try {
       const result = await request(`/wifi-scopes/${Number(scope.value)}/options`); if(!current(context)) return; options = result;
+      closed = result.accepts_changes === false;
       $('#ssid-source').textContent = result.simulated ? 'SIMULACIÓN: inventario de demostración; no es infraestructura real.' : 'Inventario consultado en UniFi y OPNsense.';
       $('#ssid-network').replaceChildren(new Option('Selecciona una red',''),...result.networks.map(n=>new Option(`${n.parent_interface} · VLAN ${n.tag}`,n.id)));
       $('#ssid-profile').replaceChildren(new Option('Selecciona un perfil',''),...result.security_profiles.map(p=>new Option(p,p)));
@@ -103,7 +204,7 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     });
   }
   async function prepare(upload) {
-    if(busy) return; const context=capture();
+    if(busy || closed) return; const context=capture();
     try {
       const payload = common();
       let path = '/ssid-plans';

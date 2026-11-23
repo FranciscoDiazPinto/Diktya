@@ -883,6 +883,16 @@ export const ProvisioningMarkup = memo(function ProvisioningMarkup({
           {"\n            "}
         </form>
         {"\n            "}
+        <section id="fair-closure" hidden aria-labelledby="fair-closure-heading">
+          <h3 id="fair-closure-heading">Cierre de feria</h3>
+          <button id="fair-closure-preview" type="button" disabled>
+            Revisar cierre del ámbito
+          </button>
+          <div id="fair-closure-summary"></div>
+          <button id="fair-closure-confirm" type="button" hidden>
+            Confirmar cierre del ámbito
+          </button>
+        </section>
         <p id="ssid-status" role="status"></p>
         {"\n            "}
         <div id="ssid-plan-list" className="reservation-list"></div>
@@ -951,6 +961,17 @@ export const ProvisioningMarkup = memo(function ProvisioningMarkup({
           {"\n            "}
         </form>
         {"\n            "}
+        <section aria-labelledby="vlan-batch-heading" className="support-form">
+          <h3 id="vlan-batch-heading">Cambios de VLAN en lote</h3>
+          <button id="vlan-batch-add" type="button" disabled>Agregar selección al lote</button>
+          <ol id="vlan-batch-draft"></ol>
+          <button id="vlan-batch-preview" type="button" disabled>Revisar lote</button>
+          <label htmlFor="vlan-batch-history">Lotes anteriores del ámbito</label>
+          <select id="vlan-batch-history" disabled>
+            <option value="">Selecciona un lote</option>
+          </select>
+          <div id="vlan-batch-detail"></div>
+        </section>
         <form id="restart-form" className="support-form">
           {"\n              "}
           <h3>{"Reiniciar un equipo"}</h3>

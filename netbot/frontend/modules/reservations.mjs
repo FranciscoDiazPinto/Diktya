@@ -3,11 +3,12 @@ import { canReserveVlans, reservationPayload } from '../chat-reservations.mjs';
 export function createReservations({ document, state, api, chatMessages, textNode, showToast }) {
   const { authedRequest } = api;
   const reservationList = document.querySelector('#vlan-reservations');
+  let seenExpired = new Set();
   function configureUser(user) {
     reservationList.hidden = !canReserveVlans(user.roles || []);
     if (!reservationList.hidden) refreshReservations();
   }
-  function reset() { reservationList.replaceChildren(); reservationList.hidden = true; }
+  function reset() { seenExpired = new Set(); reservationList.replaceChildren(); reservationList.hidden = true; }
   function renderReservationProposal(proposal) {
     const session = state.session;
     const card = document.createElement('article');
@@ -50,7 +51,10 @@ export function createReservations({ document, state, api, chatMessages, textNod
     const session = state.session;
     if (!canReserveVlans(state.user?.roles || [])) return;
     try {
-      const rows = await authedRequest('/api/v1/changes/vlan-reservations', {});
+      const [rows, expired] = await Promise.all([
+        authedRequest('/api/v1/changes/vlan-reservations', {}),
+        authedRequest('/api/v1/changes/vlan-reservations/mine/expired', {}),
+      ]);
       if (session !== state.session) return;
       reservationList.replaceChildren(textNode('h3', 'Reservas VLAN activas'));
       if (!rows.length) reservationList.append(textNode('p', 'No hay reservas activas.'));
@@ -76,6 +80,18 @@ export function createReservations({ document, state, api, chatMessages, textNod
         });
         item.append(release);
         reservationList.append(item);
+      }
+      if (expired.length) {
+        reservationList.append(textNode('h3', 'Mis reservas vencidas'));
+        const history = document.createElement('ul');
+        for (const row of expired) {
+          const date = new Date(row.released_at).toLocaleString('es-CL');
+          history.append(textNode('li', `VLAN ${row.tag} · ${row.event_name} · ${row.ssid} · Liberada el ${date}`));
+        }
+        reservationList.append(history);
+        const unseen = expired.filter(row => !seenExpired.has(row.id));
+        for (const row of unseen) seenExpired.add(row.id);
+        if (unseen.length) showToast(`${unseen.length} reserva(s) de VLAN vencieron y fueron liberadas.`);
       }
     } catch (error) {
       if (session !== state.session) return;

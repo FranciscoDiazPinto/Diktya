@@ -174,6 +174,48 @@ def test_worker_claims_approval_reauthorizes_and_verifies_without_duplicate_exec
     asyncio.run(run());assert writer.create.await_count==1
 
 
+@pytest.mark.parametrize('replace_reservation', [False, True])
+def test_confirmed_reservation_is_bound_to_the_selected_row(db_session, ssid_setup, replace_reservation):
+    from app.changes.models import VlanReservation
+    from app.changes.ssid_schemas import SsidConfirm, SsidProposal
+
+    x = ssid_setup
+    writer = SimpleNamespace(profile=lambda _: {}, create=AsyncMock(return_value='created'),
+                             verify=AsyncMock(return_value=True))
+    service = execution_service(db_session, x, writer)
+
+    def reserve():
+        reservation = VlanReservation(
+            parent_interface='igc1', tag=20, interface_name='vlan20', event_name='Feria',
+            purpose='Atender cliente', ssid=x.proposal['ssid'], requested_by_id=x.tech.id,
+            status='reserved', created_at=utc_now(),
+        )
+        db_session.add(reservation)
+        db_session.commit()
+        return reservation
+
+    async def run():
+        original = reserve()
+        plan = await service.prepare(x.tech, SsidProposal(**x.proposal))
+        confirmation = SsidConfirm(revision=plan.revision, row_numbers=[1])
+        result = await service.confirm(x.tech, plan.id, confirmation)
+        assert result.rows[0]['reservation_id'] == original.id
+        if replace_reservation:
+            original.status = 'released'
+            db_session.commit()
+            replacement = reserve()
+            repeated = await service.confirm(x.tech, plan.id, confirmation)
+            assert repeated.rows[0]['reservation_id'] == original.id
+            assert (await service.execute(plan.id)).status == 'failed'
+            writer.create.assert_not_awaited()
+            assert replacement.status == 'reserved'
+        else:
+            assert (await service.execute(plan.id)).status == 'completed'
+            assert original.status == 'assigned'
+
+    asyncio.run(run())
+
+
 def test_uncertain_write_is_durable_keeps_lease_and_is_never_retried(client,db_session,ssid_setup):
     from app.changes.ssid_schemas import SsidProposal,SsidConfirm
     from app.changes.models import WifiWriteLease
@@ -297,3 +339,104 @@ def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_se
                        json={'revision': plan['revision'], 'row_numbers': [5]}).status_code == 409
     assert client.post(confirm, headers=setup.headers,
                        json={'revision': plan['revision'], 'row_numbers': [3]}).status_code == 200
+
+
+def test_fair_closure_preview_is_admin_only_and_scoped(client, db_session, ssid_setup):
+    from app.changes.models import WifiScope
+    from uuid import uuid4
+
+    x = ssid_setup
+    endpoint = f'/api/v1/changes/wifi-scopes/{x.scope}/closure-preview'
+    prepared = client.post('/api/v1/changes/ssid-plans', headers=x.headers, json=x.proposal).json()
+    pending = db_session.get(SsidPlan, prepared['id'])
+    other_scope = WifiScope(name='Otra feria', site_id='demo-site', resources={'event_name': 'Otra feria'})
+    db_session.add(other_scope)
+    db_session.flush()
+    for scope_id, status in ((x.scope, 'uncertain'), (x.scope, 'partial'), (other_scope.id, 'confirmed')):
+        db_session.add(SsidPlan(
+            id=str(uuid4()), owner_id=pending.owner_id, scope_id=scope_id,
+            source=pending.source, status=status, fingerprint=pending.fingerprint,
+            revision=pending.revision, rows=[], created_at=pending.created_at,
+            expires_at=pending.expires_at,
+        ))
+    db_session.commit()
+
+    assert client.get(endpoint, headers=x.headers).status_code == 403
+    response = client.get(endpoint, headers=x.admin)
+    assert response.status_code == 200
+    body = response.json()
+    assert body['pending'] == [{'kind': 'ssid', 'id': prepared['id'], 'status': 'preview'}]
+    assert [entry['status'] for entry in body['blockers']] == ['uncertain']
+    assert [entry['status'] for entry in body['review']] == ['partial']
+    assert db_session.get(SsidPlan, prepared['id'], populate_existing=True).status == 'preview'
+
+
+def test_confirm_fair_closure_cancels_pending_plans_and_blocks_new_work(client, db_session, ssid_setup):
+    from app.changes.models import VlanReservation
+
+    x = ssid_setup
+    reservation = VlanReservation(
+        parent_interface='igc1', tag=20, interface_name='vlan20', event_name='Feria',
+        purpose='Atender cliente', ssid=x.proposal['ssid'], requested_by_id=x.tech.id,
+        status='reserved', created_at=utc_now(),
+    )
+    db_session.add(reservation)
+    db_session.commit()
+    base = f'/api/v1/changes/wifi-scopes/{x.scope}'
+    plans = '/api/v1/changes/ssid-plans'
+    original = client.get(f'{base}/closure-preview', headers=x.admin).json()
+    plan = client.post(plans, headers=x.headers, json=x.proposal).json()
+    approval = {'revision': plan['revision'], 'row_numbers': [1]}
+    assert client.post(f"{plans}/{plan['id']}/confirm", headers=x.headers, json=approval).status_code == 200
+
+    stale = client.post(f'{base}/closure-confirm', headers=x.admin, json={'revision': original['revision']})
+    assert stale.status_code == 409
+    preview = client.get(f'{base}/closure-preview', headers=x.admin).json()
+    assert preview['linked_reservations'] == [
+        {'id': reservation.id, 'status': 'reserved', 'releasable': True}
+    ]
+    payload = {'revision': preview['revision']}
+    assert client.post(f'{base}/closure-confirm', headers=x.headers, json=payload).status_code == 403
+    closed = client.post(f'{base}/closure-confirm', headers=x.admin, json=payload)
+    assert closed.status_code == 200
+    assert closed.json()['accepts_changes'] is False
+    assert closed.json()['pending'] == []
+    assert db_session.get(VlanReservation, reservation.id, populate_existing=True).status == 'released'
+    assert client.get(f"{plans}/{plan['id']}", headers=x.headers).json()['status'] == 'cancelled'
+    assert client.post(f"{plans}/{plan['id']}/confirm", headers=x.headers, json=approval).status_code == 409
+    assert client.post(plans, headers=x.headers, json=x.proposal).status_code == 409
+
+
+def test_retry_keeps_verified_rows_and_requires_new_confirmation(client, db_session, ssid_setup):
+    x = ssid_setup
+    base = '/api/v1/changes/ssid-plans'
+    original = client.post(base, headers=x.headers, json=x.proposal).json()
+    plan = db_session.get(SsidPlan, original['id'])
+    proposal = original['rows'][0]['proposal']
+    names = ['Verificado', 'Pendiente-2', 'Pendiente-3', 'Sin-aprobar']
+    plan.rows = [
+        {'row_number': index, 'proposal': {**proposal, 'ssid': name}, 'errors': []}
+        for index, name in enumerate(names, 1)
+    ]
+    plan.selection = [1, 2, 3]
+    plan.execution_results = [
+        {'ssid': name, 'status': status}
+        for name, status in zip(names, ['verified_configuration', 'rolled_back', 'not_started'])
+    ]
+    plan.status = 'uncertain'
+    db_session.commit()
+    retry = f"{base}/{original['id']}/retry"
+    assert client.post(retry, headers=x.admin).status_code == 404
+    assert client.post(retry, headers=x.headers).status_code == 409
+
+    plan.status = 'partial'
+    db_session.commit()
+    result = client.post(retry, headers=x.headers)
+    assert result.status_code == 201, result.text
+    resumed = result.json()
+    assert resumed['id'] != original['id']
+    assert resumed['status'] == 'preview'
+    assert resumed['selection'] == []
+    assert [row['row_number'] for row in resumed['rows']] == [2, 3]
+    assert [row['proposal']['ssid'] for row in resumed['rows']] == names[1:3]
+    assert db_session.get(SsidPlan, original['id'], populate_existing=True).status == 'partial'

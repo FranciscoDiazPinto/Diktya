@@ -19,7 +19,8 @@ from tests.test_ssid_plans import ssid_setup
 def _service(db_session, x):
     service = SsidPlanService(db_session, x.settings, monitoring=None)
     service.options = AsyncMock(return_value=(
-        {"simulated": False, "networks": [{"id": "network-30", "tag": 30}]},
+        {"simulated": False, "event_name": "Feria",
+         "networks": [{"id": "network-30", "tag": 30, "parent_interface": "igc1"}]},
         [{"id": "ssid-123", "ssid": "WiFi-Invitados"}],
         "fingerprint-test",
     ))
@@ -309,6 +310,33 @@ def test_h10_execution_success_is_audited_and_releases_lock(db_session, ssid_set
     assert writer.update_vlan.await_count == 1
 
 
+@pytest.mark.parametrize('released', [False, True])
+def test_h10_uses_the_reservation_confirmed_for_the_target(db_session, ssid_setup, released):
+    from datetime import datetime, timezone
+    from app.changes.models import VlanReservation
+
+    reservation = VlanReservation(
+        parent_interface='igc1', tag=30, interface_name='vlan30', event_name='Feria',
+        purpose='Migración', ssid='WiFi-Invitados', requested_by_id=ssid_setup.tech.id,
+        status='reserved', created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(reservation)
+    db_session.commit()
+    writer = SimpleNamespace(update_vlan=AsyncMock(), verify_vlan=AsyncMock(return_value=True))
+    service, plan = _ready_executor(db_session, ssid_setup, writer)
+    assert db_session.get(SsidVlanChangePlan, plan['id']).reservation_id == reservation.id
+
+    if released:
+        reservation.status = 'released'
+        db_session.commit()
+        with pytest.raises(Conflict, match='reserva confirmada'):
+            asyncio.run(service.execute_vlan_change(plan['id']))
+        writer.update_vlan.assert_not_awaited()
+    else:
+        assert asyncio.run(service.execute_vlan_change(plan['id']))['status'] == 'completed'
+        assert reservation.status == 'assigned'
+
+
 def test_h10_uncertain_retains_lock_and_never_retries(db_session, ssid_setup):
     from sqlalchemy import select, func
     from app.changes.models import WifiWriteLease
@@ -477,3 +505,115 @@ def test_vlan_confirmation_requires_same_broadcast_aps(db_session, ssid_setup):
     broadcast['ap_ids'] = ['ap-2']
     with pytest.raises(Conflict, match='Cambió el inventario'):
         _confirm(service, ssid_setup, plan)
+
+
+def test_vlan_batch_preview_preserves_rows_and_does_not_store_plans(db_session, ssid_setup):
+    from sqlalchemy import func, select
+    from app.changes.ssid_schemas import SsidVlanBatch
+
+    x = ssid_setup
+    service = _service(db_session, x)
+    payload = SsidVlanBatch(scope_id=x.scope, rows=[
+        {'broadcast_id': 'ssid-123', 'network_id': 'network-30', 'purpose': 'Migración'},
+        {'broadcast_id': 'no-existe', 'network_id': 'network-30', 'purpose': 'Migración'},
+    ])
+    result = asyncio.run(service.preview_vlan_batch(x.tech, payload))
+    valid, invalid = result['rows']
+    assert valid['row_number'] == 1 and valid['target_vlan'] == 30 and not valid['errors']
+    assert invalid['row_number'] == 2 and invalid['errors']
+    service.options.assert_awaited_once()
+    service.inventory.read_broadcast.assert_awaited_once()
+    assert db_session.scalar(select(func.count()).select_from(SsidVlanChangePlan)) == 0
+
+
+def test_confirmed_vlan_batch_queues_only_the_next_row(db_session, ssid_setup):
+    from app.changes.queue import confirmed_ids
+    from app.changes.ssid_schemas import SsidConfirm, SsidVlanBatch
+
+    x = ssid_setup
+    service = _service(db_session, x)
+    options, existing, fingerprint = service.options.return_value
+    second = {'id': 'ssid-456', 'ssid': 'WiFi-Expositores'}
+    service.options.return_value = options, [*existing, second], fingerprint
+
+    async def detail(_site_id, broadcast_id):
+        ssid = 'WiFi-Invitados' if broadcast_id == 'ssid-123' else second['ssid']
+        return {'id': broadcast_id, 'ssid': ssid, 'network_id': 'network-20'}
+
+    service.inventory.read_broadcast.side_effect = detail
+
+    async def run():
+        draft = await service.preview_vlan_batch(x.tech, SsidVlanBatch(
+            scope_id=x.scope, rows=[
+                {'broadcast_id': broadcast, 'network_id': 'network-30', 'purpose': 'Migración'}
+                for broadcast in ('ssid-123', 'ssid-456')
+            ],
+        ))
+        approval = SsidConfirm(revision=draft['revision'], row_numbers=[2, 1])
+        approved = await service.confirm_vlan_batch(x.tech, draft['id'], approval)
+        first, next_row = [row['plan_id'] for row in approved['results']]
+        repeated = await service.confirm_vlan_batch(x.tech, draft['id'], approval)
+        assert repeated['results'] == approved['results']
+        assert confirmed_ids(db_session, 'vlan') == [first]
+        child = db_session.get(SsidVlanChangePlan, first)
+        child.status = 'uncertain'
+        db_session.commit()
+        assert confirmed_ids(db_session, 'vlan') == []
+        child.status = 'completed'
+        db_session.commit()
+        assert confirmed_ids(db_session, 'vlan') == [next_row]
+        next_child = db_session.get(SsidVlanChangePlan, next_row)
+        next_child.status = 'uncertain'
+        db_session.commit()
+        with pytest.raises(Conflict, match='requiere conciliación'):
+            await service.retry_vlan_batch(x.tech, draft['id'])
+        next_child.status = 'rolled_back'
+        db_session.commit()
+        assert service.get_vlan_batch(x.tech, draft['id'])['can_retry']
+        resumed = await service.retry_vlan_batch(x.tech, draft['id'])
+        assert resumed['status'] == 'preview' and resumed['selection'] == []
+        assert [row['row_number'] for row in resumed['rows']] == [2]
+        original = service.get_vlan_batch(x.tech, draft['id'])
+        assert original['status'] == 'superseded'
+        assert original['results'][0]['status'] == 'completed'
+        with pytest.raises(Conflict):
+            await service.retry_vlan_batch(x.tech, draft['id'])
+
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('networks, expected', [
+    (['network-20', 'network-30'], True),
+    (['network-20', 'network-20'], False),
+])
+def test_vlan_verification_retries_reads_only(networks, expected):
+    from app.changes.ssid_executor import UniFiSsidWriter
+
+    remaining = iter(networks)
+    methods = []
+
+    def handler(request):
+        methods.append(request.method)
+        return httpx.Response(200, json=_broadcast(next(remaining)))
+
+    writer = UniFiSsidWriter(
+        _writer_settings(unifi_verification_attempts=2, unifi_verification_interval_seconds=0),
+        httpx.MockTransport(handler),
+    )
+    assert asyncio.run(writer.verify_vlan('site', 'ssid-123', 'WiFi-Invitados', 'network-30')) is expected
+    assert methods == ['GET', 'GET']
+
+
+def test_vlan_verification_timeout_ends_a_slow_read():
+    from app.changes.ssid_executor import UniFiSsidWriter
+
+    async def handler(_request):
+        await asyncio.sleep(10)
+        pytest.fail('Una lectura excedió el límite de verificación.')
+
+    writer = UniFiSsidWriter(
+        _writer_settings(unifi_verification_timeout_seconds=0.05),
+        httpx.MockTransport(handler),
+    )
+    assert asyncio.run(writer.verify_vlan('site', 'ssid-123', 'WiFi-Invitados', 'network-30')) is False

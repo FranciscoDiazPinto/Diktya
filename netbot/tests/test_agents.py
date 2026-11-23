@@ -207,7 +207,8 @@ def test_end_to_end_vlan_change_from_request_to_verified_result(client, db_sessi
 
     def service(db):
         plans = SsidPlanService(db, live, monitoring=None, writer=writer)
-        plans.options = AsyncMock(return_value=({"simulated": False, "networks": [{"id": "network-30", "tag": 30}]},
+        plans.options = AsyncMock(return_value=({"simulated": False, "event_name": "Feria",
+                                                   "networks": [{"id": "network-30", "tag": 30, "parent_interface": "igc1"}]},
                                                 [{"id": "ssid-1", "ssid": "Expositores"}], "fingerprint"))
         plans.inventory.read_broadcast = AsyncMock(side_effect=lambda site, broadcast: {
             "id": "ssid-1", "ssid": "Expositores", "network_id": network["value"]})

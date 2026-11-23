@@ -6,7 +6,7 @@ identificadores y nunca consulta estas tablas directamente.
 from datetime import datetime, timezone
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.auth.audit import record_event
 
@@ -18,9 +18,17 @@ KINDS = {"ssid": SsidPlan, "vlan": SsidVlanChangePlan, "restart": DeviceRestartP
 def confirmed_ids(db: Session, kind: str, limit: int = 20) -> list[str]:
     """Aprobaciones pendientes de ejecución, la más antigua primero."""
     model = KINDS[kind]
-    return list(db.scalars(select(model.id).where(model.status == "confirmed",
-                                                 model.expires_at > datetime.now(timezone.utc))
-                           .order_by(model.confirmed_at).limit(limit)))
+    statement = select(model.id).where(
+        model.status == "confirmed", model.expires_at > datetime.now(timezone.utc),
+    )
+    if kind == 'vlan':
+        predecessor = aliased(SsidVlanChangePlan)
+        completed = select(predecessor.id).where(
+            predecessor.id == model.predecessor_id, predecessor.status == 'completed',
+        ).exists()
+        statement = statement.where(model.predecessor_id.is_(None) | completed)
+    return list(db.scalars(statement.order_by(model.confirmed_at).limit(limit)))
+
 
 
 def interrupted_ids(db: Session, kind: str, before: datetime, limit: int = 20) -> list[str]:

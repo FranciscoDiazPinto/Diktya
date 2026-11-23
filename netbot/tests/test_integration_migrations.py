@@ -194,3 +194,59 @@ def test_google_migration_preserves_users_and_protects_subject_bindings(executio
         migrate('upgrade', 'head')
     finally:
         engine.dispose()
+
+
+def test_reservation_hold_upgrade_preserves_rows_and_protects_other_sessions(execution_migration_url, tmp_path):
+    from sqlalchemy.orm import Session
+    from app.changes.service import clear_reservation_hold, expire_due, hold_reservation, mark_assigned
+    from app.core.errors import Conflict
+
+    url = execution_migration_url
+    env = dict(os.environ, DATABASE_URL=url, ENVIRONMENT='test', GOOGLE_LOGIN_ENABLED='false',
+               ADMIN_EMAIL='', ADMIN_PASSWORD='', UNIFI_ENABLED='false', GUEST_EMAIL_RECOVERY_ENABLED='false')
+
+    def migrate(command, target, success=True):
+        result = subprocess.run([sys.executable, '-m', 'alembic', '-c', str(ROOT/'alembic.ini'), command, target],
+                                cwd=tmp_path, env=env, capture_output=True, text=True)
+        assert (result.returncode == 0) == success, result.stderr
+        return result
+
+    previous = '025_vlan_batch_plans'
+    migrate('upgrade', previous)
+    engine = create_engine(url)
+    now = datetime.now(timezone.utc)
+    try:
+        metadata = MetaData()
+        metadata.reflect(engine)
+        with engine.begin() as db:
+            db.execute(metadata.tables['users'].insert().values(
+                id=81, email='staff@example.com', hashed_password='synthetic', is_active=True,
+            ))
+            db.execute(metadata.tables['vlan_reservations'].insert().values(
+                id=25, parent_interface='igc1', tag=25, interface_name='vlan25',
+                event_name='Feria de prueba', purpose='Prueba', ssid='Prueba',
+                requested_by_id=81, status='reserved', created_at=now,
+                expires_at=now + timedelta(minutes=10),
+            ))
+        migrate('upgrade', 'head')
+        with Session(engine) as worker, Session(engine) as another:
+            assert worker.execute(text('SELECT status, held_by_plan_id FROM vlan_reservations WHERE id=25')).one() == ('reserved', None)
+            hold_reservation(worker, 25, 'original', now)
+            worker.commit()
+            assert expire_due(another, now + timedelta(minutes=11)) == 0
+            with pytest.raises(Conflict):
+                hold_reservation(another, 25, 'otro-plan', now)
+            another.rollback()
+            clear_reservation_hold(another, 25, 'otro-plan')
+            another.commit()
+        rejected = migrate('downgrade', previous, success=False)
+        assert 'reservas protegidas' in rejected.stderr
+        with Session(engine) as worker:
+            assert mark_assigned(worker, 25, now, plan_id='original')
+            worker.commit()
+        migrate('downgrade', previous)
+        with engine.connect() as db:
+            assert db.scalar(text('SELECT status FROM vlan_reservations WHERE id=25')) == 'assigned'
+        migrate('upgrade', 'head')
+    finally:
+        engine.dispose()
