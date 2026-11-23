@@ -114,6 +114,48 @@ describe("React application with the real feature controllers", () => {
     expect(JSON.parse(request.body)).toEqual({revision: "reviewed"});
   });
 
+  it("opens the next fair only from a reviewed closed scope and assigns selected staff", async () => {
+    const base = "/api/v1/changes/wifi-scopes";
+    const administrator = {...admin, permissions: [...admin.permissions, "users:read"]};
+    const fetcher = mockFetch(administrator, path => {
+      if (path === base) return response([{id: 7, name: "Feria anterior"}]);
+      if (path === `${base}/7/options`) {
+        return response({networks: [], security_profiles: [], aps: [], accepts_changes: false});
+      }
+      if (path === `${base}/7/closure-preview`) {
+        return response({event_name: "Feria anterior", accepts_changes: false, revision: "reviewed-closed",
+                         pending: [], blockers: [], review: [], linked_reservations: []});
+      }
+      if (path === "/admin/users") return response([{
+        id: 8, email: "staff@example.com", full_name: "Técnico de prueba", is_active: true,
+        permissions: ["changes:request"],
+      }]);
+      if (path === `${base}/7/successor`) return response({id: 9, name: "Feria siguiente"}, 201);
+    });
+    history.replaceState(null, "", "#provisioning");
+    await login(fetcher, administrator);
+    const scope = document.querySelector("#ssid-scope");
+    await waitFor(() => expect(scope.options).toHaveLength(2));
+    fireEvent.change(scope, {target: {value: "7"}});
+    const preview = screen.getByRole("button", {name: "Revisar cierre del ámbito"});
+    await waitFor(() => expect(preview).toBeEnabled());
+    expect(screen.queryByRole("form", {name: "Abrir próxima feria"})).toBeNull();
+    fireEvent.click(preview);
+    const form = await screen.findByRole("form", {name: "Abrir próxima feria"});
+    const staff = await within(form).findByRole("checkbox", {name: /Técnico de prueba/});
+    fireEvent.change(within(form).getByLabelText(/Nombre del ámbito/), {target: {value: "Feria siguiente"}});
+    fireEvent.change(within(form).getByLabelText(/Nombre del evento/), {target: {value: "Nuevo evento"}});
+    fireEvent.click(staff);
+    fireEvent.submit(form);
+    await screen.findByText(/Ámbito «Feria siguiente» creado/);
+    const [, request] = fetcher.mock.calls.find(([path]) => path.endsWith("/7/successor"));
+    expect(JSON.parse(request.body)).toEqual({
+      name: "Feria siguiente", event_name: "Nuevo evento", revision: "reviewed-closed", user_ids: [8],
+    });
+    expect([...scope.options].map(option => option.value)).toContain("9");
+    expect([...document.querySelector("#changes-scope").options].map(option => option.value)).toContain("9");
+  });
+
   it("mounts guest chat and cancels a pending login on returning to guests", async () => {
     let resolve;
     const pending = new Promise((r) => {

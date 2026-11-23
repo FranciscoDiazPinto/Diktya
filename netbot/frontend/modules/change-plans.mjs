@@ -339,5 +339,9 @@ export function createChangePlans({document, Option, state, api, textNode, captu
   const renderVlanProposal = p => proposalCard(`Propuesta de cambio de VLAN: SSID ${p.broadcast_id} → red ${p.network_id}. Motivo: ${p.purpose}`, '/ssid-vlan-change-plans', p);
   const renderRestartProposal = p => proposalCard(`Propuesta de reinicio del equipo ${p.device_id}. Motivo: ${p.purpose}`, '/device-restart-plans', p);
 
-  return {reset, configureUser, refresh, renderVlanProposal, renderRestartProposal};
+  function addScope(newScope) {
+    if (!panel.hidden) scope.append(new Option(newScope.name, newScope.id));
+  }
+
+  return {reset, configureUser, refresh, renderVlanProposal, renderRestartProposal, addScope};
 }

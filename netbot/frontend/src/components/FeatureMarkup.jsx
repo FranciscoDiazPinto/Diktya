@@ -892,6 +892,19 @@ export const ProvisioningMarkup = memo(function ProvisioningMarkup({
           <button id="fair-closure-confirm" type="button" hidden>
             Confirmar cierre del ámbito
           </button>
+          <form id="fair-successor" className="support-form" method="post" hidden
+                aria-labelledby="fair-successor-heading">
+            <h4 id="fair-successor-heading">Abrir próxima feria</h4>
+            <label htmlFor="fair-successor-name">Nombre del ámbito (obligatorio)</label>
+            <input id="fair-successor-name" name="name" required maxLength={160} />
+            <label htmlFor="fair-successor-event">Nombre del evento (obligatorio)</label>
+            <input id="fair-successor-event" name="event_name" required maxLength={160} />
+            <fieldset id="fair-successor-assignees" hidden>
+              <legend>Personal autorizado para la próxima feria</legend>
+              <div id="fair-successor-users"></div>
+            </fieldset>
+            <button id="fair-successor-submit" type="submit">Crear ámbito de la próxima feria</button>
+          </form>
         </section>
         <p id="ssid-status" role="status"></p>
         {"\n            "}

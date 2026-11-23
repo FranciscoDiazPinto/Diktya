@@ -266,6 +266,18 @@
               <button id="fair-closure-preview" type="button" disabled>Revisar cierre del ámbito</button>
               <div id="fair-closure-summary"></div>
               <button id="fair-closure-confirm" type="button" hidden>Confirmar cierre del ámbito</button>
+              <form id="fair-successor" method="post" hidden aria-labelledby="fair-successor-heading">
+                <h4 id="fair-successor-heading">Abrir próxima feria</h4>
+                <label for="fair-successor-name">Nombre del ámbito (obligatorio)</label>
+                <input id="fair-successor-name" name="name" required maxlength="160">
+                <label for="fair-successor-event">Nombre del evento (obligatorio)</label>
+                <input id="fair-successor-event" name="event_name" required maxlength="160">
+                <fieldset id="fair-successor-assignees" hidden>
+                  <legend>Personal autorizado para la próxima feria</legend>
+                  <div id="fair-successor-users"></div>
+                </fieldset>
+                <button id="fair-successor-submit" type="submit">Crear ámbito de la próxima feria</button>
+              </form>
             </section>
             <p id="ssid-status" role="status"></p>
             <div id="ssid-plan-list" class="reservation-list"></div>

@@ -82,6 +82,7 @@ export function mountFeatures(root, runtime, navigate) {
     captureChat,
     isChatCurrent,
     chatMessages,
+    onScopeCreated: scope => changePlans.addScope(scope),
     onOpenPlans: () =>
       navigation.currentView === "overview" &&
       navigation.navigate("provisioning"),

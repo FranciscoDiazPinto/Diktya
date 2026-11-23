@@ -1,5 +1,5 @@
 // Propuestas y confirmación por API; ninguna escritura de red desde el LLM.
-export function createSsidPlans({document, Option, state, api, textNode, captureChat, isChatCurrent, chatMessages, onOpenPlans = () => {}}) {
+export function createSsidPlans({document, Option, state, api, textNode, captureChat, isChatCurrent, chatMessages, onOpenPlans = () => {}, onScopeCreated = () => {}}) {
   const $ = s => document.querySelector(s), panel = $('#ssid-panel'), scope = $('#ssid-scope');
   let generation = 0, options = null, aps = [], busy = false;
   const capture = () => ({session:state.session,generation});
@@ -9,6 +9,8 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
   const previewButton = $('#fair-closure-preview');
   const confirmButton = $('#fair-closure-confirm');
   const summary = $('#fair-closure-summary');
+  const successorForm = $('#fair-successor');
+  const successorUsers = $('#fair-successor-users');
   let closurePreview = null;
   let closed = false;
 
@@ -16,6 +18,11 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     closurePreview = null;
     summary.replaceChildren();
     confirmButton.hidden = true;
+    successorForm.hidden = true;
+    $('#fair-successor-assignees').hidden = true;
+    successorUsers.replaceChildren();
+    $('#fair-successor-name').value = '';
+    $('#fair-successor-event').value = '';
   }
 
   function showClosure(result) {
@@ -43,7 +50,69 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     }
     confirmButton.hidden = closed && !result.linked_reservations.some(row => row.releasable);
     confirmButton.textContent = closed ? 'Confirmar liberación de reservas' : 'Confirmar cierre del ámbito';
+    successorForm.hidden = !closed || !confirmButton.hidden || result.pending.length > 0 || result.blockers.length > 0;
+    if (!successorForm.hidden) {
+      successorForm.action = `/api/v1/changes/wifi-scopes/${Number(scope.value)}/successor`;
+    }
   }
+
+  async function loadSuccessorUsers(context, result) {
+    if (successorForm.hidden || !state.user?.permissions?.includes('users:read')) return;
+    try {
+      const users = await api.authedRequest('/admin/users', {});
+      if (!current(context) || closurePreview !== result || !Array.isArray(users)) return;
+      for (const user of users) {
+        if (!user.is_active || !user.permissions?.includes('changes:request')) continue;
+        const option = document.createElement('input');
+        option.type = 'checkbox';
+        option.name = 'user_ids';
+        option.value = String(user.id);
+        const label = document.createElement('label');
+        label.append(option, textNode('span', user.full_name ? `${user.full_name} · ${user.email}` : user.email));
+        successorUsers.append(label);
+      }
+      $('#fair-successor-assignees').hidden = !successorUsers.children.length;
+    } catch {
+      if (current(context) && closurePreview === result) {
+        $('#ssid-status').textContent = 'No se pudo cargar el personal autorizado. Puedes volver a revisar el cierre.';
+      }
+    }
+  }
+
+  successorForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy || successorForm.hidden || !closurePreview || !scope.value) return;
+    const name = $('#fair-successor-name');
+    const eventName = $('#fair-successor-event');
+    const invalid = [name, eventName].find(field => !field.value.trim());
+    if (invalid) {
+      $('#ssid-status').textContent = 'Completa el nombre del ámbito y del evento.';
+      invalid.focus();
+      return;
+    }
+    const context = capture();
+    const data = {
+      name: name.value.trim(), event_name: eventName.value.trim(), revision: closurePreview.revision,
+      user_ids: [...successorUsers.querySelectorAll('input:checked')].map(input => Number(input.value)),
+    };
+    controls(true);
+    try {
+      const result = await request(`/wifi-scopes/${Number(scope.value)}/successor`, {
+        method: 'POST', body: JSON.stringify(data),
+      });
+      if (!current(context)) return;
+      scope.append(new Option(result.name, result.id));
+      onScopeCreated(result);
+      clearClosure();
+      $('#ssid-status').textContent = `Ámbito «${result.name}» creado. Selecciónalo para preparar cambios.`;
+      controls(false);
+      scope.focus();
+    } catch (error) {
+      if (current(context)) $('#ssid-status').textContent = error.message;
+    } finally {
+      if (current(context)) controls(false);
+    }
+  });
 
   async function reviewClosure(confirm) {
     if (busy || !scope.value || closure.hidden || (confirm && !closurePreview)) return;
@@ -62,6 +131,7 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
           : 'Cambios bloqueados para esta feria.'
         : 'Vista previa disponible. Revisa los planes y las reservas antes de confirmar.';
       if (confirm) await refresh();
+      if (current(context)) await loadSuccessorUsers(context, result);
     } catch (error) {
       if (current(context)) $('#ssid-status').textContent = error.message;
     } finally {
@@ -81,6 +151,7 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
     $('#ssid-upload').disabled = value || !options || closed;
     previewButton.disabled = value || !scope.value;
     confirmButton.disabled = value;
+    $('#fair-successor-submit').disabled = value;
   }
   function reset() {
     generation += 1; options = null; aps = []; panel.hidden = true;
