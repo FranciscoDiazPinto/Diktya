@@ -617,3 +617,28 @@ def test_vlan_verification_timeout_ends_a_slow_read():
         httpx.MockTransport(handler),
     )
     assert asyncio.run(writer.verify_vlan('site', 'ssid-123', 'WiFi-Invitados', 'network-30')) is False
+
+
+def test_vlan_role_revocation_during_preflight_never_starts_rollback(db_session, ssid_setup):
+    from sqlalchemy.orm import Session
+    from app.auth.models import User
+
+    async def update_vlan(_site, _broadcast, _current, _target, authorize):
+        with Session(db_session.get_bind()) as administration:
+            user = administration.get(User, ssid_setup.tech.id)
+            user.is_active = False
+            administration.commit()
+        authorize()
+        pytest.fail('La autorización anterior al PUT no detectó la revocación.')
+
+    writer = SimpleNamespace(
+        update_vlan=AsyncMock(side_effect=update_vlan),
+        verify_vlan=AsyncMock(),
+        read_network=AsyncMock(return_value='network-30'),
+    )
+    service, plan = _ready_executor(db_session, ssid_setup, writer)
+    result = asyncio.run(service.execute_vlan_change(plan['id']))
+    assert result['status'] == 'failed'
+    writer.update_vlan.assert_awaited_once()
+    writer.verify_vlan.assert_not_awaited()
+    writer.read_network.assert_not_awaited()

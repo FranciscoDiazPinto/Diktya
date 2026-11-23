@@ -692,8 +692,9 @@ class SsidPlanService:
             verified = await self.writer.verify_vlan(
                 plan.site_id, plan.broadcast_id, plan.ssid, plan.target_network_id,
             ) is True
-        except Conflict:
-            # El callback se ejecuta antes del PUT. Un rechazo aquí no requiere recuperación.
+        except ApplicationError:
+            # El adaptador solo produce errores de aplicación antes del PUT.
+            # Una respuesta ambigua del PUT usa WriteUncertain y sí requiere recuperación.
             self.db.rollback()
             if not write_returned:
                 return self._finish_vlan_change(plan_id, actor.id, resource_key, 'failed')
