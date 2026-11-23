@@ -112,6 +112,8 @@ Para actualizar a `021_execution_ownership`, detener la API y todos los workers,
 
 La relectura de verificación de SSID y VLAN usa `UNIFI_VERIFICATION_ATTEMPTS`, `UNIFI_VERIFICATION_INTERVAL_SECONDS` y `UNIFI_VERIFICATION_TIMEOUT_SECONDS`. El timeout cubre los intentos y sus pausas. Los reintentos son consultas al controlador. Una escritura ambigua sigue el flujo de recuperación o conciliación descrito arriba.
 
+Al confirmar un cambio individual de VLAN, el plan adquiere además la exclusión durable de la red de destino. Una segunda confirmación sobre la misma red espera a que se resuelva, cancele, rechace o venza la primera. Un cambio individual confirmado antes de incorporar esta protección debe prepararse y confirmarse de nuevo. Los lotes de cambios de VLAN adquieren la exclusión por fila cuando comienza su ejecución.
+
 ### Cambios de VLAN en lote
 
 En **Aprovisionamiento → Cambio de VLAN y reinicio de equipos**, selecciona el ámbito y completa el SSID, la VLAN destino y el motivo. Usa **Agregar selección al lote** para cada fila y **Revisar lote** para preparar la propuesta. Marca las filas que vas a aprobar y pulsa **Confirmar filas del lote**. El historial y el detalle distinguen aprobación en cola, ejecución, detención, conciliación y verificación completa. Puedes recuperar la propuesta y sus resultados desde **Lotes anteriores del ámbito**, y usar **Retomar cambios pendientes** cuando el primer fallo tenga un resultado resuelto.

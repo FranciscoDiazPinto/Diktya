@@ -574,6 +574,13 @@ class SsidPlanService:
         if result.rowcount != 1:
             self.db.rollback()
             raise Conflict("El plan fue modificado por otra solicitud.")
+        self.db.add(WifiWriteLease(resource_key=vlan_lease_key(plan.site_id, plan.target_network_id),
+                                   vlan_plan_id=plan_id))
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            raise Conflict('La VLAN de destino está reservada por otro cambio.') from None
         record_event(self.db, 'wifi.ssid_vlan_change.confirmed', actor_id=actor.id, target_id=actor.id,
                      details={'plan_id': plan_id, 'revision': payload.revision, 'reservation_id': reservation_id})
         self.db.commit()
@@ -613,6 +620,7 @@ class SsidPlanService:
         if result.rowcount != 1:
             self.db.rollback()
             raise Conflict("El plan ya fue tomado por el ejecutor o está finalizado.")
+        self.db.execute(delete(WifiWriteLease).where(WifiWriteLease.vlan_plan_id == plan_id))
         record_event(self.db, 'wifi.ssid_vlan_change.cancelled', actor_id=actor.id, target_id=actor.id,
                      details={'plan_id': plan.id})
         self.db.commit()
@@ -703,11 +711,17 @@ class SsidPlanService:
 
         check_reservation()
         require_open_scope(self.db, plan.scope_id)
-        # PK compartida con la creación: bloqueo durable por sitio + nombre de SSID.
-        keys = sorted({digest([plan.site_id, plan.ssid.casefold()]),
-                       vlan_lease_key(plan.site_id, plan.target_network_id)})
+        # El cambio individual requiere la reserva adquirida al confirmar.
+        target_key = vlan_lease_key(plan.site_id, plan.target_network_id)
+        keys = {digest([plan.site_id, plan.ssid.casefold()])}
+        if plan.batch_id is None:
+            target_lease = self.db.get(WifiWriteLease, target_key, populate_existing=True)
+            if target_lease is None or target_lease.vlan_plan_id != plan.id:
+                raise Conflict('El plan no tiene una reserva de ejecución vigente. Prepara otro plan.')
+        else:
+            keys.add(target_key)
         try:
-            self.db.add_all([WifiWriteLease(resource_key=key, vlan_plan_id=plan.id) for key in keys])
+            self.db.add_all([WifiWriteLease(resource_key=key, vlan_plan_id=plan.id) for key in sorted(keys)])
             self.db.flush()
         except IntegrityError:
             self.db.rollback()

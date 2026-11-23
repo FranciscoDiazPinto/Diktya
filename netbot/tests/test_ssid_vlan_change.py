@@ -673,3 +673,16 @@ def test_vlan_change_refuses_a_reservation_for_another_operation(db_session, ssi
         with pytest.raises(Conflict, match='reserva para otro cambio'):
             asyncio.run(service.execute_vlan_change(draft['id']))
         writer.update_vlan.assert_not_awaited()
+
+
+def test_individual_vlan_approval_reserves_target_until_cancelled(db_session, ssid_setup):
+    x = ssid_setup
+    service = _service(db_session, x)
+    first = _preview(service, x)
+    second = _preview(service, x)
+    assert _confirm(service, x, first)['status'] == 'confirmed'
+    with pytest.raises(Conflict, match='reservada por otro cambio'):
+        _confirm(service, x, second)
+    assert db_session.get(SsidVlanChangePlan, second['id']).status == 'preview'
+    assert service.cancel_vlan_change(x.tech, first['id'])['status'] == 'cancelled'
+    assert _confirm(service, x, second)['status'] == 'confirmed'

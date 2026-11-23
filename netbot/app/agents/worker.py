@@ -79,10 +79,10 @@ class ChangeWorker:
         with self._session_factory() as db:
             if expire_due(db, now):
                 db.commit()
-            if not self._settings.unifi_write_enabled:
-                return  # sin habilitación explícita las aprobaciones esperan; nada se descarta
             if expire_approvals(db, now):
                 db.commit()
+            if not self._settings.unifi_write_enabled:
+                return  # las aprobaciones vigentes esperan sin escribir en la red
             # Recuperación tras una caída: solo lectura sobre la red.
             stale = now - timedelta(seconds=self._settings.device_restart_timeout_seconds * 2)
             for kind in KINDS:

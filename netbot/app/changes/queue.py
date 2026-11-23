@@ -5,12 +5,12 @@ identificadores y nunca consulta estas tablas directamente.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session, aliased
 
 from app.auth.audit import record_event
 
-from .models import DeviceRestartPlan, SsidPlan, SsidVlanChangePlan
+from .models import DeviceRestartPlan, SsidPlan, SsidVlanChangePlan, WifiWriteLease
 
 KINDS = {"ssid": SsidPlan, "vlan": SsidVlanChangePlan, "restart": DeviceRestartPlan}
 
@@ -45,6 +45,10 @@ def expire_approvals(db: Session, now: datetime) -> int:
         rows = db.execute(update(model).where(model.status == 'confirmed', model.expires_at <= now)
                           .values(status='expired').returning(model.id, model.owner_id),
                           execution_options={'synchronize_session': False}).all()
+        if kind == 'vlan' and rows:
+            db.execute(delete(WifiWriteLease).where(
+                WifiWriteLease.vlan_plan_id.in_([plan_id for plan_id, _ in rows]),
+            ))
         for plan_id, owner in rows:
             record_event(db, 'change.approval.expired', actor_id=owner, source='worker',
                          details={'kind': kind, 'plan_id': plan_id})
@@ -59,5 +63,7 @@ def reject_approval(db: Session, kind: str, plan_id: str, reason: str) -> None:
                       .values(status='rejected').returning(model.owner_id),
                       execution_options={'synchronize_session': False})
     if owner is not None:
+        if kind == 'vlan':
+            db.execute(delete(WifiWriteLease).where(WifiWriteLease.vlan_plan_id == plan_id))
         record_event(db, 'change.approval.rejected', actor_id=owner, source='worker', outcome='denied',
                      details={'kind': kind, 'plan_id': plan_id, 'reason': reason})
