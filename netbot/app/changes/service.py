@@ -84,6 +84,16 @@ def find_reserved_vlan(
     return db.scalar(select(VlanReservation.id).where(*conditions))
 
 
+def vlan_has_pending_reservation(db: Session, parent_interface: str, tag: int, now: datetime) -> bool:
+    return db.scalar(select(VlanReservation.id).where(
+        VlanReservation.status == 'reserved',
+        VlanReservation.parent_interface == parent_interface,
+        VlanReservation.tag == tag,
+        or_(VlanReservation.held_by_plan_id.is_not(None), VlanReservation.expires_at.is_(None),
+            VlanReservation.expires_at > now),
+    )) is not None
+
+
 def hold_reservation(db: Session, reservation_id: int, plan_id: str, now: datetime) -> None:
     changed = db.execute(update(VlanReservation).where(
         VlanReservation.id == reservation_id, VlanReservation.status == 'reserved',

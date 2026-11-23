@@ -42,7 +42,8 @@ from .wifi_inventory import WifiInventory
 from .csv_parser import parse_csv
 from .event_workbook import parse_event_workbook
 from .csv_service import as_utc, utc_now
-from .service import clear_reservation_hold, find_reserved_vlan, hold_reservation, mark_assigned
+from .service import (clear_reservation_hold, find_reserved_vlan, hold_reservation, mark_assigned,
+                      vlan_has_pending_reservation)
 from .execution import PlanBusy, exclusive_plan
 from .fair_closure import lock_fair_scope, preview_fair_closure, require_open_scope
 
@@ -691,7 +692,7 @@ class SsidPlanService:
         bindings = {network['id']: network for network in options['networks']}
 
         def check_reservation():
-            if plan.reservation_id is not None and self._reservation_for(
+            if self._reservation_for(
                 actor.id, options, bindings, plan.target_network_id, plan.ssid, utc_now(),
             ) != plan.reservation_id:
                 raise Conflict('La reserva confirmada ya no está vigente para este cambio.')
@@ -729,6 +730,8 @@ class SsidPlanService:
             active = self.scope(actor, plan.scope_id, Permission.CHANGES_EXECUTE)
             if digest([active.site_id, active.resources]) != scope_revision:
                 raise Conflict('Cambió el ámbito durante la ejecución.')
+            if plan.reservation_id is None:
+                check_reservation()
 
         # Desde executing nunca se repite la escritura original: se verifica y, si no se
         # puede acreditar el resultado, se concilia leyendo el controlador.
@@ -1056,10 +1059,15 @@ class SsidPlanService:
         binding = bindings.get(network_id)
         if binding is None:
             return None
-        return find_reserved_vlan(
+        reservation_id = find_reserved_vlan(
             self.db, parent_interface=binding['parent_interface'], tag=binding['tag'],
             event_name=options['event_name'], ssid=ssid, actor_id=actor_id, now=now, lock=lock,
         )
+        if reservation_id is None and vlan_has_pending_reservation(
+            self.db, binding['parent_interface'], binding['tag'], now,
+        ):
+            raise Conflict('La VLAN de destino ya tiene una reserva para otro cambio.')
+        return reservation_id
 
     @exclusive_plan('ssid')
     async def execute(self, plan_id):
@@ -1111,19 +1119,27 @@ class SsidPlanService:
         # conservar las filas ya verificadas. Nunca se reintenta una escritura ambigua.
         for entry, proposal, row in zip(results, selected, approved_rows):
             reservation_id = row.get('reservation_id')
+
+            def authorize_write():
+                reauthorize()
+                if reservation_id is None and self._reservation_for(
+                    actor.id, options, bindings, proposal.network_id, proposal.ssid, utc_now(),
+                ) is not None:
+                    raise Conflict('La reserva de esta VLAN cambió después de confirmar el plan.')
+
             try:
                 reauthorize()
+                expected = self._reservation_for(
+                    actor.id, options, bindings, proposal.network_id, proposal.ssid, utc_now(),
+                )
+                if expected != reservation_id:
+                    raise Conflict('La reserva confirmada ya no está vigente para este cambio.')
                 if reservation_id is not None:
-                    expected = self._reservation_for(
-                        actor.id, options, bindings, proposal.network_id, proposal.ssid, utc_now(),
-                    )
-                    if expected != reservation_id:
-                        raise Conflict('La reserva confirmada ya no está vigente para este cambio.')
                     hold_reservation(self.db, reservation_id, plan_id, utc_now())
                 entry['status'] = 'writing'
                 plan.execution_results = [dict(result) for result in results]
                 self.db.commit()
-                external_id = await self.writer.create(site_id, proposal, authorize=reauthorize)
+                external_id = await self.writer.create(site_id, proposal, authorize=authorize_write)
             except WriteUncertain:
                 entry['status']='uncertain'; break
             except ApplicationError:

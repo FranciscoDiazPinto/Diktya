@@ -642,3 +642,34 @@ def test_vlan_role_revocation_during_preflight_never_starts_rollback(db_session,
     writer.update_vlan.assert_awaited_once()
     writer.verify_vlan.assert_not_awaited()
     writer.read_network.assert_not_awaited()
+
+
+@pytest.mark.parametrize('before_confirmation', [True, False])
+def test_vlan_change_refuses_a_reservation_for_another_operation(db_session, ssid_setup, before_confirmation):
+    from datetime import datetime, timezone
+    from app.changes.models import VlanReservation
+
+    x = ssid_setup
+
+    def reserve_for_other_event():
+        db_session.add(VlanReservation(
+            parent_interface='igc1', tag=30, interface_name='vlan30', event_name='Otro evento',
+            purpose='Prueba de reserva', ssid='Otro SSID', requested_by_id=x.tech.id,
+            status='reserved', created_at=datetime.now(timezone.utc),
+        ))
+        db_session.commit()
+
+    if before_confirmation:
+        service = _service(db_session, x)
+        draft = _preview(service, x)
+        reserve_for_other_event()
+        with pytest.raises(Conflict, match='reserva para otro cambio'):
+            _confirm(service, x, draft)
+        assert db_session.get(SsidVlanChangePlan, draft['id']).status == 'preview'
+    else:
+        writer = SimpleNamespace(update_vlan=AsyncMock())
+        service, draft = _ready_executor(db_session, x, writer)
+        reserve_for_other_event()
+        with pytest.raises(Conflict, match='reserva para otro cambio'):
+            asyncio.run(service.execute_vlan_change(draft['id']))
+        writer.update_vlan.assert_not_awaited()
