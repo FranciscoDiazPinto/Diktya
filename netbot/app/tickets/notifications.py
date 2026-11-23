@@ -31,7 +31,7 @@ _EVENTS = {"created": "Nuevo ticket", "escalated": "Ticket sin atención", "reop
 Mailer = Callable[[str, str, str], None]
 
 
-def _recipients(db: Session, ticket: Ticket) -> list[dict]:
+def ticket_recipients(db: Session, ticket: Ticket) -> list[dict]:
     staff = active_staff(db)
     if ticket.network_id is None:
         return staff
@@ -48,7 +48,7 @@ def enqueue(db: Session, ticket: Ticket, event: str, settings: Settings, now: da
     link = f"{settings.public_app_url.rstrip('/')}/#ticket-{ticket.id}"
     body = f"Ticket #{ticket.id}\nCriticidad: {label}\n{device}Detalle: {link}"
     highlighted = ticket.criticality in {"alta", "critica"}
-    for person in _recipients(db, ticket):
+    for person in ticket_recipients(db, ticket):
         common = dict(ticket_id=ticket.id, user_id=person["id"], event=event, criticality=ticket.criticality,
                       highlighted=highlighted, title=title, body=body, link=link)
         db.add(Notification(channel="in_app", status="sent", sent_at=now, **common))

@@ -14,14 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.service import active_staff
 from app.core.config import Settings
 from app.monitoring.alerts import Incident, active_incidents, unresolved_keys
 from app.monitoring.inventory import configured_sources
 
 from .criticality import attention_due, attention_minutes, classify, criticality_rules, raised
 from .models import Ticket, TicketEvent
-from .notifications import Mailer, due_emails, enqueue, register_attempt
+from .notifications import Mailer, due_emails, enqueue, register_attempt, ticket_recipients
 
 logger = logging.getLogger("netbot.tickets.agent")
 
@@ -145,10 +144,14 @@ class TicketAgent:
             return
         now = self._clock()
         with self._session_factory() as db:
-            contacts = {person["id"]: person["email"] for person in active_staff(db)}
             for row in due_emails(db, now):
-                email = contacts.get(row.user_id)
-                if email is None:  # desactivado o sin rol desde que se encoló
+                db.expire_all()
+                if row.status != "pending":
+                    continue
+                ticket = db.get(Ticket, row.ticket_id)
+                recipients = ticket_recipients(db, ticket) if ticket is not None else []
+                email = next((person["email"] for person in recipients if person["id"] == row.user_id), None)
+                if email is None:  # el destinatario perdió su rol o su ámbito
                     row.status = "cancelled"
                     db.commit()
                     continue

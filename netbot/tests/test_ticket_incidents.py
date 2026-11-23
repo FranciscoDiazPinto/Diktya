@@ -385,3 +385,23 @@ async def test_smtp_can_be_used_for_wifi_without_ticket_emails():
         assert lab.sent == []
     finally:
         lab.db.close()
+
+
+async def test_recipient_is_reauthorized_after_previous_smtp_wait(lab):
+    sent = []
+
+    def mailer(to, _subject, _body):
+        sent.append(to)
+        if to == lab.tech.email:
+            with lab.factory() as administration:
+                user = administration.get(User, lab.admin.id)
+                user.is_active = False
+                administration.commit()
+
+    lab.agent = TicketAgent(lab.factory, lab.settings, mailer, clock=lambda: lab.now)
+    lab.alert()
+    await lab.cycle()
+    assert sent == ["tech@example.com"]
+    assert {row.user_id: row.status for row in lab.rows(channel="email")} == {
+        lab.tech.id: "sent", lab.admin.id: "cancelled",
+    }
