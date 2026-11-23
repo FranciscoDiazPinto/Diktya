@@ -38,6 +38,12 @@ def interrupted_ids(db: Session, kind: str, before: datetime, limit: int = 20) -
                            .limit(limit)))
 
 
+def release_pending_plan_leases(db: Session, kind: str, plan_ids: list[str]) -> None:
+    column = {'ssid': WifiWriteLease.plan_id, 'vlan': WifiWriteLease.vlan_plan_id}.get(kind)
+    if column is not None and plan_ids:
+        db.execute(delete(WifiWriteLease).where(column.in_(plan_ids)))
+
+
 def expire_approvals(db: Session, now: datetime) -> int:
     """Retira aprobaciones vencidas de la cola, sin tocar trabajos ya iniciados."""
     count = 0
@@ -45,10 +51,7 @@ def expire_approvals(db: Session, now: datetime) -> int:
         rows = db.execute(update(model).where(model.status == 'confirmed', model.expires_at <= now)
                           .values(status='expired').returning(model.id, model.owner_id),
                           execution_options={'synchronize_session': False}).all()
-        if kind == 'vlan' and rows:
-            db.execute(delete(WifiWriteLease).where(
-                WifiWriteLease.vlan_plan_id.in_([plan_id for plan_id, _ in rows]),
-            ))
+        release_pending_plan_leases(db, kind, [plan_id for plan_id, _ in rows])
         for plan_id, owner in rows:
             record_event(db, 'change.approval.expired', actor_id=owner, source='worker',
                          details={'kind': kind, 'plan_id': plan_id})
@@ -63,7 +66,6 @@ def reject_approval(db: Session, kind: str, plan_id: str, reason: str) -> None:
                       .values(status='rejected').returning(model.owner_id),
                       execution_options={'synchronize_session': False})
     if owner is not None:
-        if kind == 'vlan':
-            db.execute(delete(WifiWriteLease).where(WifiWriteLease.vlan_plan_id == plan_id))
+        release_pending_plan_leases(db, kind, [plan_id])
         record_event(db, 'change.approval.rejected', actor_id=owner, source='worker', outcome='denied',
                      details={'kind': kind, 'plan_id': plan_id, 'reason': reason})

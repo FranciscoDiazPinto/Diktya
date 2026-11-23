@@ -1045,17 +1045,25 @@ class SsidPlanService:
         require_open_scope(self.db, plan.scope_id)
         now = utc_now()
         approved_rows = []
+        target_keys = set()
         for row in plan.rows:
             if row['row_number'] in payload.row_numbers:
                 proposal = SsidProposal.model_validate(row['proposal'])
                 reservation_id = self._reservation_for(actor.id, options, bindings, proposal.network_id, proposal.ssid, now, lock=True)
                 row = {**row, 'reservation_id': reservation_id}
+                target_keys.add(vlan_lease_key(options['site_id'], proposal.network_id))
             approved_rows.append(row)
         result=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan_id,SsidPlan.status=='preview',
             SsidPlan.expires_at>utc_now(),SsidPlan.revision==payload.revision).values(status='confirmed',
             selection=payload.row_numbers,confirmed_at=now,rows=approved_rows),execution_options={'synchronize_session':False})
         if result.rowcount!=1:
             self.db.rollback(); raise Conflict('Otra solicitud modificó el plan. Recarga su estado.')
+        self.db.add_all([WifiWriteLease(resource_key=key, plan_id=plan_id) for key in sorted(target_keys)])
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            raise Conflict('Una VLAN seleccionada está reservada por otro cambio.') from None
         record_event(self.db, 'ssid.plan.confirmed', actor_id=actor.id,
                      details={'plan_id': plan_id, 'revision': payload.revision, 'rows': payload.row_numbers,
                               'reservation_ids': [row['reservation_id'] for row in approved_rows
@@ -1065,9 +1073,10 @@ class SsidPlanService:
 
     def cancel(self, actor, plan_id):
         plan=self.owned(actor,plan_id)
-        result=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan.id,SsidPlan.status=='preview').values(status='cancelled'),execution_options={'synchronize_session':False})
+        result=self.db.execute(update(SsidPlan).where(SsidPlan.id==plan.id,SsidPlan.status.in_(('preview', 'confirmed'))).values(status='cancelled'),execution_options={'synchronize_session':False})
         if result.rowcount!=1:
-            self.db.rollback(); raise Conflict('Un plan confirmado no puede cancelarse como vista previa.')
+            self.db.rollback(); raise Conflict('El plan ya fue tomado por el ejecutor o está finalizado.')
+        self.db.execute(delete(WifiWriteLease).where(WifiWriteLease.plan_id == plan_id))
         record_event(self.db, 'ssid.plan.cancelled', actor_id=actor.id, details={'plan_id': plan_id})
         self.db.commit(); self.db.refresh(plan)
         return self.read(plan)
@@ -1113,10 +1122,15 @@ class SsidPlanService:
             self.validate(proposal,options,existing)
             self.writer.profile(proposal.security_profile)
         require_open_scope(self.db, plan.scope_id)
+        targets = {vlan_lease_key(scope.site_id, proposal.network_id) for proposal in selected}
+        reserved = set(self.db.scalars(select(WifiWriteLease.resource_key).where(
+            WifiWriteLease.plan_id == plan_id, WifiWriteLease.resource_key.in_(targets),
+        )))
+        if reserved != targets:
+            raise Conflict('El plan no tiene todas sus VLAN reservadas. Prepara otro plan.')
         # Exclusión durable por SSID/sitio, también entre ámbitos superpuestos.
         try:
             keys = {digest([scope.site_id, proposal.ssid.casefold()]) for proposal in selected}
-            keys.update(vlan_lease_key(scope.site_id, proposal.network_id) for proposal in selected)
             self.db.add_all([WifiWriteLease(resource_key=key, plan_id=plan_id) for key in sorted(keys)])
             self.db.flush()
         except IntegrityError:

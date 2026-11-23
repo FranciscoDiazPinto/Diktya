@@ -2,7 +2,7 @@
 from hashlib import sha256
 import json
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.access import require_user_permission
@@ -12,7 +12,8 @@ from app.auth.permissions import Permission
 from app.core.errors import Conflict, NotFound
 
 from .csv_service import utc_now
-from .models import DeviceRestartPlan, SsidPlan, SsidVlanBatchPlan, SsidVlanChangePlan, VlanReservation, WifiScope, WifiWriteLease
+from .models import DeviceRestartPlan, SsidPlan, SsidVlanBatchPlan, SsidVlanChangePlan, VlanReservation, WifiScope
+from .queue import release_pending_plan_leases
 
 PLAN_TYPES = (
     ('ssid', SsidPlan),
@@ -146,8 +147,7 @@ def confirm_fair_closure(db: Session, actor: User, scope_id: int, revision: str)
         if changed.rowcount != len(ids):
             db.rollback()
             raise Conflict('Un plan cambió durante la confirmación. Revisa la vista previa.')
-        if kind == 'vlan':
-            db.execute(delete(WifiWriteLease).where(WifiWriteLease.vlan_plan_id.in_(ids)))
+        release_pending_plan_leases(db, kind, ids)
         cancelled.extend(ids)
     if releasable:
         db.execute(update(VlanReservation).where(

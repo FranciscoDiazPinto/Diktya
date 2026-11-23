@@ -230,8 +230,8 @@ def test_uncertain_write_is_durable_keeps_lease_and_is_never_retried(client,db_s
         assert (await service.execute(plan.id)).status=='uncertain'
         with pytest.raises(Conflict): await service.execute(plan.id)
         second=await service.prepare(x.tech,SsidProposal(**{**x.proposal, 'ssid': 'Otro SSID'}))
-        await service.confirm(x.tech,second.id,SsidConfirm(revision=second.revision,row_numbers=[1]))
-        with pytest.raises(Conflict): await service.execute(second.id)
+        with pytest.raises(Conflict, match='reservada por otro cambio'):
+            await service.confirm(x.tech,second.id,SsidConfirm(revision=second.revision,row_numbers=[1]))
     asyncio.run(run())
     assert writer.create.await_count==1 and db_session.scalar(select(func.count()).select_from(WifiWriteLease))==2
 
