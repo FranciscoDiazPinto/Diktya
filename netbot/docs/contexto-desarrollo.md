@@ -830,3 +830,9 @@ La revisión de cierre reprodujo el hallazgo B314 de Bandit en el lector Excel d
 ### Ensayo del PMV local
 
 La instancia de demostración usa una base temporal y un usuario visor. Se verificaron lecturas reales de OPNsense y UniFi por ZeroTier. UniFi directo presentó el certificado verificado y el colector cargó equipos, VLAN y SSID. El gráfico WAN y las estadísticas parciales del firewall consultaron el NOC en transacciones de solo lectura con TLS y SCRAM vinculado al canal. OPNsense siguió entregando los eventos del firewall. El chat respondió una consulta general con OpenRouter. Las escrituras UniFi y el envío de correos estaban deshabilitados. El ensayo acredita el recorrido local de consulta y queda pendiente la aceptación de pares y el despliegue de entrega.
+
+### Revisión de diferencias con main
+
+Tickets y Google Workspace ya forman parte de la rama de cierre. Se recuperaron de `main` el alta separada de clientes y los avisos de monitoreo ante lecturas parciales o permisos insuficientes. Una cuenta histórica con roles mezclados conserva el perfil de cliente para permisos, chat y Google. El inicio de sesión Google conserva el consumo atómico del desafío de la rama de cierre. Las notificaciones de tickets conservan el aislamiento por red y la reautorización al enviar.
+
+Para la prueba operativa de Google falta configurar el ID web de OAuth y los dominios Workspace autorizados. Los avisos internos de tickets y su ciclo se pueden probar en local. Para acreditar el correo se debe habilitar el envío y probarlo con un destinatario autorizado.

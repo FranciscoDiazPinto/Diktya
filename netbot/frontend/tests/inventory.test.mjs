@@ -130,3 +130,22 @@ test('sin ninguna lectura muestra que no hay datos, no ceros ni "sin alertas"', 
   assert.equal(text(ui.$('#alerts-body')).includes('Sin alertas activas'), false);
   assert.ok(text(ui.$('#devices-body')).includes('Sin datos de las fuentes'));
 });
+
+test('shows no Wi-Fi counts until an inventory source has responded', async () => {
+  const ui = setup(async (path) => path.includes('/summary') ? summary({
+    access_points_total: 0,
+    access_points_online: 0,
+    access_points_offline: 0,
+    ssids_active: 0,
+    sources: [
+      { source: 'opnsense', status: 'ok', last_success_at: '2026-11-01T12:00:00Z' },
+      { source: 'unifi', status: 'unavailable', last_success_at: null },
+    ],
+  }) : responses(path));
+  await ui.controller.configureUser({ permissions: ['monitoring:read'] });
+  const indicators = ui.$('#inventory-kpis').children;
+  for (const label of ['APs en línea', 'APs fuera de línea', 'SSID activos']) {
+    const indicator = indicators.find(({ children }) => children[0].textContent === label);
+    assert.equal(indicator.children[1].textContent, '–');
+  }
+});

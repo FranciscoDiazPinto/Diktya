@@ -4,6 +4,7 @@ import {
   MonitoringOverview,
   MonitoringNotices,
   TrafficChart,
+  Interfaces,
   Clients,
 } from "../components/Monitoring.jsx";
 import { useMonitoring } from "../hooks/useMonitoring.jsx";
@@ -105,4 +106,23 @@ it("filters real DHCP component rows", () => {
     />,
   );
   expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
+});
+
+it("reports denied WAN counters without rendering missing counters as zero", () => {
+  const monitoring = {
+    data: {
+      traffic: { data: null, status: "degraded", source: "opnsense", issues: [{ kind: "permission" }] },
+      interfaces: metric([{ name: "WAN principal", status: "up", traffic: null }]),
+    },
+  };
+  render(
+    <>
+      <MonitoringOverview monitoring={monitoring} />
+      <Interfaces monitoring={monitoring} />
+    </>,
+  );
+  expect(screen.getAllByText("Permiso insuficiente en OPNsense.")).toHaveLength(2);
+  expect(screen.queryByText("Recolectando muestras de tráfico…")).toBeNull();
+  const row = screen.getByText("WAN principal").closest("tr");
+  expect(Array.from(row.cells).slice(-2).map((cell) => cell.textContent)).toEqual(["–", "–"]);
 });

@@ -7,10 +7,10 @@ import {
   clockTime,
   endpoint,
 } from "../../modules/format.mjs";
-export function TrafficChart({ series = [] }) {
-  const points = series.find((s) => s.interface_id === "wan")?.points || [];
+export function TrafficChart({ series, unavailableReason }) {
+  const points = series?.find((s) => s.interface_id === "wan")?.points || [];
   if (points.length < 2)
-    return <p className="empty-state">Recolectando muestras de tráfico…</p>;
+    return <p className="empty-state">{unavailableReason || "Recolectando muestras de tráfico…"}</p>;
   const max =
     Math.max(
       ...points.flatMap((p) => [p.bytes_in_per_second, p.bytes_out_per_second]),
@@ -110,6 +110,20 @@ function Table({ caption, head, rows, empty = "Sin datos disponibles." }) {
     </div>
   );
 }
+const RESOURCE_LABELS = {
+  system: "Estado del sistema",
+  interfaces: "Interfaces",
+  traffic: "Tráfico WAN",
+  clients: "Clientes DHCP",
+  stats: "Estadísticas del firewall",
+  events: "Eventos del firewall",
+};
+
+const denied = (resource) => resource?.issues?.some((issue) => issue.kind === "permission");
+const missingPermission = (resource) =>
+  resource?.source === "opnsense" ? "Permiso insuficiente en OPNsense." :
+    resource?.source === "noc" ? "Permiso insuficiente en el NOC." : "Permiso insuficiente en la fuente.";
+
 export function MonitoringNotices({ monitoring }) {
   const resources = Object.entries(monitoring.data),
     problems = resources.filter(([, r]) => r.status !== "ok" || r.stale);
@@ -126,7 +140,9 @@ export function MonitoringNotices({ monitoring }) {
           <ul>
             {problems.map(([key, r]) => (
               <li key={key}>
-                {key}: {r.stale ? "Datos anteriores" : r.status}
+                {RESOURCE_LABELS[key] || key} · {r.stale ? "Datos anteriores" :
+                  r.status === "degraded" ? "Lectura parcial" : "No disponible"}
+                {denied(r) ? " · " + missingPermission(r) : ""}
                 {r.collected_at ? " · " + clockTime(r.collected_at) : ""}
                 {r.source === "mock" ? " · Simulación" : ""}
               </li>
@@ -185,7 +201,9 @@ export function MonitoringOverview({ monitoring }) {
                 ? "Datos anteriores"
                 : resource?.status === "ok"
                   ? "Última lectura disponible"
-                  : "Sin datos completos"}
+                  : denied(resource)
+                    ? missingPermission(resource)
+                    : "Sin datos completos"}
               {resource?.source === "mock" ? " · Simulación" : ""}
             </div>
           </article>
@@ -197,7 +215,11 @@ export function MonitoringOverview({ monitoring }) {
             <h2>Uso de red WAN</h2>
             <span>Entrada / salida{d.traffic?.source === "noc" ? " · NOC" : ""}</span>
           </div>
-          <TrafficChart series={d.traffic?.data} />
+          <TrafficChart
+            series={d.traffic?.data}
+            unavailableReason={denied(d.traffic) ? missingPermission(d.traffic) :
+              d.traffic?.status === "unavailable" ? "Tráfico WAN no disponible." : undefined}
+          />
         </article>
         <article className="panel system-panel">
           <div className="panel-heading">
@@ -273,8 +295,12 @@ export function Interfaces({ monitoring }) {
           i.description || i.name,
           i.status,
           (i.ip_addresses || []).join(", "),
-          formatBytes((i.traffic?.bytes_in || 0) + (i.traffic?.bytes_out || 0)),
-          (i.traffic?.errors_in || 0) + (i.traffic?.errors_out || 0),
+          i.traffic?.bytes_in != null && i.traffic?.bytes_out != null
+            ? formatBytes(i.traffic.bytes_in + i.traffic.bytes_out)
+            : "–",
+          i.traffic?.errors_in != null && i.traffic?.errors_out != null
+            ? i.traffic.errors_in + i.traffic.errors_out
+            : "–",
         ])}
       />
     </article>

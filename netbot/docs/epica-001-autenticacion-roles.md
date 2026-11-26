@@ -183,3 +183,15 @@ El ID de cliente es público. Este flujo de inicio de sesión no usa un client s
 Las pruebas automatizadas usan cuentas ficticias, certificados RSA locales y transporte simulado. No acreditan configuración real de Google Cloud, aprobación de Workspace, MFA corporativo ni un login real con cuentas de Diktya. La prueba real requiere el cliente OAuth y el dominio autorizados. El downgrade de `022` se rechaza si existen identidades vinculadas para impedir que se pierda la protección por `sub`; conservarlas y respaldar antes de cualquier cambio de versión.
 
 Fuentes de implementación: [verificación de ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token), [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect) y [biblioteca oficial Python](https://google-auth.readthedocs.io/en/latest/reference/google.oauth2.id_token.html).
+
+### Cuentas de clientes externos
+
+En **Usuarios → Nuevo cliente**, un administrador registra el correo externo
+y una contraseña temporal. El cliente entra mediante el formulario local y
+puede cambiar su contraseña en **Mi cuenta**. Para darle acceso a una red,
+el administrador debe asignársela mediante el flujo existente.
+
+El formulario y `POST /admin/users/customers` no aceptan roles. El servidor
+asigna el perfil interno fijo de cliente y rechaza reemplazarlo o combinarlo
+con permisos internos, también desde la CLI. El administrador puede editar
+el nombre, restablecer la contraseña, desbloquear o desactivar la cuenta.

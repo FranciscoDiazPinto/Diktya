@@ -9,7 +9,7 @@ from app.core.database import get_db
 from .dependencies import get_current_user, require_permission
 from .models import User
 from . import service, google_login
-from .schemas import AuthAuditRead, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, RoleRead, GoogleLoginConfig, GoogleChallengeRead, GoogleLoginRequest, TokenResponse, UserCreate, UserRead, UserUpdate
+from .schemas import AuthAuditRead, CustomerCreate, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, RoleRead, GoogleLoginConfig, GoogleChallengeRead, GoogleLoginRequest, TokenResponse, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 admin_router = APIRouter(prefix="/admin", tags=["administration"])
@@ -63,6 +63,12 @@ def list_users(db: Session = Depends(get_db), actor: User = Depends(require_perm
 @admin_router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user(data: UserCreate, db: Session = Depends(get_db), actor: User = Depends(require_permission("users:manage"))) -> UserRead:
     return service.create_user(data, db, actor)
+
+
+@admin_router.post("/users/customers", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def create_customer(data: CustomerCreate, db: Session = Depends(get_db),
+                    actor: User = Depends(require_permission("users:manage"))) -> UserRead:
+    return service.create_customer(data, db, actor)
 
 
 @admin_router.patch("/users/{user_id}", response_model=UserRead)

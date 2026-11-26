@@ -354,7 +354,7 @@
   <div class="chat-controls"><button id="audit-prev" type="button" disabled>Anterior</button><span id="audit-page"></span><button id="audit-next" type="button" disabled>Siguiente</button></div>
 </section>
 <section class="panel support-panel" id="view-users" hidden aria-labelledby="users-heading">
-  <div class="panel-heading"><div><p class="panel-kicker">ADMINISTRACIÓN</p><h2 id="users-heading">Usuarios y roles</h2></div><button id="users-refresh" type="button">Actualizar</button></div>
+  <div class="panel-heading"><div><p class="panel-kicker">ADMINISTRACIÓN</p><h2 id="users-heading">Usuarios y roles</h2></div><button id="user-new-customer" type="button">Nuevo cliente</button><button id="users-refresh" type="button">Actualizar</button></div>
   <p class="chat-intro">Un usuario desactivado no puede iniciar sesión y conserva su historial. No se eliminan cuentas. Siempre debe quedar al menos un administrador activo.</p>
   <form id="user-form" class="support-form" autocomplete="off">
     <h3 id="user-form-title">Nuevo usuario</h3>
@@ -362,7 +362,7 @@
     <label for="user-full-name">Nombre</label><input id="user-full-name" maxlength="160" />
     <label for="user-password">Contraseña</label><input id="user-password" type="password" maxlength="128" autocomplete="new-password" />
     <p id="user-password-hint" class="chat-intro"></p>
-    <fieldset><legend>Roles</legend><div id="user-roles"></div></fieldset>
+    <fieldset id="user-role-fieldset"><legend>Roles</legend><div id="user-roles"></div></fieldset>
     <label><input id="user-active" type="checkbox" checked /> Cuenta activa</label>
     <div class="chat-controls"><button id="user-save" type="submit">Guardar</button><button id="user-cancel" type="button" hidden>Cancelar edición</button></div>
   </form>

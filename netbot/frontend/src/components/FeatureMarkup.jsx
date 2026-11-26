@@ -1262,6 +1262,7 @@ export const UsersMarkup = memo(function UsersMarkup() {
           <p className="panel-kicker">{"ADMINISTRACIÓN"}</p>
           <h2 id="users-heading">{"Usuarios y roles"}</h2>
         </div>
+        <button id="user-new-customer" type="button">{"Nuevo cliente"}</button>
         <button id="users-refresh" type="button">
           {"Actualizar"}
         </button>
@@ -1273,7 +1274,7 @@ export const UsersMarkup = memo(function UsersMarkup() {
         }
       </p>
       {"\n  "}
-      <form id="user-form" className="support-form" autoComplete="off">
+      <form id="user-form" className="support-form" autoComplete="off" aria-labelledby="user-form-title">
         {"\n    "}
         <h3 id="user-form-title">{"Nuevo usuario"}</h3>
         {"\n    "}
@@ -1293,7 +1294,7 @@ export const UsersMarkup = memo(function UsersMarkup() {
         {"\n    "}
         <p id="user-password-hint" className="chat-intro"></p>
         {"\n    "}
-        <fieldset>
+        <fieldset id="user-role-fieldset">
           <legend>{"Roles"}</legend>
           <div id="user-roles"></div>
         </fieldset>

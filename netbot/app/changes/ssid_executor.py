@@ -14,10 +14,10 @@ import httpx
 from app.core.errors import ServiceUnavailable
 
 CONTRACT = '10.6.106'
-VLAN_ONLY_CONTRACT = '11.0.104'
+WIFI_11_CONTRACT = '11.0.104'
 _WRITE_CONTRACTS = {
-    'ssid': {CONTRACT},
-    'vlan': {CONTRACT, VLAN_ONLY_CONTRACT},
+    'ssid': {CONTRACT, WIFI_11_CONTRACT},
+    'vlan': {CONTRACT, WIFI_11_CONTRACT},
     'restart': {CONTRACT},
 }
 # Campos de solo lectura del detalle que el contrato no admite en PUT.
@@ -31,6 +31,11 @@ _VLAN_11_REQUIRED = {
 _VLAN_11_OPTIONAL = {
     'broadcastingDeviceFilter', 'mdnsProxyConfiguration', 'multicastFilteringPolicy',
     'basicDataRateKbpsByFrequencyGHz', 'clientFilteringPolicy', 'blackoutScheduleConfiguration',
+}
+_WIFI_11_STANDARD = {
+    'broadcastingFrequenciesGHz', 'hotspotConfiguration', 'mloEnabled', 'bandSteeringEnabled',
+    'arpProxyEnabled', 'bssTransitionEnabled', 'advertiseDeviceName', 'dtimPeriodByFrequencyGHzOverride',
+    'dnsAssistanceConfiguration', 'handoffSuggestionsConfiguration',
 }
 
 
@@ -61,8 +66,8 @@ class UniFiSsidWriter:
         s = self.settings
         if not write_contract_enabled(s, operation):
             raise ServiceUnavailable('La operación UniFi requiere habilitación explícita y un contrato compatible.')
-        if s.unifi_api_contract == VLAN_ONLY_CONTRACT and not s.unifi_write_api_key:
-            raise ServiceUnavailable('El cambio de VLAN con este contrato requiere una clave del ejecutor.')
+        if s.unifi_api_contract == WIFI_11_CONTRACT and not s.unifi_write_api_key:
+            raise ServiceUnavailable('La operación con este contrato requiere una clave del ejecutor.')
         base = urlsplit(s.unifi_api_base_url or '')
         if (base.scheme != 'https' or base.username or base.password or base.query or base.fragment
                 or not (s.unifi_write_api_key or s.unifi_api_key)):
@@ -176,13 +181,18 @@ class UniFiSsidWriter:
                 if current.status_code == 404:
                     return True
                 current.raise_for_status()
-                if current.json().get('name') != ssid:
+                detail = current.json()
+                if detail.get('name') != ssid:
                     return False
+                if self.settings.unifi_api_contract == WIFI_11_CONTRACT:
+                    if detail.get('id') != external_id:
+                        return False
+                    await self._require_contract(client)
                 removed = await client.delete(path)
                 if removed.status_code not in (200, 204, 404):
                     return False
                 return (await client.get(path)).status_code == 404
-        except (httpx.HTTPError, ValueError, TypeError, AttributeError):
+        except (ServiceUnavailable, httpx.HTTPError, ValueError, TypeError, AttributeError):
             return False
 
     # --------------------------------------------------------- cambio de VLAN (HU010)
@@ -228,10 +238,12 @@ class UniFiSsidWriter:
             if not isinstance(passphrase, str) or len(passphrase) < 8 or set(passphrase) <= {'*', '•'}:
                 raise ServiceUnavailable('El controlador censura la clave del SSID; no se modifica para no sustituirla.')
         body = {key: value for key, value in detail.items() if key not in READ_ONLY_FIELDS}
-        if self.settings.unifi_api_contract == VLAN_ONLY_CONTRACT:
+        if self.settings.unifi_api_contract == WIFI_11_CONTRACT:
+            optional = _VLAN_11_OPTIONAL | _WIFI_11_STANDARD if body.get('type') == 'STANDARD' else _VLAN_11_OPTIONAL
             if (security['type'] not in PERSONAL_SECURITY
+                    or body.get('type') not in {'STANDARD', 'IOT_OPTIMIZED'}
                     or not _VLAN_11_REQUIRED <= body.keys()
-                    or not body.keys() <= _VLAN_11_REQUIRED | _VLAN_11_OPTIONAL
+                    or not body.keys() <= _VLAN_11_REQUIRED | optional
                     or any(body[key] is None for key in _VLAN_11_REQUIRED)):
                 raise ServiceUnavailable('El detalle del SSID no permite conservar su configuración con este contrato.')
         body['network'] = {'type': 'SPECIFIC', 'networkId': network_id}

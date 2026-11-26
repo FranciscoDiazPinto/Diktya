@@ -136,7 +136,8 @@ def login(data: GoogleLoginRequest, db: Session) -> TokenResponse:
     service._lock_administration(db)
     identity = db.scalar(select(GoogleIdentity).where(GoogleIdentity.subject == subject))
     user = db.get(User, identity.user_id) if identity else db.scalar(select(User).where(User.email == email.lower()))
-    if not user or not user.is_active or not STAFF_ROLES.intersection(role.name for role in user.roles):
+    roles = {role.name for role in user.roles} if user else set()
+    if not user or not user.is_active or 'cliente' in roles or not STAFF_ROLES.intersection(roles):
         _deny(db, 'account')
     binding = db.get(GoogleIdentity, user.id)
     if (binding and binding.subject != subject) or (identity and user.email.lower() != email.lower()):

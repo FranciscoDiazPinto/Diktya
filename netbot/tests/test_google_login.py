@@ -75,10 +75,12 @@ def test_rejects_identity_claim_mismatches(client, db_session, admin_user, monke
     assert db_session.scalar(select(func.count()).select_from(RefreshToken)) == 0
 
 
-@pytest.mark.parametrize('account', ['unknown', 'inactive', 'customer'])
+@pytest.mark.parametrize('account', ['unknown', 'inactive', 'customer', 'legacy_mixed_customer'])
 def test_domain_membership_does_not_provision_or_authorize_accounts(client, db_session, admin_user, monkeypatch, google_enabled, account):
     if account == 'inactive': admin_user.is_active = False
     if account == 'customer': admin_user.roles = [db_session.scalar(select(Role).where(Role.name == 'cliente'))]
+    if account == 'legacy_mixed_customer':
+        admin_user.roles.append(db_session.scalar(select(Role).where(Role.name == 'cliente')))
     db_session.commit()
     data, _ = prepare(client, monkeypatch, **({'email': 'missing@example.com'} if account == 'unknown' else {}))
     assert client.post('/auth/google', json=data).status_code == 401

@@ -30,6 +30,8 @@ PROFILE_POLICIES = {
 
 def profile_for_user(user) -> str:
     roles = {r.name for r in user.roles}
+    if "cliente" in roles:
+        return "cliente"
     if "admin" in roles:
         return "admin"
     if roles & {"tecnico", "operador"}:

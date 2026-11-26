@@ -10,7 +10,7 @@ class Element {
   addEventListener(name,fn){this.events[name]=fn;}
   append(...nodes){this.children.push(...nodes);}
   replaceChildren(...nodes){this.children=nodes;}
-  click(){} remove(){}
+  click(){} remove(){} focus(){}
   get text(){return [this.textContent,...this.children.map(child=>child.text)].join(' ');}
 }
 function harness(request) {
@@ -47,6 +47,20 @@ test('create, edit, deactivate and unlock use the administrative API and render 
   assert.equal(patch.path,'/admin/users/2');assert.deepEqual(patch.body,{full_name:'<i>Tec</i>',roles:['tecnico'],is_active:false});
   await row.children[4].children[1].events.click();
   assert.ok(h.calls.some(c=>c.path==='/admin/users/2/unlock'&&c.method==='POST'));
+});
+
+test('customer creation never submits an internal role', async () => {
+  const h = harness(async () => [user]);
+  await createUsers(h).configureUser({permissions: ['users:manage']});
+  h.$('user-new-customer').events.click();
+  assert.equal(h.$('user-role-fieldset').hidden, true);
+  h.$('user-email').value = 'customer@example.test';
+  h.$('user-password').value = 'test-only-passphrase';
+  await h.$('user-form').events.submit({preventDefault() {}});
+  assert.deepEqual(h.calls.find(c => c.method === 'POST'), {
+    path: '/admin/users/customers', method: 'POST',
+    body: {email: 'customer@example.test', full_name: null, password: 'test-only-passphrase'},
+  });
 });
 
 test('validation errors name the affected field',()=>{

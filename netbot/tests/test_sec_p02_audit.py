@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 from sqlalchemy import func, select
 
+from app.auth.audit import AuthAuditMiddleware
 from app.auth.models import AuthAuditEvent, Role, User
 from app.auth.security import hash_password
 from app.core.config import Settings, get_settings
@@ -23,7 +24,11 @@ def rows(db, action=None):
     return list(db.scalars(query.where(AuthAuditEvent.action == action) if action else query))
 
 
-def test_anonymous_denials_are_sampled(client, db_session):
+def test_anonymous_denials_are_sampled(client, db_session, monkeypatch):
+    middleware = app.middleware_stack
+    while not isinstance(middleware, AuthAuditMiddleware):
+        middleware = middleware.app
+    monkeypatch.setattr(middleware.limits, 'clock', lambda: 30)
     assert [client.get('/auth/me').status_code for _ in range(50)] == [401] * 50
     assert len(rows(db_session, 'access.denied')) == 5
 

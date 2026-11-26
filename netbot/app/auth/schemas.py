@@ -16,11 +16,15 @@ def strong_password(value: str) -> str:
     return value
 
 
-class UserCreate(BaseModel):
+class CustomerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr
     password: str = Field(min_length=12, max_length=128)
     full_name: Optional[str] = Field(default=None, max_length=160)
+    _password = field_validator("password")(strong_password)
+
+
+class UserCreate(CustomerCreate):
     roles: list[str] = Field(default_factory=lambda: ["visor"], min_length=1, max_length=20)
 
     @field_validator("roles")
@@ -29,9 +33,6 @@ class UserCreate(BaseModel):
         if len(set(roles)) != len(roles):
             raise ValueError("No repitas roles.")
         return roles
-
-    _password = field_validator("password")(strong_password)
-
 
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")

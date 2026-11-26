@@ -443,7 +443,8 @@ def test_h10_writer_replaces_with_official_put_preserving_configuration():
 
 def _broadcast_v11(network_id):
     return {**_broadcast(network_id), 'multicastToUnicastConversionEnabled': False,
-            'uapsdEnabled': False, 'channel2gLockedTo6': False, 'dtimPeriod2gLockedTo3': False}
+            'uapsdEnabled': False, 'channel2gLockedTo6': False, 'dtimPeriod2gLockedTo3': False,
+            'broadcastingFrequenciesGHz': [5], 'bssTransitionEnabled': True}
 
 
 def test_h10_v11_put_and_restoration_keep_the_broadcast_configuration():
@@ -514,10 +515,10 @@ def test_v11_requires_worker_key_and_blocks_unreviewed_operations():
     writer = UniFiSsidWriter(_writer_settings('11.0.104'), httpx.MockTransport(handler))
     with pytest.raises(ServiceUnavailable, match='clave del ejecutor'):
         asyncio.run(writer.update_vlan('demo-site', 'ssid-123', 'network-20', 'network-30', lambda: None))
+    with pytest.raises(ServiceUnavailable, match='clave del ejecutor'):
+        asyncio.run(writer.create('demo-site', None, lambda: None))
     writer = UniFiSsidWriter(_writer_settings('11.0.104', unifi_write_api_key='write-only-key'),
                             httpx.MockTransport(handler))
-    with pytest.raises(ServiceUnavailable, match='contrato compatible'):
-        asyncio.run(writer.create('demo-site', None, lambda: None))
     with pytest.raises(ServiceUnavailable, match='contrato compatible'):
         asyncio.run(writer.restart('demo-site', 'device-1', lambda: None))
 

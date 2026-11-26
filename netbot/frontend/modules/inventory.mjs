@@ -75,11 +75,13 @@ export function createInventory({ document, window, Option, state, api, textNode
 
   function renderSummary(data) {
     const availability = data.availability_percent == null ? 'Sin datos' : `${data.availability_percent.toFixed(2)} %`;
+    const hasWifiInventory = data.sources.some(({ source, last_success_at }) =>
+      ["unifi", "mock"].includes(source) && last_success_at);
     const items = [
-      ['APs en línea', `${data.access_points_online} / ${data.access_points_total}`],
-      ['APs fuera de línea', data.access_points_offline],
+      ['APs en línea', hasWifiInventory ? `${data.access_points_online} / ${data.access_points_total}` : '–'],
+      ['APs fuera de línea', hasWifiInventory ? data.access_points_offline : '–'],
       ['VLAN activas', data.vlans_active],
-      ['SSID activos', data.ssids_active],
+      ['SSID activos', hasWifiInventory ? data.ssids_active : '–'],
       [`Disponibilidad ${data.availability_window_hours} h`, availability],
       ['Alertas activas', data.active_alerts],
     ].map(([label, value]) => [label, local.hasData ? value : '–']); // sin lecturas, cero sería falso
@@ -103,7 +105,8 @@ export function createInventory({ document, window, Option, state, api, textNode
       const detail = source.status === 'ok' ? 'Operativa' : source.status === 'degraded' ? 'Parcial' : 'No disponible';
       const version = source.version ? ` ${source.version}` : '';
       const error = source.last_error_message ? ` · ${source.last_error_message}` : '';
-      return textNode('span', `${SOURCE_LABELS[source.source] || source.source}${version}: ${detail}${error}`, 'source-chip');
+      const read = source.last_success_at ? ` · ${source.stale ? 'Lectura anterior' : 'Lectura'} ${dateTime(source.last_success_at)}` : '';
+      return textNode('span', `${SOURCE_LABELS[source.source] || source.source}${version}: ${detail}${read}${error}`, 'source-chip');
     }));
   }
 

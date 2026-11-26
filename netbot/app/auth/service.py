@@ -2,11 +2,11 @@
 import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import delete, select, update, func
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.core.errors import Unauthenticated, NotFound, Conflict, InvalidInput
-from .models import RefreshToken, Role, User, AuthAuditEvent, GoogleLoginChallenge, user_roles
+from .models import RefreshToken, Role, User, AuthAuditEvent, GoogleLoginChallenge
 from .audit import current_peer, record_event, bind_request
 from app.core.config import settings
 from app.core.keys import derive_key
@@ -14,7 +14,7 @@ from app.core.keys import derive_key
 from .roles import effective_permissions
 from .access import require_user_permission
 from .permissions import Permission
-from .schemas import LoginRequest, PasswordChange, RefreshRequest, RoleCreate, TokenResponse, UserCreate, UserRead, UserUpdate, RoleRead
+from .schemas import CustomerCreate, LoginRequest, PasswordChange, RefreshRequest, RoleCreate, TokenResponse, UserCreate, UserRead, UserUpdate, RoleRead
 from .security import create_access_token, create_refresh_token, hash_password, verify_password
 
 _DUMMY_PASSWORD_HASH = hash_password("netbot-login-timing-placeholder")
@@ -154,15 +154,25 @@ def _lock_administration(db: Session) -> None:
     db.expire_all()
 
 
+def _active_admin_ids():
+    return select(User.id).where(
+        User.is_active.is_(True), User.roles.any(Role.name == "admin"),
+        ~User.roles.any(Role.name == "cliente"),
+    )
+
+
 def _ensure_admin_remains(db: Session, user: User, active: bool, roles: list[Role]) -> None:
-    if user.is_active and any(r.name == "admin" for r in user.roles) and (not active or not any(r.name == "admin" for r in roles)):
-        others = db.scalar(select(func.count()).select_from(User).join(user_roles).join(Role).where(
-            User.is_active.is_(True), Role.name == "admin", User.id != user.id))
+    current = {r.name for r in user.roles}
+    proposed = {r.name for r in roles}
+    if user.is_active and "admin" in current and "cliente" not in current and (not active or "admin" not in proposed):
+        others = db.scalar(_active_admin_ids().where(User.id != user.id).limit(1))
         if not others:
             raise Conflict("Debe permanecer al menos un administrador activo.")
 
 
 def _roles(db: Session, names: list[str]) -> list[Role]:
+    if "cliente" in names and names != ["cliente"]:
+        raise InvalidInput("Una cuenta de cliente solo admite el perfil de cliente.", field="roles")
     roles = list(db.scalars(select(Role).where(Role.name.in_(names))))
     if len(roles) != len(set(names)):
         raise InvalidInput("Unknown role", field="roles")
@@ -186,10 +196,14 @@ def create_user(data: UserCreate, db: Session, actor: User) -> UserRead:
     return _create_user(data, db, actor.id)
 
 
+def create_customer(data: CustomerCreate, db: Session, actor: User) -> UserRead:
+    return create_user(UserCreate(**data.model_dump(), roles=["cliente"]), db, actor)
+
+
 def _create_user(data: UserCreate, db: Session, actor_id, *, source="http") -> UserRead:
     if db.scalar(select(User).where(User.email == data.email.lower())):
         raise Conflict("Email already registered", field="email")
-    if "admin" not in data.roles and not db.scalar(select(User.id).join(user_roles).join(Role).where(User.is_active.is_(True), Role.name == "admin").limit(1)):
+    if "admin" not in data.roles and not db.scalar(_active_admin_ids().limit(1)):
         raise Conflict("El primer usuario debe ser un administrador activo.")
     user = User(email=data.email.lower(), full_name=data.full_name,
                 hashed_password=hash_password(data.password), roles=_roles(db, data.roles))
@@ -216,6 +230,8 @@ def _update_user(user_id: int, data: UserUpdate, db: Session, actor_id, *, sourc
     user = db.get(User, user_id)
     if not user:
         raise NotFound("User not found")
+    if any(role.name == "cliente" for role in user.roles) and data.roles is not None and data.roles != ["cliente"]:
+        raise Conflict("Las cuentas de cliente no pueden cambiar a un perfil interno.", field="roles")
     roles = _roles(db, data.roles) if data.roles is not None else user.roles
     active = data.is_active if data.is_active is not None else user.is_active
     _ensure_admin_remains(db, user, active, roles)

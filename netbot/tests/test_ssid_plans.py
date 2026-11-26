@@ -245,18 +245,20 @@ def test_uncertain_write_is_durable_keeps_lease_and_is_never_retried(client,db_s
     assert writer.create.await_count==1 and db_session.scalar(select(func.count()).select_from(WifiWriteLease))==2
 
 
-def test_writer_uses_official_create_contract_and_rejects_other_version():
+@pytest.mark.parametrize('contract', ['10.6.106', '11.0.104'])
+def test_writer_uses_official_create_contract_and_rejects_other_version(contract):
     from app.changes.ssid_executor import UniFiSsidWriter
     from app.changes.ssid_schemas import SsidProposal
     from app.core.errors import ServiceUnavailable
-    posted=[];version=['10.6.106'];authorizations=[]
+    posted=[];version=[contract];authorizations=[]
     def respond(request):
         if request.url.path.endswith('/info'): return httpx.Response(200,json={'applicationVersion':version[0]})
         assert request.method=='POST'
         body=json.loads(request.content);posted.append(body)
         return httpx.Response(201,json={'id':'new-broadcast'})
     settings=Settings(_env_file=None,unifi_inventory_mode='api',unifi_api_base_url='https://controller.example.test/proxy/network/integration/v1',
-        unifi_api_key='test-only-key',unifi_write_enabled=True,unifi_api_contract='10.6.106',
+        unifi_api_key='test-only-key',unifi_write_api_key='test-worker-key',
+        unifi_write_enabled=True,unifi_api_contract=contract,
         ssid_security_profiles_json=json.dumps({'p':{'type':'WPA2_PERSONAL','passphrase':'test-only-psk','bands':[2.4,5]}}))
     writer=UniFiSsidWriter(settings,httpx.MockTransport(respond))
     proposal=SsidProposal(scope_id=1,ssid='New SSID',network_id='network1',ap_ids=['ap1'],security_profile='p',purpose='Test')
@@ -273,6 +275,37 @@ def test_writer_uses_official_create_contract_and_rejects_other_version():
     version[0]='other-version'
     with pytest.raises(ServiceUnavailable): asyncio.run(writer.create('site1',proposal,lambda:None))
     assert len(posted)==1
+
+
+def test_v11_removes_only_the_ssid_created_by_the_plan():
+    from app.changes.ssid_executor import UniFiSsidWriter
+
+    settings = Settings(_env_file=None, unifi_inventory_mode='api',
+                        unifi_api_base_url='https://controller.example.test/proxy/network/integration/v1',
+                        unifi_write_api_key='test-worker-key', unifi_write_enabled=True,
+                        unifi_api_contract='11.0.104')
+    state = {'detail': {'id': 'other-broadcast', 'name': 'SSID-Lab'}, 'version': '11.0.104'}
+    deletes = []
+
+    def respond(request):
+        assert request.headers['x-api-key'] == 'test-worker-key'
+        if request.url.path.endswith('/info'):
+            return httpx.Response(200, json={'applicationVersion': state['version']})
+        if request.method == 'DELETE':
+            deletes.append(request.url.path)
+            state['detail'] = None
+            return httpx.Response(200)
+        return httpx.Response(200, json=state['detail']) if state['detail'] else httpx.Response(404)
+
+    writer = UniFiSsidWriter(settings, httpx.MockTransport(respond))
+    assert not asyncio.run(writer.delete_created('site1', 'new-broadcast', 'SSID-Lab'))
+    state['detail']['id'] = 'new-broadcast'
+    state['version'] = 'other-version'
+    assert not asyncio.run(writer.delete_created('site1', 'new-broadcast', 'SSID-Lab'))
+    assert not deletes
+    state['version'] = '11.0.104'
+    assert asyncio.run(writer.delete_created('site1', 'new-broadcast', 'SSID-Lab'))
+    assert len(deletes) == 1
 
 
 def test_worker_rejects_ssid_creation_if_an_approved_ap_goes_offline(db_session, ssid_setup):
