@@ -55,7 +55,7 @@ class CollectionIssue(NetbotModel):
 
 class MonitoringResponse(NetbotModel, Generic[T]):
     status: MonitoringStatus
-    source: str = Field(description="Proveedor que originó los datos: 'opnsense', 'unifi' o 'mock'.")
+    source: str = Field(description="Proveedor que originó los datos: 'opnsense', 'unifi', 'noc' o 'mock'.")
     collected_at: datetime
     stale: bool = False
     last_attempt_at: datetime | None = None
@@ -212,6 +212,7 @@ class FirewallStatistics(NetbotModel):
     )
     packets_passed: int | None = Field(None, ge=0)
     packets_blocked: int | None = Field(None, ge=0)
+    logged_blocked_packets_5m: int | None = Field(None, ge=0)
 
 
 # --------------------------------------------------------------------------- #

@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import TypeVar
 
 from .providers.base import CollectionResult, NetworkMonitoringProvider, AccessPointMonitoringProvider
+from .providers.noc import NocTelemetry
 from .schemas import (
     CollectionIssue,
     DhcpLease,
@@ -65,9 +66,11 @@ class MonitoringService:
         clock: Callable[[], float] = time.monotonic,
         stale_retention_seconds: float = 300.0,
         access_points_provider: AccessPointMonitoringProvider | None = None,
+        noc: NocTelemetry | None = None,
     ) -> None:
         self._provider = provider
         self._access_points = access_points_provider
+        self._noc = noc
         self._stale_retention = stale_retention_seconds
         self._last_known: dict[str, tuple[MonitoringResponse, float]] = {}
         self._ttl = cache_ttl_seconds
@@ -102,6 +105,8 @@ class MonitoringService:
         return await self._cached("vlans", self._provider.get_vlan_inventory)
 
     async def get_firewall_stats(self) -> MonitoringResponse[FirewallStatistics]:
+        if self._noc is not None:
+            return await self._cached("noc.firewall", self._noc.firewall, source="noc")
         return await self._cached("firewall.stats", self._provider.get_firewall_statistics)
 
     async def get_firewall_events(
@@ -134,6 +139,8 @@ class MonitoringService:
 
     async def sample_traffic(self) -> None:
         """Guarda una lectura de los contadores (si es nueva) y descarta las antiguas."""
+        if self._noc is not None:
+            return  # El NOC ya toma muestras y conserva su historial.
         response = await self.get_interfaces()
         self._append_traffic_sample(response)
 
@@ -155,6 +162,18 @@ class MonitoringService:
     async def get_traffic_history(
         self, window_seconds: float = 300
     ) -> MonitoringResponse[list[InterfaceTrafficHistory]]:
+        if self._noc is not None:
+            # Un número fijo de ventanas evita que cada selección abra otra caché.
+            bucket = 300 if window_seconds <= 300 else 900 if window_seconds <= 900 else 3600
+            response = await self._cached(f"noc.traffic.{bucket}", lambda: self._noc.traffic(bucket), source="noc")
+            if response.data is None:
+                return response
+            cutoff = response.collected_at.timestamp() - window_seconds
+            return response.model_copy(update={"data": [
+                series.model_copy(update={"points": [
+                    point for point in series.points if point.timestamp.timestamp() >= cutoff
+                ]}) for series in response.data
+            ]})
         interfaces = await self.get_interfaces()
         self._append_traffic_sample(interfaces)
         if not self._samples:
@@ -255,7 +274,7 @@ class MonitoringService:
         return MonitoringResponse(
             status=self._status(result),
             source=source or self._provider.source,
-            collected_at=collected_at,
+            collected_at=result.observed_at or collected_at,
             last_attempt_at=collected_at,
             data=result.data,
             issues=result.issues,

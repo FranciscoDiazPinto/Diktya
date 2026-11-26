@@ -8,6 +8,7 @@ from app.core.config import Settings
 
 from .providers.base import InfrastructureSource, NetworkMonitoringProvider
 from .providers.mock import MockMonitoringProvider
+from .providers.noc import NocTelemetry
 from .providers.opnsense import (
     DnsmasqLeaseProvider,
     KeaLeaseProvider,
@@ -83,4 +84,6 @@ def build_monitoring_service(settings: Settings) -> MonitoringService:
         history_seconds=settings.monitoring_history_seconds,
         stale_retention_seconds=settings.monitoring_stale_retention_seconds,
         access_points_provider=AccessPointAdapter(build_unifi_source(settings)),
+        noc=NocTelemetry(settings.noc_monitoring_dsn, settings.noc_monitoring_ca_bundle)
+        if settings.noc_monitoring_dsn and settings.monitoring_provider == "opnsense" else None,
     )

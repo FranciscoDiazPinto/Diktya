@@ -35,6 +35,13 @@ Sin PostgreSQL se puede omitir `DATABASE_URL`: la API usa SQLite (`netbot.db`).
 
 Con Node 24 LTS: `npm ci --prefix frontend` y `npm run dev --prefix frontend`. Abrir `http://127.0.0.1:5173`. Vite envía `/auth`, `/admin`, `/api` y `/health` a `127.0.0.1:8000`; si la API usa otro puerto, arrancar con `NETBOT_DEV_API_TARGET=http://127.0.0.1:8001 npm run dev --prefix frontend`.
 
+Para la demostración local, usar una cuenta `visor`. En **Resumen**, revisar
+sistema, gráfico WAN y chat. En **Dispositivos** y **SSID y VLAN**, mostrar el
+inventario de OPNsense y UniFi. En **Firewall**, comprobar los estados y bloqueos
+registrados del NOC, junto a los eventos de OPNsense. El recorrido usa lecturas
+reales de las integraciones configuradas y mantiene `UNIFI_WRITE_ENABLED=false`.
+[Fuentes y configuración](docs/epica-002-monitoreo.md)
+
 Para producción: `npm run build --prefix frontend`. Servir únicamente `frontend/dist`, o construir el servicio `proxy` de Compose, que compila React y copia el resultado a nginx. `python -m http.server` sobre las fuentes ya no ejecuta la aplicación.
 
 ## Guía para contribuir
@@ -64,6 +71,8 @@ Crear una migración con `alembic revision --autogenerate -m "descripcion"`, rev
 ## Monitoreo
 
 Por defecto consulta las fuentes reales: definir las variables `OPNSENSE_*` y `UNIFI_*` en `.env`.
+Para usar el NOC como fuente del gráfico de tráfico y de estadísticas parciales de
+firewall, configurar su conexión PostgreSQL de solo lectura. [Configuración del NOC](docs/epica-002-monitoreo.md#fuente-opcional-noc)
 Sin credenciales la API arranca igual: la fuente figura como no configurada y el dashboard indica
 qué falta, sin inventar datos. Si una fuente cae, se conserva el último dato conocido marcado como
 desactualizado. `MONITORING_PROVIDER=mock` activa datos simulados solo si se pide de forma
@@ -102,7 +111,7 @@ configurado en OpenRouter.
 
 Admin puede validar la [plantilla y contrato CSV](docs/carga-csv.md), revisar filas y confirmar reservas locales. No crea SSIDs ni modifica infraestructura. Las cargas persisten por propietario y las vistas previas vencen. Producción requiere migración 005.
 
-Los planes SSID para admin/técnico, selección de AP y VLAN existentes y ejecutor optativo separado están integrados. Aplicar `alembic upgrade head` (hasta `021_execution_ownership`), con API y workers detenidos; consultar [configuración, confirmación y límites](docs/carga-csv.md#planes-ssid-por-chat-y-csv-rama-chatbot) antes de habilitar escrituras.
+Los planes de aprovisionamiento permiten importar un Excel de feria, crear SSID con AP seleccionados y cambiar VLAN existentes de forma individual o en lote. La confirmación adquiere la exclusión durable de las VLAN y un worker separado ejecuta el plan aprobado. Con la API y los workers detenidos, ejecutar `alembic upgrade head` hasta `027_vlan_batch_reservation`. Validar las operaciones en laboratorio antes de habilitar escrituras. [Configuración, confirmación y límites](docs/carga-csv.md#ejecución-verificación-y-recuperación)
 
 ## Seguridad de despliegue y remediación de auditoría
 

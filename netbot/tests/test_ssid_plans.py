@@ -10,7 +10,7 @@ from app.main import app
 from app.core.config import Settings, get_settings
 from app.auth.models import User, Role
 from app.auth.security import hash_password
-from app.changes.models import SsidPlan, WifiScopeGrant
+from app.changes.models import SsidPlan, VlanReservation, WifiScopeGrant
 from app.changes.wifi_inventory import WifiInventory
 from app.changes.dependencies import get_ssid_service
 from app.changes.csv_service import utc_now
@@ -131,13 +131,22 @@ def test_official_inventory_paginates_and_never_returns_security_configuration()
         assert request.headers['X-API-Key']=='test-only-key'
         if request.url.path.endswith('/info'): return httpx.Response(200,json={'applicationVersion':'10.6.106'})
         if request.url.path.endswith('/devices'): rows=[{'id':'ap1','name':'AP','features':['accessPoint']}]
-        elif request.url.path.endswith('/networks'): rows=[{'id':'net1','name':'Red','vlanId':20}]
-        else: rows=[{'id':'ssid1','name':'SSID','securityConfiguration':{'passphrase':'must-not-leave'}}]
+        elif request.url.path.endswith('/networks'):
+            rows = [{'id': 'net1', 'name': 'Red', 'vlanId': 20},
+                    {'id': 'default', 'name': 'Nativa', 'vlanId': 1, 'default': True}]
+        else:
+            rows = [
+                {'id': 'ssid1', 'name': 'SSID', 'network': {'type': 'SPECIFIC', 'networkId': 'net1'},
+                 'securityConfiguration': {'passphrase': 'must-not-leave'}},
+                {'id': 'ssid2', 'name': 'SSID nativo', 'network': {'type': 'NATIVE'}},
+                {'id': 'ssid3', 'name': 'SSID sin red'},
+            ]
         return httpx.Response(200,json={'data':rows,'totalCount':len(rows)})
     settings=Settings(_env_file=None,unifi_inventory_mode='api',unifi_api_base_url='https://controller.example.test/proxy/network/integration/v1',unifi_api_key='test-only-key')
     result=asyncio.run(WifiInventory(settings,httpx.MockTransport(respond)).read('site1'))
     assert len(paths)==4 and 'securityConfiguration' not in json.dumps(result)
     assert result['networks'][0]['tag']==20
+    assert [ssid['network_id'] for ssid in result['ssids']] == ['net1', 'default', None]
 
 
 def execution_service(db_session, x, writer):
@@ -286,7 +295,7 @@ def test_worker_rejects_ssid_creation_if_an_approved_ap_goes_offline(db_session,
     asyncio.run(run())
 
 
-def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_session, ssid_setup):
+def test_event_excel_allocates_first_free_vlans(client, db_session, ssid_setup, monkeypatch):
     from base64 import b64encode
     from io import BytesIO
     from zipfile import ZipFile
@@ -294,6 +303,20 @@ def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_se
     spreadsheet = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
     document = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
     package = 'http://schemas.openxmlformats.org/package/2006/relationships'
+    setup = ssid_setup
+    second = {'id': 'demo-network-30', 'parent_interface': 'igc1', 'tag': 30}
+    scope = {**setup.data, 'networks': [second, *setup.data['networks']]}
+    assert client.put(f'/api/v1/changes/wifi-scopes/{setup.scope}', headers=setup.admin, json=scope).status_code == 200
+    read = WifiInventory.read
+    broadcast = {'id': 'ssid-existente', 'ssid': 'Wi-Fi existente', 'network_id': 'otra-red'}
+
+    async def inventory_with_two_networks(self, site_id):
+        inventory = await read(self, site_id)
+        inventory['networks'].insert(0, second)
+        inventory['ssids'].append(broadcast.copy())
+        return inventory
+
+    monkeypatch.setattr(WifiInventory, 'read', inventory_with_two_networks)
 
     def row(number, event, ssid, vlan, key=''):
         text_cells = {'A': event, 'B': ssid, 'D': key}
@@ -304,10 +327,11 @@ def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_se
         return f'<row r="{number}">{cells}<c r="C{number}"><v>{vlan}</v></c></row>'
 
     rows = row(1, 'Evento', 'WiFi / SSID', 'N° Vlan', 'Clave')
-    rows += row(3, 'Feria', 'Clientes-A', '20.0', 'secret-workbook-value')
+    rows += row(3, 'Feria', 'Clientes-A', '99', 'secret-workbook-value')
     rows += row(4, 'Feria', '', '30')  # Fila de cableado.
-    rows += row(5, 'Feria', 'Clientes-B', '99')
+    rows += row(5, 'Feria', 'Clientes-B', '')
     rows += row(6, 'Otro evento', 'Clientes-C', '20')
+    rows += row(7, 'Feria', 'Clientes-D', '20')
     buffer = BytesIO()
     with ZipFile(buffer, 'w') as archive:
         archive.writestr('xl/workbook.xml', f'<workbook xmlns="{spreadsheet}" xmlns:r="{document}">'
@@ -318,7 +342,6 @@ def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_se
         archive.writestr('xl/worksheets/sheet2.xml', f'<worksheet xmlns="{spreadsheet}">'
                          f'<sheetData>{rows}</sheetData></worksheet>')
 
-    setup = ssid_setup
     payload = {key: setup.proposal[key] for key in ('scope_id', 'security_profile', 'ap_ids')}
     payload['xlsx_base64'] = b64encode(buffer.getvalue()).decode('ascii')
     path = '/api/v1/changes/ssid-plans/xlsx'
@@ -327,18 +350,61 @@ def test_event_excel_previews_wifi_rows_without_persisting_secrets(client, db_se
     assert response.status_code == 201, response.text
     plan = response.json()
     assert plan['status'] == 'preview' and not plan['selection']
-    assert [row['row_number'] for row in plan['rows']] == [3, 5, 6]
-    valid, *invalid = plan['rows']
+    assert [row['row_number'] for row in plan['rows']] == [3, 5, 6, 7]
+    valid, next_valid, *invalid = plan['rows']
+    assert [valid['vlan_tag'], next_valid['vlan_tag']] == [20, 30]
     assert valid['proposal']['network_id'] == 'demo-network-20'
     assert valid['proposal']['ap_ids'] == ['demo-ap-1']
     assert all(row['errors'] and row['proposal'] is None for row in invalid)
+    assert 'No quedan VLAN libres' in invalid[1]['errors'][0]
     assert 'secret-workbook-value' not in response.text
     assert 'secret-workbook-value' not in str(db_session.scalars(select(SsidPlan)).one().rows)
     confirm = f"/api/v1/changes/ssid-plans/{plan['id']}/confirm"
     assert client.post(confirm, headers=setup.headers,
-                       json={'revision': plan['revision'], 'row_numbers': [5]}).status_code == 409
+                       json={'revision': plan['revision'], 'row_numbers': [7]}).status_code == 409
+    other = client.post(path, headers=setup.headers, json=payload).json()
+    assert client.post(f"/api/v1/changes/ssid-plans/{other['id']}/confirm", headers=setup.headers,
+                       json={'revision': other['revision'], 'row_numbers': [3]}).status_code == 200
+    conflict = client.post(confirm, headers=setup.headers,
+                           json={'revision': plan['revision'], 'row_numbers': [3, 5]})
+    assert conflict.status_code == 409
+    assert 'ya no está libre' in conflict.json()['detail']
+    refreshed = client.post(path, headers=setup.headers, json=payload).json()
+    assert refreshed['rows'][0]['vlan_tag'] == 30
+    assert refreshed['rows'][1]['proposal'] is None
+    broadcast['network_id'] = 'demo-network-30'
+    assert client.post(path, headers=setup.headers, json=payload).json()['rows'][0]['proposal'] is None
     assert client.post(confirm, headers=setup.headers,
-                       json={'revision': plan['revision'], 'row_numbers': [3]}).status_code == 200
+                       json={'revision': plan['revision'], 'row_numbers': [5]}).status_code == 409
+    broadcast['network_id'] = 'otra-red'
+    reserved = VlanReservation(parent_interface='igc1', tag=30, interface_name='vlan02', event_name='Otro evento',
+                               purpose='Reserva de prueba', ssid='Otro SSID', requested_by_id=setup.tech.id,
+                               created_at=utc_now(), status='assigned')
+    db_session.add(reserved)
+    db_session.commit()
+    assert client.post(path, headers=setup.headers, json=payload).json()['rows'][0]['proposal'] is None
+    reserved.status = 'released'
+    db_session.commit()
+    assert client.post(confirm, headers=setup.headers,
+                       json={'revision': plan['revision'], 'row_numbers': [5]}).status_code == 200
+
+
+def test_event_excel_rejects_dtd_before_preparing_a_plan(client, db_session, ssid_setup):
+    from base64 import b64encode
+    from io import BytesIO
+    from zipfile import ZipFile
+
+    buffer = BytesIO()
+    with ZipFile(buffer, 'w') as archive:
+        archive.writestr('xl/workbook.xml', '<!DOCTYPE workbook><workbook/>')
+
+    payload = {key: ssid_setup.proposal[key] for key in ('scope_id', 'security_profile', 'ap_ids')}
+    payload['xlsx_base64'] = b64encode(buffer.getvalue()).decode('ascii')
+    response = client.post('/api/v1/changes/ssid-plans/xlsx', headers=ssid_setup.headers, json=payload)
+
+    assert response.status_code == 400
+    assert response.json()['detail'] == 'El Excel contiene XML no admitido.'
+    assert db_session.scalars(select(SsidPlan)).first() is None
 
 
 def test_fair_closure_preview_is_admin_only_and_scoped(client, db_session, ssid_setup):

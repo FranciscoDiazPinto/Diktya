@@ -873,8 +873,8 @@ export const ProvisioningMarkup = memo(function ProvisioningMarkup({
           </label>
           <input id="ssid-csv" name="ssid-file" type="file" accept=".csv,.xlsx" aria-describedby="ssid-file-help" />
           <p id="ssid-file-help">
-            Del Excel se leen Evento, WiFi / SSID y N° Vlan de la hoja Histórico.
-            Se usan los AP y el perfil seleccionados arriba para todas las filas.
+            Del Excel se leen Evento y WiFi / SSID de la hoja Histórico. Netbot propone
+            la primera VLAN libre por fila y usa los AP y el perfil seleccionados arriba.
           </p>
           {"\n              "}
           <button id="ssid-upload" type="button" disabled>

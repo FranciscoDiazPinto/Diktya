@@ -129,6 +129,27 @@ truncamiento silencioso. `CONNECTION_INTERRUPTED` e `ISOLATED` se presentan como
 
 ## Estado de verificación
 
+### Fuente opcional NOC
+
+Con `MONITORING_PROVIDER=opnsense`, configurar `NOC_MONITORING_DSN` con
+una cuenta PostgreSQL de solo lectura. Este DSN es independiente de `DATABASE_URL`.
+La fuente se identifica como `noc` en el historial de interfaz y las estadísticas
+de firewall. OPNsense provee los eventos del firewall, inventario y demás recursos.
+Las conexiones requieren TLS y SCRAM con vinculación de canal. Si se configura
+`NOC_MONITORING_CA_BUNDLE`, también se verifica la CA y el nombre del servidor.
+En Docker la ruta corresponde al archivo montado dentro del contenedor.
+
+El tráfico se lee de `v2.interfaz_tasa_15s` y convierte Mbps a bytes/s.
+El adaptador consulta ventanas de cinco, quince o sesenta minutos según lo pedido
+y conserva las marcas de tiempo originales.
+`v2.core_1m` aporta el último conteo reciente de estados PF.
+`v2.bloqueo_1m` aporta los paquetes bloqueados registrados en los últimos cinco
+minutos cerrados, expuestos como `logged_blocked_packets_5m`. Los contadores
+acumulados de PF y el total de permitidos quedan desconocidos con esta fuente.
+Una respuesta sin muestras recientes conserva el tratamiento de indisponibilidad
+y datos anteriores del monitoreo. Las consultas son de solo lectura y tienen
+límites de duración y tamaño.
+
 **Contrastado con fuentes oficiales**, sin hardware: el código de OPNsense core (rama `master`, sus
 controladores de API y scripts) y el OpenAPI de UniFi Network 10.6.106. Eso corrigió tres supuestos:
 
@@ -138,9 +159,12 @@ controladores de API y scripts) y el OpenAPI de UniFi Network 10.6.106. Eso corr
    incluye `Status`: `pf_enabled` queda nulo en vez de suponerse.
 3. `firewall/log` entrega hora local sin zona: se interpreta con `OPNSENSE_TIMEZONE`.
 
-**Sin validar contra equipos reales.** Las pruebas usan respuestas simuladas con esas formas. Antes
-de dar por cerrada la historia 004 hay que correr una lectura contra la versión que se vaya a
-desplegar, y registrar versiones y resultado. Tampoco se probó el transporte `connector`.
+**Ensayo local del PMV.** Se comprobaron lecturas reales por ZeroTier del sistema e
+inventario VLAN de OPNsense, de equipos y SSID de UniFi en modo `direct` y de
+tráfico y estadísticas parciales de firewall del NOC. Para UniFi se verificó el
+certificado y su nombre DNS. Ese nombre debe resolver a la consola desde el
+equipo que ejecuta Netbot. La revisión integral de HU004, el transporte
+`connector` y las escrituras UniFi siguen pendientes.
 
 ## Notas
 

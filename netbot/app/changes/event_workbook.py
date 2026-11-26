@@ -4,17 +4,19 @@ from dataclasses import dataclass, field
 from io import BytesIO
 import posixpath
 import re
-from xml.etree import ElementTree as ET
+from xml.etree.ElementTree import ParseError
 from zipfile import BadZipFile, ZipFile
 from zlib import error as ZipDataError
+
+from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
 
 from app.core.errors import InvalidInput, PayloadTooLarge
 
 _SHEET = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 _REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
-_HEADERS = {"evento": "event", "wifi / ssid": "ssid", "n° vlan": "vlan"}
+_HEADERS = {"evento": "event", "wifi / ssid": "ssid"}
 _CELL = re.compile(r"([A-Z]+)([1-9][0-9]*)")
-_VLAN = re.compile(r"[0-9]{1,4}(?:\.0+)?")
 
 
 @dataclass
@@ -22,7 +24,6 @@ class EventWifiRow:
     number: int
     event: str
     ssid: str
-    vlan: int | None
     errors: list[str] = field(default_factory=list)
 
 
@@ -33,9 +34,12 @@ def _xml(archive, path):
     if len(content) > limit:
         raise PayloadTooLarge("Una sección del Excel supera el tamaño admitido.")
     text = content.decode("utf-8-sig")
-    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)", text, re.IGNORECASE) or "\x00" in text:
+    if "\x00" in text:
         raise InvalidInput("El Excel contiene XML no admitido.")
-    return ET.fromstring(text)
+    try:
+        return ElementTree.fromstring(text, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+    except DefusedXmlException:
+        raise InvalidInput("El Excel contiene XML no admitido.") from None
 
 
 def _sheet(archive):
@@ -81,7 +85,7 @@ def _rows(sheet, strings, max_rows):
                 raise InvalidInput("El encabezado de Histórico contiene columnas duplicadas.")
             columns[column] = name
     if set(columns.values()) != set(_HEADERS.values()):
-        raise InvalidInput("Histórico requiere las columnas Evento, WiFi / SSID y N° Vlan.")
+        raise InvalidInput("Histórico requiere las columnas Evento y WiFi / SSID.")
 
     rows = []
     for record in records:
@@ -104,15 +108,11 @@ def _rows(sheet, strings, max_rows):
             continue
         if len(rows) >= max_rows:
             raise PayloadTooLarge("El Excel supera el número máximo de filas Wi-Fi.")
-        raw_vlan = values.get("vlan", "")
-        vlan = int(raw_vlan.partition(".")[0]) if _VLAN.fullmatch(raw_vlan) else None
-        row = EventWifiRow(int(record.attrib["r"]), values.get("event", ""), ssid, vlan)
+        row = EventWifiRow(int(record.attrib["r"]), values.get("event", ""), ssid)
         if formulas:
-            row.errors.append("Usa valores, sin fórmulas, en Evento, WiFi / SSID y N° Vlan.")
+            row.errors.append("Usa valores, sin fórmulas, en Evento y WiFi / SSID.")
         if not row.event:
             row.errors.append("Indica el evento.")
-        if vlan is None or not 1 <= vlan <= 4094:
-            row.errors.append("N° Vlan debe ser un entero entre 1 y 4094.")
         rows.append(row)
 
     if not rows:
@@ -124,7 +124,7 @@ def _rows(sheet, strings, max_rows):
     for row in rows:
         if counts[row.event.casefold(), row.ssid.casefold()] > 1:
             row.errors.append("El SSID se repite para el mismo evento en el Excel.")
-    return rows
+    return sorted(rows, key=lambda row: row.number)
 
 
 def parse_event_workbook(content: bytes, *, max_bytes: int, max_rows: int) -> list[EventWifiRow]:
@@ -141,6 +141,6 @@ def parse_event_workbook(content: bytes, *, max_bytes: int, max_rows: int) -> li
                     for item in table.findall(f"{_SHEET}si")
                 ]
             return _rows(sheet, strings, max_rows)
-    except (BadZipFile, ET.ParseError, KeyError, IndexError, ValueError, AttributeError,
+    except (BadZipFile, ParseError, KeyError, IndexError, ValueError, AttributeError,
             RuntimeError, StopIteration, ZipDataError):
         raise InvalidInput("El archivo no es un Excel XLSX válido con la estructura esperada.") from None

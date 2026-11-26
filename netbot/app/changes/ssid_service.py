@@ -42,11 +42,12 @@ from .wifi_inventory import WifiInventory
 from .csv_parser import parse_csv
 from .event_workbook import parse_event_workbook
 from .csv_service import as_utc, utc_now
-from .service import (clear_reservation_hold, find_reserved_vlan, hold_reservation, mark_assigned,
+from .service import (active_vlan_keys, clear_reservation_hold, find_reserved_vlan, hold_reservation, mark_assigned,
                       vlan_has_pending_reservation)
 from .execution import PlanBusy, exclusive_plan
 from .fair_closure import lock_fair_scope, preview_fair_closure, require_open_scope
 from .queue import release_finished_batch_leases
+from .ssid_executor import write_contract_enabled
 
 
 def digest(value):
@@ -164,7 +165,8 @@ class SsidPlanService:
               'aps':[a for a in remote['aps'] if a['id'] in resources['ap_ids']],
               'networks':bindings,'security_profiles':resources['security_profiles']}
         profile_revision = digest(self.settings.ssid_security_profiles_json.get_secret_value()) if self.settings.ssid_security_profiles_json else None
-        fingerprint=digest([safe,resources,remote['ssids'],self.settings.unifi_api_base_url,self.settings.monitoring_site_id,profile_revision])
+        ssid_identities = [{'id': b['id'], 'ssid': b['ssid']} for b in remote['ssids']]
+        fingerprint=digest([safe,resources,ssid_identities,self.settings.unifi_api_base_url,self.settings.monitoring_site_id,profile_revision])
         return {**safe, 'accepts_changes': scope.accepts_changes}, remote['ssids'], fingerprint
 
     @staticmethod
@@ -688,8 +690,7 @@ class SsidPlanService:
                 raise PlanBusy('La fila anterior del lote aún no se ha verificado.')
         if scope.site_id != plan.site_id:
             raise Conflict('El sitio del ámbito cambió.')
-        if (not self.settings.unifi_write_enabled or self.settings.unifi_api_contract != '10.6.106'
-                or self.settings.unifi_inventory_mode != 'api'):
+        if not write_contract_enabled(self.settings, 'vlan'):
             raise ServiceUnavailable('Ejecución H10 deshabilitada o contrato no autorizado.')
 
         scope_revision = digest([scope.site_id, scope.resources])
@@ -946,7 +947,10 @@ class SsidPlanService:
                 raise Conflict(
                     f"Fila {row['row_number']}: {error.detail} Corrige las filas pendientes en un nuevo listado."
                 ) from None
-            rows.append({'row_number': row['row_number'], 'proposal': proposal.model_dump(), 'errors': []})
+            candidate = {'row_number': row['row_number'], 'proposal': proposal.model_dump(), 'errors': []}
+            if row.get('vlan_tag') is not None:
+                candidate['vlan_tag'] = row['vlan_tag']
+            rows.append(candidate)
         if not rows:
             raise Conflict('El plan no tiene filas pendientes que se puedan retomar.')
         return self._store(actor, scope_id, options, fingerprint, rows, retry_of=plan_id)
@@ -975,6 +979,31 @@ class SsidPlanService:
             rows.append({'row_number':row.row_number,'proposal':proposal.model_dump() if proposal else None,'errors':errors})
         return self._store(actor,payload.scope_id,options,fingerprint,rows)
 
+    def _free_workbook_networks(self, options, existing, *, plan_id=None):
+        used = {broadcast.get('network_id') for broadcast in existing}
+        if None in used:
+            raise ServiceUnavailable('UniFi no informa la red de todos los SSID. No se puede determinar qué VLAN están libres.')
+        keys = {network['id']: vlan_lease_key(options['site_id'], network['id'])
+                for network in options['networks']}
+        leases = select(WifiWriteLease.resource_key).where(WifiWriteLease.resource_key.in_(keys.values()))
+        if plan_id is not None:
+            leases = leases.where(WifiWriteLease.plan_id.is_distinct_from(plan_id))
+        leased = set(self.db.scalars(leases))
+        reserved = active_vlan_keys(self.db, utc_now())
+        return sorted(
+            (n for n in options['networks']
+             if n['id'] not in used and keys[n['id']] not in leased
+             and (n['parent_interface'], n['tag']) not in reserved),
+            key=lambda n: (n['tag'], n['parent_interface'], n['id']),
+        )
+
+    def _check_workbook_vlans(self, rows, options, existing, *, plan_id=None):
+        targets = {row['proposal']['network_id'] for row in rows if row.get('vlan_tag') is not None}
+        if targets and not targets <= {n['id'] for n in self._free_workbook_networks(
+            options, existing, plan_id=plan_id,
+        )}:
+            raise Conflict('Una VLAN propuesta ya no está libre. Revisa la planilla para preparar otro plan.')
+
     async def workbook(self, actor: User, payload: SsidWorkbook):
         self.scope(actor, payload.scope_id)
         try:
@@ -985,33 +1014,37 @@ class SsidPlanService:
             content, max_bytes=self.settings.csv_max_bytes, max_rows=self.settings.csv_max_rows,
         )
         options, existing, fingerprint = await self.options(actor, payload.scope_id)
+        available = iter(self._free_workbook_networks(options, existing))
+        network = next(available, None)
         rows = []
         for row in parsed:
             errors = list(row.errors)
             proposal = None
+            vlan_tag = None
             if row.event.casefold() != options['event_name'].casefold():
                 errors.append('El evento de la fila no corresponde al ámbito seleccionado.')
             if not errors:
-                matches = [network for network in options['networks'] if network['tag'] == row.vlan]
-                if len(matches) != 1:
-                    errors.append('La VLAN no existe en el ámbito o coincide con más de una red.')
+                if network is None:
+                    errors.append('No quedan VLAN libres en el ámbito para esta fila.')
                 else:
                     try:
                         candidate = SsidProposal(
                             scope_id=payload.scope_id,
                             ssid=row.ssid,
-                            network_id=matches[0]['id'],
+                            network_id=network['id'],
                             ap_ids=payload.ap_ids,
                             security_profile=payload.security_profile,
                             purpose='Propuesta Wi-Fi desde la planilla del evento',
                         )
                         self.validate(candidate, options, existing)
                         proposal = candidate.model_dump()
+                        vlan_tag = network['tag']
+                        network = next(available, None)
                     except ValidationError:
                         errors.append('SSID inválido: comprueba que ocupe hasta 32 bytes UTF-8.')
                     except Conflict as exc:
                         errors.append(exc.detail)
-            rows.append({'row_number': row.number, 'proposal': proposal, 'errors': errors})
+            rows.append({'row_number': row.number, 'proposal': proposal, 'errors': errors, 'vlan_tag': vlan_tag})
         return self._store(actor, payload.scope_id, options, fingerprint, rows)
 
     def owned(self, actor, plan_id, permission=Permission.CHANGES_REQUEST):
@@ -1052,13 +1085,16 @@ class SsidPlanService:
                 raise Conflict('Selecciona únicamente filas válidas.')
         old=check()
         if old: return old
-        options, _, fingerprint = await self.options(actor, plan.scope_id)
+        options, existing, fingerprint = await self.options(actor, plan.scope_id)
         plan=self.owned(actor,plan_id,Permission.CHANGES_APPROVE)
         old=check()
         if old: return old
         if fingerprint!=plan.fingerprint: raise Conflict('Cambió el inventario o ámbito. Prepara una nueva propuesta.')
         bindings = {network['id']: network for network in options['networks']}
         require_open_scope(self.db, plan.scope_id)
+        self._check_workbook_vlans(
+            [row for row in plan.rows if row['row_number'] in payload.row_numbers], options, existing,
+        )
         now = utc_now()
         approved_rows = []
         target_keys = set()
@@ -1132,8 +1168,9 @@ class SsidPlanService:
         if not selected: raise Conflict('El plan no contiene una selección aprobada.')
         if plan.source=='mock':
             raise Conflict('Un plan simulado nunca se ejecuta en infraestructura real.')
-        if not self.settings.unifi_write_enabled or self.settings.unifi_api_contract!='10.6.106':
+        if not write_contract_enabled(self.settings, 'ssid'):
             raise ServiceUnavailable('El ejecutor real está deshabilitado o el contrato no fue confirmado.')
+        self._check_workbook_vlans(approved_rows, options, existing, plan_id=plan_id)
         for proposal in selected:
             self.validate(proposal,options,existing)
             self.writer.profile(proposal.security_profile)
@@ -1172,6 +1209,11 @@ class SsidPlanService:
 
             def authorize_write():
                 reauthorize()
+                binding = bindings[proposal.network_id]
+                if row.get('vlan_tag') is not None and (
+                    binding['parent_interface'], binding['tag'],
+                ) in active_vlan_keys(self.db, utc_now()):
+                    raise Conflict('La VLAN propuesta ya no está libre.')
                 if reservation_id is None and self._reservation_for(
                     actor.id, options, bindings, proposal.network_id, proposal.ssid, utc_now(),
                 ) is not None:

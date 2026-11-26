@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     # --- Monitoreo (Épica 002) ---
     # Fuente real por defecto. "mock" solo se usa si se pide de forma explícita.
     monitoring_provider: Literal["mock", "opnsense"] = "opnsense"
+    noc_monitoring_dsn: SecretStr | None = None
+    noc_monitoring_ca_bundle: str | None = None
     monitoring_cache_ttl_seconds: float = Field(5.0, ge=0, le=60)
     monitoring_stale_retention_seconds: float = Field(300.0, ge=0, le=86400)
     monitoring_mock_scenario: Literal["healthy", "degraded", "outage"] = "healthy"

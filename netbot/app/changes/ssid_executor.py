@@ -1,4 +1,4 @@
-"""Escritura independiente para el contrato público UniFi Network 10.6.106.
+"""Escritura controlada según el contrato de UniFi Network de cada operación.
 
 No se importa código del otro producto. Toda llamada requiere un plan confirmado y una
 autorización inmediatamente anterior a la escritura. Ninguna excepción, cabecera ni
@@ -14,9 +14,30 @@ import httpx
 from app.core.errors import ServiceUnavailable
 
 CONTRACT = '10.6.106'
+VLAN_ONLY_CONTRACT = '11.0.104'
+_WRITE_CONTRACTS = {
+    'ssid': {CONTRACT},
+    'vlan': {CONTRACT, VLAN_ONLY_CONTRACT},
+    'restart': {CONTRACT},
+}
 # Campos de solo lectura del detalle que el contrato no admite en PUT.
 READ_ONLY_FIELDS = {'id', 'metadata'}
 PERSONAL_SECURITY = {'WPA2_PERSONAL', 'WPA3_PERSONAL', 'WPA2_WPA3_PERSONAL'}
+_VLAN_11_REQUIRED = {
+    'type', 'name', 'network', 'enabled', 'securityConfiguration',
+    'multicastToUnicastConversionEnabled', 'clientIsolationEnabled', 'hideName',
+    'uapsdEnabled', 'channel2gLockedTo6', 'dtimPeriod2gLockedTo3',
+}
+_VLAN_11_OPTIONAL = {
+    'broadcastingDeviceFilter', 'mdnsProxyConfiguration', 'multicastFilteringPolicy',
+    'basicDataRateKbpsByFrequencyGHz', 'clientFilteringPolicy', 'blackoutScheduleConfiguration',
+}
+
+
+def write_contract_enabled(settings, operation):
+    if not settings.unifi_write_enabled or settings.unifi_inventory_mode != 'api':
+        return False
+    return settings.unifi_api_contract in _WRITE_CONTRACTS[operation]
 
 
 class WriteUncertain(Exception):
@@ -36,10 +57,12 @@ class UniFiSsidWriter:
         key = self.settings.unifi_write_api_key or self.settings.unifi_api_key
         return key.get_secret_value()
 
-    def _require_enabled(self):
+    def _require_enabled(self, operation):
         s = self.settings
-        if not s.unifi_write_enabled or s.unifi_api_contract != CONTRACT or s.unifi_inventory_mode != 'api':
-            raise ServiceUnavailable('La escritura UniFi requiere habilitación explícita y contrato 10.6.106.')
+        if not write_contract_enabled(s, operation):
+            raise ServiceUnavailable('La operación UniFi requiere habilitación explícita y un contrato compatible.')
+        if s.unifi_api_contract == VLAN_ONLY_CONTRACT and not s.unifi_write_api_key:
+            raise ServiceUnavailable('El cambio de VLAN con este contrato requiere una clave del ejecutor.')
         base = urlsplit(s.unifi_api_base_url or '')
         if (base.scheme != 'https' or base.username or base.password or base.query or base.fragment
                 or not (s.unifi_write_api_key or s.unifi_api_key)):
@@ -89,7 +112,7 @@ class UniFiSsidWriter:
                 'bssTransitionEnabled': False}
 
     async def create(self, site_id, proposal, authorize):
-        self._require_enabled()
+        self._require_enabled('ssid')
         body = self.body(proposal)
         try:
             async with self._client() as client:
@@ -145,7 +168,7 @@ class UniFiSsidWriter:
         Devuelve True si el recurso ya no existe. Si el identificador apunta a otro nombre,
         no se borra: pudo ser reutilizado por un tercero.
         """
-        self._require_enabled()
+        self._require_enabled('ssid')
         path = _path(site_id, 'wifi/broadcasts', external_id)
         try:
             async with self._client() as client:
@@ -166,12 +189,12 @@ class UniFiSsidWriter:
     async def update_vlan(self, site_id, broadcast_id, current_network_id, target_network_id, authorize):
         """Reasocia un SSID existente a otra red existente.
 
-        El contrato 10.6.106 solo ofrece PUT (reemplazo completo): se reenvía el detalle
+        Los contratos admitidos ofrecen PUT (reemplazo completo): se reenvía el detalle
         leído, sin campos de solo lectura, cambiando únicamente la referencia de red. Si
         el controlador devuelve la clave censurada no se escribe: reenviarla la sustituiría.
         Un error después de iniciar el PUT es incierto y no debe reintentarse.
         """
-        self._require_enabled()
+        self._require_enabled('vlan')
         if (not all(isinstance(x, str) and x for x in (site_id, broadcast_id, current_network_id, target_network_id))
                 or current_network_id == target_network_id):
             raise ServiceUnavailable('Identificadores de VLAN/SSID inválidos.')
@@ -196,8 +219,7 @@ class UniFiSsidWriter:
             except (httpx.HTTPError, ValueError, TypeError):
                 raise WriteUncertain() from None
 
-    @staticmethod
-    def _replacement_body(detail, network_id):
+    def _replacement_body(self, detail, network_id):
         security = detail.get('securityConfiguration')
         if not isinstance(security, dict) or not isinstance(security.get('type'), str):
             raise ServiceUnavailable('El controlador no entregó la seguridad del SSID; no se modifica.')
@@ -206,6 +228,12 @@ class UniFiSsidWriter:
             if not isinstance(passphrase, str) or len(passphrase) < 8 or set(passphrase) <= {'*', '•'}:
                 raise ServiceUnavailable('El controlador censura la clave del SSID; no se modifica para no sustituirla.')
         body = {key: value for key, value in detail.items() if key not in READ_ONLY_FIELDS}
+        if self.settings.unifi_api_contract == VLAN_ONLY_CONTRACT:
+            if (security['type'] not in PERSONAL_SECURITY
+                    or not _VLAN_11_REQUIRED <= body.keys()
+                    or not body.keys() <= _VLAN_11_REQUIRED | _VLAN_11_OPTIONAL
+                    or any(body[key] is None for key in _VLAN_11_REQUIRED)):
+                raise ServiceUnavailable('El detalle del SSID no permite conservar su configuración con este contrato.')
         body['network'] = {'type': 'SPECIFIC', 'networkId': network_id}
         return body
 
@@ -280,7 +308,7 @@ class UniFiSsidWriter:
 
     async def restart(self, site_id, device_id, authorize):
         """Envía un único reinicio. Un reinicio no se deshace ni se repite a ciegas."""
-        self._require_enabled()
+        self._require_enabled('restart')
         async with self._client() as client:
             try:
                 await self._require_contract(client)

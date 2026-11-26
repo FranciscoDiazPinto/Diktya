@@ -68,13 +68,18 @@ En **Aprovisionamiento → Planes de SSID por ámbito**, selecciona el ámbito,
 los AP y el perfil de seguridad. Carga el XLSX y pulsa **Revisar propuestas
 del archivo**. El archivo admite hasta 1 MiB y usa los límites de filas de
 la carga CSV. La API `POST /api/v1/changes/ssid-plans/xlsx` recibe
-`scope_id`, `ap_ids`, `security_profile` y `xlsx_base64`.
+`scope_id`, `ap_ids`, `security_profile` y `xlsx_base64`. El lector limita el tamaño de cada sección XML y rechaza DTD, declaraciones de entidades y referencias externas.
 
-- La hoja **Histórico** debe tener los encabezados **Evento**, **WiFi / SSID**
-  y **N° Vlan** en la primera fila. Las filas sin SSID se omiten.
-- Cada VLAN debe identificar una sola red autorizada y existente en el ámbito.
-  Se rechazan los SSID repetidos, fuera de evento o ya existentes. La vista previa
-  conserva el número de fila de Excel.
+- La hoja **Histórico** debe tener los encabezados **Evento** y **WiFi / SSID**
+  en la primera fila. Las filas sin SSID se omiten y la columna **N° Vlan** se ignora.
+- Para cada fila válida, Netbot propone la VLAN existente y autorizada de menor
+  número que siga libre. Excluye redes vinculadas a SSID en UniFi, reservas activas,
+  exclusiones de otros planes y VLAN ya elegidas en el mismo archivo. Si UniFi
+  devuelve una asociación que Netbot no puede resolver, la disponibilidad queda
+  indeterminada. Las VLAN del ámbito deben estar destinadas al uso Wi-Fi de la feria.
+- La vista previa conserva el número de fila y muestra la VLAN propuesta o el
+  motivo del rechazo. Confirmar conserva las VLAN que se mostraron. Si una dejó de
+  estar libre, se debe preparar otra vista previa.
 - La selección de AP y el perfil del panel se aplican a todas las filas.
   El importador omite contactos, claves y columnas de AP, velocidad y cableado.
   El archivo solo se procesa en memoria. Se guardan las propuestas y errores,
@@ -95,7 +100,7 @@ Reglas comunes:
 - **Confirmación**: vinculada al actor y a la `revision` exacta mostrada. Repetirla devuelve el mismo plan; un plan vencido, cancelado o alterado no se ejecuta.
 - **Autorización**: se revalida al preparar, confirmar, tomar el trabajo e inmediatamente antes de escribir. Revocar el ámbito bloquea un trabajo aún no ejecutado. El técnico solo reinicia AP de su ámbito; gateway, firewall o equipos que no se acreditan como AP exigen administrador.
 - **Exclusión**: bloqueo durable por sitio y SSID, por red VLAN de destino, o por equipo. Un resultado incierto conserva la exclusión del SSID y de su VLAN hasta la conciliación. Ejecución y conciliación del mismo plan comparten además una exclusión entre procesos, independiente de sus commits: un trabajo activo no se recupera aunque lleve mucho tiempo. PostgreSQL requiere conexión directa o pooling de sesión; SQLite usa `flock` local en Unix junto a la base.
-- **Cambio de VLAN**: el contrato 10.6.106 solo ofrece `PUT`. Se reenvía el detalle leído sin `id` ni `metadata`, cambiando únicamente la red. Si el controlador entrega la clave censurada o sin seguridad, no se escribe.
+- **Cambio de VLAN**: los contratos `10.6.106` y `11.0.104` usan `PUT` completo. Se reenvía el detalle leído sin `id` ni `metadata`, cambiando únicamente la red. Para `11.0.104` se verificó el OpenAPI que publica la consola y se exige una clave de escritura en el worker. Este contrato admite cambiar o restaurar la VLAN de un SSID con seguridad personal. Si la clave del SSID viene censurada o el detalle contiene campos desconocidos o carece de campos requeridos, se detiene antes del `PUT`. El alta de SSID y el reinicio conservan su contrato `10.6.106`.
 - **Precondiciones**: la creación requiere una VLAN existente que coincida en los inventarios de OPNsense y UniFi, y AP autorizados con estado `ONLINE`. La aprobación se invalida si cambia el inventario antes de que el worker tome el trabajo. Para el cambio de VLAN, cuando UniFi devuelve AP explícitos, se comprueba su estado y se vincula su selección a la aprobación. Si UniFi no identifica AP explícitos, la vista previa lo indica. El reinicio exige que el equipo siga coincidiendo con el plan y esté en línea antes de enviar la orden.
 - **Prueba de servicio**: el inventario confirma la asociación de VLAN y el estado del AP. La conectividad del trayecto hasta el gateway requiere verificar en terreno que un cliente se asocie, reciba IP y llegue al servicio esperado.
 - **Estados inciertos**: una escritura ambigua nunca se repite. Primero se lee el controlador: si el cambio quedó aplicado y verifica, se da por completado; si no se aplicó, `failed`; si otro actor cambió el recurso, `uncertain` sin sobrescribirlo. `uncertain` y `rollback_failed` conservan el bloqueo.
@@ -103,7 +108,7 @@ Reglas comunes:
 - **Aprobaciones**: las vencidas salen de la cola como `expired` con auditoría; un rechazo definitivo previo a ejecutar pasa a `rejected` y exige preparar otra propuesta. Un plan ocupado por otro ejecutor conserva su aprobación hasta que pueda tomarse o venza.
 - **Escalamiento**: verificación fallida o resultado incierto abren un ticket de criticidad Alta; un rollback fallido, Crítica; un equipo que no vuelve, Alta.
 - **Mantenimiento**: durante un reinicio confirmado no se alerta la caída esperada de ese equipo. La ventana vence sola.
-- **Reservas**: al confirmar una fila de alta o un cambio individual de VLAN, se guarda el ID de la reserva vigente del mismo actor, evento, SSID e interfaz/VLAN, si existe. El worker comprueba ese ID antes de escribir y marca la reserva como `assigned` al verificar la configuración. Si la reserva vinculada se libera, vence o se reemplaza, la fila se detiene antes de enviar el cambio. Una reserva vigente de otro cambio bloquea la confirmación y la ejecución. Si aparece una reserva después de la confirmación, el plan requiere una nueva revisión. Los planes sobre una VLAN sin reserva conservan el flujo existente sin asignación automática. El cambio individual requiere la migración `023_vlan_change_reservation`. El cierre de feria y la liberación coordinada siguen pendientes.
+- **Reservas**: al confirmar, las altas y los cambios de VLAN individuales o en lote toman la exclusión durable de las VLAN de destino. Si existe una reserva local compatible con el actor, el evento, el SSID y la interfaz/VLAN, se vincula al plan. El worker revalida esa reserva antes de escribir y la marca como `assigned` al verificar la configuración. Una reserva local activa para otro cambio bloquea la confirmación. Si no hay una reserva local previa, el plan puede confirmarse con su propia exclusión durable.
 
 `completed` significa configuración coincidente en el controlador. No demuestra difusión efectiva, conectividad Wi-Fi ni Internet. Antes de habilitar `UNIFI_WRITE_ENABLED` hay que validar en laboratorio la versión del controlador, el `PUT` de actualización, la acción `RESTART` y qué devuelve el detalle de seguridad.
 
@@ -112,7 +117,7 @@ Para actualizar a `021_execution_ownership`, detener la API y todos los workers,
 
 La relectura de verificación de SSID y VLAN usa `UNIFI_VERIFICATION_ATTEMPTS`, `UNIFI_VERIFICATION_INTERVAL_SECONDS` y `UNIFI_VERIFICATION_TIMEOUT_SECONDS`. El timeout cubre los intentos y sus pausas. Los reintentos son consultas al controlador. Una escritura ambigua sigue el flujo de recuperación o conciliación descrito arriba.
 
-Al confirmar un cambio individual de VLAN o un plan de altas de SSID, el plan adquiere la exclusión durable de todas las VLAN seleccionadas. Una segunda confirmación sobre la misma red espera a que se resuelva, cancele, rechace o venza la primera. Un plan confirmado antes de incorporar esta protección debe prepararse y confirmarse de nuevo si carece de sus reservas. Los lotes de cambios de VLAN reservan todas las redes seleccionadas al confirmar. Las filas de una misma VLAN comparten la exclusión del lote. La reserva dura hasta resolver, cancelar o vencer las filas pendientes y permanece activa si alguna requiere conciliación. Requiere la migración `027_vlan_batch_reservation`.
+Si otra aprobación ya tiene la exclusión de la VLAN, vuelve a confirmar cuando se libere. Los planes confirmados antes de incorporar esta protección requieren una nueva propuesta y confirmación cuando carecen de la exclusión. En los lotes, las filas de una misma VLAN comparten la exclusión. Esta se conserva mientras haya filas pendientes o alguna requiera conciliación. Los lotes requieren la migración `027_vlan_batch_reservation`.
 
 ### Cambios de VLAN en lote
 

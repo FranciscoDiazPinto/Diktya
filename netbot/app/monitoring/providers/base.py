@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, ClassVar, Generic, TypeVar, Protocol
 
 from ..exceptions import MonitoringError, ProviderNotSupportedError
@@ -34,6 +35,7 @@ class CollectionResult(Generic[T]):
 
     data: T | None
     issues: list[CollectionIssue] = field(default_factory=list)
+    observed_at: datetime | None = None
 
 
 @dataclass(slots=True)

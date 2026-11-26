@@ -173,7 +173,8 @@ export function createSsidPlans({document, Option, state, api, textNode, capture
       const line = document.createElement('label'), check = document.createElement('input'); check.type = 'checkbox';
       check.disabled = !valid || !!row.errors.length || !row.proposal;
       const p = row.proposal;
-      line.append(check, textNode('span', ` Fila ${row.row_number}: ${p ? `${p.ssid} → ${p.network_id} · AP: ${p.ap_ids.join(', ')} · perfil ${p.security_profile}` : 'Sin propuesta'}${row.errors.length ? ' · '+row.errors.join(' ') : ''}`));
+      const vlan = row.vlan_tag != null ? `VLAN ${row.vlan_tag}` : p?.network_id;
+      line.append(check, textNode('span', ` Fila ${row.row_number}: ${p ? `${p.ssid} → ${vlan} · AP: ${p.ap_ids.join(', ')} · perfil ${p.security_profile}` : 'Sin propuesta'}${row.errors.length ? ' · '+row.errors.join(' ') : ''}`));
       check.addEventListener('change', () => {
         if (!current(context) || check.disabled) return;
         if (check.checked) selected.add(row.row_number); else selected.delete(row.row_number);

@@ -94,6 +94,16 @@ def vlan_has_pending_reservation(db: Session, parent_interface: str, tag: int, n
     )) is not None
 
 
+def active_vlan_keys(db: Session, now: datetime) -> set[tuple[str, int]]:
+    """Consulta ocupación sin liberar reservas ni cambiar la transacción."""
+    rows = db.execute(select(VlanReservation.parent_interface, VlanReservation.tag).where(
+        VlanReservation.status.in_(ACTIVE),
+        or_(VlanReservation.status == 'assigned', VlanReservation.held_by_plan_id.is_not(None),
+            VlanReservation.expires_at.is_(None), VlanReservation.expires_at > now),
+    ))
+    return {(parent, tag) for parent, tag in rows}
+
+
 def hold_reservation(db: Session, reservation_id: int, plan_id: str, now: datetime) -> None:
     changed = db.execute(update(VlanReservation).where(
         VlanReservation.id == reservation_id, VlanReservation.status == 'reserved',

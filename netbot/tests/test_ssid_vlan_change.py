@@ -277,7 +277,7 @@ def _other_owner(db_session, x):
 
 # H10: ejecución segura con controlador simulado; ninguna llamada sale a la red.
 
-def _ready_executor(db_session, ssid_setup, writer):
+def _ready_executor(db_session, ssid_setup, writer, contract='10.6.106'):
     from app.core.config import Settings
     from app.changes.models import SsidVlanChangePlan
     x = ssid_setup
@@ -286,19 +286,20 @@ def _ready_executor(db_session, ssid_setup, writer):
     _confirm(service, x, plan)
     service.settings = Settings(
         _env_file=None, unifi_inventory_mode='api', unifi_write_enabled=True,
-        unifi_api_contract='10.6.106',
+        unifi_api_contract=contract,
     )
     service.writer = writer
     return service, plan
 
 
-def test_h10_execution_success_is_audited_and_releases_lock(db_session, ssid_setup):
+@pytest.mark.parametrize('contract', ['10.6.106', '11.0.104'])
+def test_h10_execution_success_is_audited_and_releases_lock(db_session, ssid_setup, contract):
     from sqlalchemy import select, func
     from app.changes.models import WifiWriteLease
     from app.auth.models import AuthAuditEvent
     x = ssid_setup
     writer = SimpleNamespace(update_vlan=AsyncMock(), verify_vlan=AsyncMock(return_value=True))
-    service, plan = _ready_executor(db_session, x, writer)
+    service, plan = _ready_executor(db_session, x, writer, contract)
     result = asyncio.run(service.execute_vlan_change(plan['id']))
     assert result['status'] == 'completed' and result['executed'] is True
     assert writer.update_vlan.await_count == 1 and writer.verify_vlan.await_count == 1
@@ -363,6 +364,23 @@ def test_h10_verify_failure_keeps_lock(db_session, ssid_setup):
     assert db_session.scalar(select(func.count()).select_from(WifiWriteLease)) == 2
 
 
+def test_h10_v11_restores_the_confirmed_previous_vlan_when_verification_fails(db_session, ssid_setup):
+    writer = SimpleNamespace(
+        update_vlan=AsyncMock(),
+        read_network=AsyncMock(return_value='network-30'),
+        verify_vlan=AsyncMock(side_effect=[False, False, True]),
+    )
+    service, plan = _ready_executor(db_session, ssid_setup, writer, '11.0.104')
+    writer.update_vlan.assert_not_awaited()
+
+    result = asyncio.run(service.execute_vlan_change(plan['id']))
+
+    assert result['status'] == 'rolled_back'
+    assert [call.args[2:4] for call in writer.update_vlan.await_args_list] == [
+        ('network-20', 'network-30'), ('network-30', 'network-20'),
+    ]
+
+
 def test_h10_blocks_stale_vlan_before_write(db_session, ssid_setup):
     x = ssid_setup
     writer = SimpleNamespace(update_vlan=AsyncMock(), verify_vlan=AsyncMock())
@@ -375,10 +393,10 @@ def test_h10_blocks_stale_vlan_before_write(db_session, ssid_setup):
     writer.update_vlan.assert_not_awaited()
 
 
-def _writer_settings(**extra):
+def _writer_settings(contract='10.6.106', **extra):
     from app.core.config import Settings
     return Settings(_env_file=None, unifi_inventory_mode='api',
-        unifi_write_enabled=True, unifi_api_contract='10.6.106',
+        unifi_write_enabled=True, unifi_api_contract=contract,
         unifi_api_base_url='https://controller.example.test/proxy/network/integration/v1',
         unifi_api_key='test-only-key', **extra)
 
@@ -421,6 +439,87 @@ def test_h10_writer_replaces_with_official_put_preserving_configuration():
     assert [r.method for r in requests].count('PUT') == 1
     # La clave de escritura es exclusiva del ejecutor y nunca se mezcla con la de lectura.
     assert {r.headers['x-api-key'] for r in requests} == {'write-only-key'}
+
+
+def _broadcast_v11(network_id):
+    return {**_broadcast(network_id), 'multicastToUnicastConversionEnabled': False,
+            'uapsdEnabled': False, 'channel2gLockedTo6': False, 'dtimPeriod2gLockedTo3': False}
+
+
+def test_h10_v11_put_and_restoration_keep_the_broadcast_configuration():
+    import json
+    from app.changes.ssid_executor import UniFiSsidWriter
+
+    current = 'network-20'
+    writes = []
+    authorized = []
+
+    def handler(request):
+        nonlocal current
+        if request.url.path.endswith('/info'):
+            return httpx.Response(200, json={'applicationVersion': '11.0.104'})
+        if request.method == 'PUT':
+            assert len(authorized) == len(writes) + 1
+            body = json.loads(request.content)
+            target = body['network']['networkId']
+            expected = _broadcast_v11(target)
+            del expected['id'], expected['metadata']
+            assert body == expected
+            assert request.headers['x-api-key'] == 'write-only-key'
+            writes.append(target)
+            current = target
+        return httpx.Response(200, json=_broadcast_v11(current))
+
+    writer = UniFiSsidWriter(_writer_settings('11.0.104', unifi_write_api_key='write-only-key'),
+                            httpx.MockTransport(handler))
+
+    async def run():
+        for origin, destination in [('network-20', 'network-30'), ('network-30', 'network-20')]:
+            await writer.update_vlan('demo-site', 'ssid-123', origin, destination,
+                                     lambda: authorized.append(True))
+            assert await writer.verify_vlan('demo-site', 'ssid-123', 'WiFi-Invitados', destination)
+
+    asyncio.run(run())
+    assert writes == ['network-30', 'network-20']
+
+
+@pytest.mark.parametrize('field', ['uapsdEnabled', 'futureSetting'])
+def test_h10_v11_blocks_incomplete_or_unknown_configuration_before_put(field):
+    from app.changes.ssid_executor import UniFiSsidWriter
+
+    def handler(request):
+        assert request.method == 'GET'
+        if request.url.path.endswith('/info'):
+            return httpx.Response(200, json={'applicationVersion': '11.0.104'})
+        detail = _broadcast_v11('network-20')
+        if field in detail:
+            del detail[field]
+        else:
+            detail[field] = True
+        return httpx.Response(200, json=detail)
+
+    writer = UniFiSsidWriter(_writer_settings('11.0.104', unifi_write_api_key='write-only-key'),
+                            httpx.MockTransport(handler))
+    with pytest.raises(ServiceUnavailable, match='conservar'):
+        asyncio.run(writer.update_vlan('demo-site', 'ssid-123', 'network-20', 'network-30',
+                                       lambda: pytest.fail('La configuración incompleta no debe autorizarse')))
+
+
+def test_v11_requires_worker_key_and_blocks_unreviewed_operations():
+    from app.changes.ssid_executor import UniFiSsidWriter
+
+    def handler(request):
+        pytest.fail('No se esperaba una solicitud al controlador')
+
+    writer = UniFiSsidWriter(_writer_settings('11.0.104'), httpx.MockTransport(handler))
+    with pytest.raises(ServiceUnavailable, match='clave del ejecutor'):
+        asyncio.run(writer.update_vlan('demo-site', 'ssid-123', 'network-20', 'network-30', lambda: None))
+    writer = UniFiSsidWriter(_writer_settings('11.0.104', unifi_write_api_key='write-only-key'),
+                            httpx.MockTransport(handler))
+    with pytest.raises(ServiceUnavailable, match='contrato compatible'):
+        asyncio.run(writer.create('demo-site', None, lambda: None))
+    with pytest.raises(ServiceUnavailable, match='contrato compatible'):
+        asyncio.run(writer.restart('demo-site', 'device-1', lambda: None))
 
 
 @pytest.mark.parametrize('passphrase', ['********', '', None])

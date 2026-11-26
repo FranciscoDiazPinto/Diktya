@@ -166,7 +166,9 @@ export function MonitoringOverview({ monitoring }) {
       clients ? clients.filter((c) => c.active).length : "–",
       d.clients,
     ],
-    ["PAQUETES BLOQUEADOS", formatCount(stats?.packets_blocked), d.stats],
+    d.stats?.source === "noc"
+      ? ["BLOQUEOS REGISTRADOS · 5 MIN", formatCount(stats?.logged_blocked_packets_5m), d.stats]
+      : ["PAQUETES BLOQUEADOS", formatCount(stats?.packets_blocked), d.stats],
   ];
   const labels = ["lime", "orange", "blue", "red"];
   return (
@@ -193,7 +195,7 @@ export function MonitoringOverview({ monitoring }) {
         <article className="panel traffic-panel">
           <div className="panel-heading">
             <h2>Uso de red WAN</h2>
-            <span>Entrada / salida</span>
+            <span>Entrada / salida{d.traffic?.source === "noc" ? " · NOC" : ""}</span>
           </div>
           <TrafficChart series={d.traffic?.data} />
         </article>
@@ -340,6 +342,7 @@ export function Firewall({ monitoring }) {
     <article className="panel wide-panel">
       <div className="panel-heading">
         <h2>Firewall</h2>
+        {monitoring.data.stats?.source === "noc" && <span>Estadísticas del NOC</span>}
       </div>
       <label>
         Filtrar eventos
@@ -361,7 +364,9 @@ export function Firewall({ monitoring }) {
           ],
           ["Estados", formatCount(stats?.states?.current_entries)],
           ["Permitidos", formatCount(stats?.packets_passed)],
-          ["Bloqueados", formatCount(stats?.packets_blocked)],
+          monitoring.data.stats?.source === "noc"
+            ? ["Bloqueos registrados · 5 min", formatCount(stats?.logged_blocked_packets_5m)]
+            : ["Bloqueados", formatCount(stats?.packets_blocked)],
         ].map(([k, v]) => (
           <div key={k}>
             <small>{k}</small>

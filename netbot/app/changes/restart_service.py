@@ -27,7 +27,7 @@ from app.monitoring import maintenance
 from .csv_service import as_utc, utc_now
 from .models import DeviceRestartPlan, WifiWriteLease
 from .execution import PlanBusy, exclusive_plan
-from .ssid_executor import UniFiSsidWriter, WriteUncertain
+from .ssid_executor import UniFiSsidWriter, WriteUncertain, write_contract_enabled
 from .ssid_schemas import DeviceRestartProposal, PlanRevision
 from .ssid_service import authorized_scope, digest
 from .fair_closure import require_open_scope
@@ -202,8 +202,7 @@ class DeviceRestartService:
         reauthorize()
         if plan.status != 'confirmed' or as_utc(plan.expires_at) <= utc_now():
             raise Conflict('El reinicio no está confirmado o la aprobación venció.')
-        if (not self.settings.unifi_write_enabled or self.settings.unifi_api_contract != '10.6.106'
-                or self.settings.unifi_inventory_mode != 'api'):
+        if not write_contract_enabled(self.settings, 'restart'):
             raise ServiceUnavailable('Ejecución de reinicios deshabilitada o contrato no autorizado.')
         before = await self.writer.device(site_id, device_id)
         reauthorize()

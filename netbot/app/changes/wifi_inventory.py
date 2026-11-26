@@ -5,6 +5,18 @@ from app.core.config import Settings
 from app.core.errors import ServiceUnavailable
 
 
+def _broadcast_network_id(broadcast, network_ids, default_network_id):
+    reference = broadcast.get('network')
+    if not isinstance(reference, dict):
+        return None
+    if reference.get('type') == 'NATIVE':
+        return default_network_id
+    network_id = reference.get('networkId')
+    if reference.get('type') == 'SPECIFIC' and isinstance(network_id, str) and network_id in network_ids:
+        return network_id
+    return None
+
+
 class WifiInventory:
     def __init__(self, settings: Settings, transport=None):
         self.settings, self.transport = settings, transport
@@ -50,10 +62,15 @@ class WifiInventory:
                 devices = await pages('devices')
                 networks = await pages('networks')
                 broadcasts = await pages('wifi/broadcasts')
+                default_ids = [n['id'] for n in networks if n.get('default') is True]
+                default_id = default_ids[0] if len(default_ids) == 1 else None
+                network_ids = {n['id'] for n in networks}
                 return {'source':'unifi', 'simulated':False, 'site_id':site_id, 'application_version':version,
                         'aps':[{'id':d['id'],'name':d['name'],'state':d.get('state')} for d in devices if 'accessPoint' in d.get('features',[])],
                         'networks':[{'id':n['id'],'name':n['name'],'tag':n['vlanId']} for n in networks],
-                        'ssids':[{'id':b['id'],'ssid':b['name']} for b in broadcasts]}
+                        'ssids':[{'id':b['id'], 'ssid':b['name'],
+                                  'network_id':_broadcast_network_id(b, network_ids, default_id)}
+                                 for b in broadcasts]}
         except (httpx.HTTPError, KeyError, TypeError, ValueError):
             # No propagar headers, URL ni cuerpos del controlador.
             raise ServiceUnavailable('No se pudo obtener un inventario UniFi completo. Revisa versión, permisos, ruta y TLS.') from None
